@@ -237,3 +237,17 @@ def test_la_bitacora_es_de_solo_anadir(laura):
         AuditEvent.objects.all().delete()
     with pytest.raises(AppendOnlyError):
         AuditEvent.objects.all().update(action="x")
+
+
+# ---------- consola ----------
+def test_createsuperuser_guarda_la_credencial_con_hash(db, monkeypatch):
+    from django.core.management import call_command
+
+    monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", "Alabanza-2026")
+    call_command(
+        "createsuperuser", interactive=False, whatsapp="55 0000 0001", nombre="Admin", verbosity=0
+    )
+    user = User.objects.get(whatsapp="+525500000001")
+    assert user.password.startswith("argon2$")
+    assert user.is_staff and user.is_superuser and user.requires_strong_credential
+    assert user.check_password("Alabanza-2026")

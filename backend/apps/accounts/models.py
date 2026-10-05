@@ -23,12 +23,16 @@ class UserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
-    def create_user(self, whatsapp, pin=None, **extra):
+    # `password` existe para que `createsuperuser` y los formularios de Django funcionen;
+    # en este sistema la credencial es un PIN o una contraseña fuerte.
+    def create_user(self, whatsapp, pin=None, password=None, **extra):
+        pin = pin or password
         extra.setdefault("is_staff", False)
         extra.setdefault("is_superuser", False)
         return self._create(whatsapp, pin, **extra)
 
-    def create_superuser(self, whatsapp, pin=None, **extra):
+    def create_superuser(self, whatsapp, pin=None, password=None, **extra):
+        pin = pin or password
         extra.setdefault("is_staff", True)
         extra.setdefault("is_superuser", True)
         extra.setdefault("requires_strong_credential", True)
