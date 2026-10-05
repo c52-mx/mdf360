@@ -38,6 +38,12 @@ cd frontend && npm ci && npm run dev
 # http://localhost:5173   (catálogo de componentes en /diseno)
 ```
 
+## Acceso (M1-17)
+
+Se entra con WhatsApp o correo más un PIN de 6 dígitos (contraseña de 10+ caracteres para roles sensibles). No hay SMS: el administrador o el Líder invita desde **Invitar** y envía el enlace desde su propio WhatsApp. Endpoints en `/api/auth/` (ver `/api/docs/`).
+
+Para probar en local: crea un superusuario (`createsuperuser`), entra en http://localhost:5173/login e invita a otra persona desde **Invitar**.
+
 ## Pruebas y calidad
 
 ```bash
@@ -47,6 +53,6 @@ cd frontend && npm run lint && npm run lint:styles && npm test && npm run build
 
 ## Documentación
 
-- Requerimientos vigentes: `docs/requerimientos/v3.2 - MVP.docx`
+- Requerimientos vigentes: `docs/requerimientos/v3.3 - MVP.docx`
 - Matriz de trazabilidad: `docs/trazabilidad/Matriz de Trazabilidad MDF.xlsx`
 - Cómo contribuir y reglas de estilo: [CONTRIBUTING.md](CONTRIBUTING.md)

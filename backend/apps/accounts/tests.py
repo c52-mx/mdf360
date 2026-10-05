@@ -27,11 +27,11 @@ def test_whatsapp_invalido(raw):
 
 @pytest.mark.django_db
 def test_el_pin_se_guarda_con_argon2():
-    user = User.objects.create_user("55 1234 5678", pin="123456", nombre="Laura")
+    user = User.objects.create_user("55 1234 5678", pin="482915", nombre="Laura")
     assert user.whatsapp == "+525512345678"
     assert user.password.startswith("argon2$")
-    assert user.check_password("123456")
-    assert not user.check_password("654321")
+    assert user.check_password("482915")
+    assert not user.check_password("159753")
 
 
 @pytest.mark.django_db

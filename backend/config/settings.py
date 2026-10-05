@@ -98,7 +98,25 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# --- Acceso (M1-17) ---
+AUTH_LOCKOUT_ATTEMPTS = int(os.environ.get("AUTH_LOCKOUT_ATTEMPTS", "5"))
+AUTH_LOCKOUT_MINUTES = int(os.environ.get("AUTH_LOCKOUT_MINUTES", "15"))
+ACTIVATION_TOKEN_HOURS = int(os.environ.get("ACTIVATION_TOKEN_HOURS", "72"))
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 90  # sesión de 90 días, se renueva con el uso
+SESSION_SAVE_EVERY_REQUEST = True
+
+# Correo (recuperación gratuita). En desarrollo se imprime en consola.
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "MDF360 <no-reply@mdf360.local>")
+
 REST_FRAMEWORK = {
+    "DEFAULT_THROTTLE_RATES": {"auth": "30/min"},
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
