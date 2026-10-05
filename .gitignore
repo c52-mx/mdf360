@@ -1,0 +1,24 @@
+# Secretos y entorno
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+backend/staticfiles/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/dev-dist/
+
+# Editor y sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+~$*

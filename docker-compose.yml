@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mdf360}
+      POSTGRES_USER: ${POSTGRES_USER:-mdf360}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mdf360}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mdf360}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DJANGO_DEBUG: "true"
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:-mdf360}
+      POSTGRES_USER: ${POSTGRES_USER:-mdf360}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mdf360}
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+
+volumes:
+  pgdata:

@@ -1,0 +1,70 @@
+/*
+ * TEMA GLOBAL DE MDF360 — única fuente de colores, tipografía y formas.
+ * Las pantallas NO definen estilos propios: usan los componentes de src/design-system.
+ * Colores estimados a partir del logo; ajustar aquí cambia toda la aplicación.
+ */
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Nunito Sans', system-ui, sans-serif;
+  --font-display: 'Montserrat', system-ui, sans-serif;
+
+  /* Superficies y texto */
+  --color-background: #f7f8fa;
+  --color-foreground: #201e1f;
+  --color-card: #ffffff;
+  --color-card-foreground: #201e1f;
+  --color-muted: #ece8ed;
+  --color-muted-foreground: #5b5560;
+  --color-border: #d9d4da;
+  --color-ring: #884088;
+
+  /* Marca */
+  --color-primary: #884088;
+  --color-primary-foreground: #ffffff;
+  --color-primary-soft: #efe3ef;
+  --color-accent: #f08020;
+  --color-accent-foreground: #201e1f;
+  --color-accent-soft: #fdf0e3;
+
+  /* Estados (siempre acompañados de icono y texto) */
+  --color-success: #00793a;
+  --color-success-foreground: #ffffff;
+  --color-success-soft: #e6f5ec;
+  --color-warning: #a04f00;
+  --color-warning-soft: #fff4e5;
+  --color-destructive: #b3261e;
+  --color-destructive-foreground: #ffffff;
+  --color-destructive-soft: #fdecea;
+
+  /* Un color por módulo */
+  --color-module-grupos: #00a850;
+  --color-module-cursos: #3090d0;
+  --color-module-kids: #f08020;
+  --color-module-admin: #884088;
+
+  --radius-card: 0.75rem;
+  --radius-control: 0.75rem;
+}
+
+@layer base {
+  html {
+    font-size: 112.5%; /* 18 px base: pensado para personas mayores */
+  }
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 700;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+}
