@@ -251,3 +251,17 @@ def test_createsuperuser_guarda_la_credencial_con_hash(db, monkeypatch):
     assert user.password.startswith("argon2$")
     assert user.is_staff and user.is_superuser and user.requires_strong_credential
     assert user.check_password("Alabanza-2026")
+
+
+# ---------- CSRF con el frontend en otro origen (desarrollo con Vite) ----------
+def test_peticion_autenticada_desde_el_origen_del_frontend(laura):
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(laura)
+    token = client.get("/api/auth/csrf/").json()["csrfToken"]
+    r = client.post(
+        "/api/auth/logout/",
+        HTTP_ORIGIN="http://localhost:5173",
+        HTTP_HOST="localhost:8000",
+        HTTP_X_CSRFTOKEN=token,
+    )
+    assert r.status_code == 204

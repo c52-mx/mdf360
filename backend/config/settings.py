@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -24,7 +25,6 @@ if not SECRET_KEY:
         raise RuntimeError("DJANGO_SECRET_KEY es obligatoria cuando DJANGO_DEBUG es falso.")
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
-CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -103,6 +103,15 @@ AUTH_LOCKOUT_ATTEMPTS = int(os.environ.get("AUTH_LOCKOUT_ATTEMPTS", "5"))
 AUTH_LOCKOUT_MINUTES = int(os.environ.get("AUTH_LOCKOUT_MINUTES", "15"))
 ACTIVATION_TOKEN_HOURS = int(os.environ.get("ACTIVATION_TOKEN_HOURS", "72"))
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
+# El navegador envía como Origin la dirección del frontend; debe ser un origen de confianza.
+_frontend = urlsplit(FRONTEND_URL)
+CSRF_TRUSTED_ORIGINS = [
+    f"{_frontend.scheme}://{_frontend.netloc}",
+    *env_list("DJANGO_CSRF_TRUSTED_ORIGINS"),
+]
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS += ["http://localhost:5173", "http://127.0.0.1:5173"]
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 90  # sesión de 90 días, se renueva con el uso
 SESSION_SAVE_EVERY_REQUEST = True
 
