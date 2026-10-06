@@ -44,6 +44,10 @@ Se entra con WhatsApp o correo más un PIN de 6 dígitos (contraseña de 10+ car
 
 Para probar en local: crea un superusuario (`createsuperuser`), entra en http://localhost:5173/login e invita a otra persona desde **Invitar**.
 
+## Expediente (M1-01)
+
+Las personas tienen tres niveles de registro (Contacto, Participante, Expediente completo) y los campos de la «Radiografía de miembros GC». Las fotos se guardan en `backend/media/` (ruta en la base de datos, fuera de git) y solo se sirven por `/api/personas/<id>/foto/` con sesión. El aviso de privacidad es un **texto genérico de ejemplo** (`backend/apps/personas/aviso.py`): hay que sustituirlo por el oficial antes de producción.
+
 ## Pruebas y calidad
 
 ```bash
@@ -53,6 +57,6 @@ cd frontend && npm run lint && npm run lint:styles && npm test && npm run build
 
 ## Documentación
 
-- Requerimientos vigentes: `docs/requerimientos/v3.3 - MVP.docx`
+- Requerimientos vigentes: `docs/requerimientos/v3.4 - MVP.docx`
 - Matriz de trazabilidad: `docs/trazabilidad/Matriz de Trazabilidad MDF.xlsx`
 - Cómo contribuir y reglas de estilo: [CONTRIBUTING.md](CONTRIBUTING.md)

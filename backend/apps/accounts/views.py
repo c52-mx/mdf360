@@ -10,6 +10,7 @@ from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from apps.core import audit
+from apps.personas import services as personas
 
 from . import services
 from .models import ActivationToken, User
@@ -149,6 +150,8 @@ class ActivationCheckView(APIView):
 
 class ActivationCompleteSerializer(TokenSerializer):
     credential = serializers.CharField(max_length=128, trim_whitespace=False)
+    acepta_privacidad = serializers.BooleanField()
+    acepta_foto = serializers.BooleanField(default=False)
 
 
 class ActivationCompleteView(APIView):
@@ -159,6 +162,10 @@ class ActivationCompleteView(APIView):
     def post(self, request):
         data = ActivationCompleteSerializer(data=request.data)
         data.is_valid(raise_exception=True)
+        if not data.validated_data["acepta_privacidad"]:
+            return _error(
+                "consent_required", "Debes aceptar el aviso de privacidad para continuar.", 400
+            )
         try:
             user = services.complete_activation(
                 data.validated_data["token"], data.validated_data["credential"], request
@@ -167,6 +174,13 @@ class ActivationCompleteView(APIView):
             return _error("invalid_token", "El enlace no es válido o ya caducó.", 400)
         except DjangoValidationError as exc:
             return _credential_error(exc)
+        persona = personas.ensure_persona_for_user(user)
+        personas.registrar_consentimiento(
+            persona,
+            acepta_datos=True,
+            acepta_foto=data.validated_data["acepta_foto"],
+            actor=user,
+        )
         login(request, user)
         return Response(UserSerializer(user).data)
 
@@ -253,6 +267,7 @@ class InvitationView(APIView):
                 whatsapp, nombre=data.validated_data["nombre"], email=email
             )
             audit.log("auth.invited", actor=request.user, target=user, request=request)
+        personas.ensure_persona_for_user(user)
         raw, token = services.issue_token(user, ActivationToken.Purpose.ACTIVATION, request.user)
         return Response(_invite_payload(user, raw, token), status=status.HTTP_201_CREATED)
 

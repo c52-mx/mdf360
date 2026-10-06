@@ -114,18 +114,24 @@ def test_flujo_completo_de_activacion(api, staff):
     assert check.status_code == 200 and check.json()["nombre"] == "Pedro Gómez"
 
     debil = api.post(
-        "/api/auth/activation/complete/", {"token": token, "credential": "123456"}, format="json"
+        "/api/auth/activation/complete/",
+        {"token": token, "credential": "123456", "acepta_privacidad": True},
+        format="json",
     )
     assert debil.status_code == 400 and debil.json()["code"] == "weak_credential"
 
     ok = api.post(
-        "/api/auth/activation/complete/", {"token": token, "credential": PIN}, format="json"
+        "/api/auth/activation/complete/",
+        {"token": token, "credential": PIN, "acepta_privacidad": True},
+        format="json",
     )
     assert ok.status_code == 200
     assert api.get("/api/auth/me/").json()["nombre"] == "Pedro Gómez"
 
     reuso = api.post(
-        "/api/auth/activation/complete/", {"token": token, "credential": PIN}, format="json"
+        "/api/auth/activation/complete/",
+        {"token": token, "credential": PIN, "acepta_privacidad": True},
+        format="json",
     )
     assert reuso.status_code == 400 and reuso.json()["code"] == "invalid_token"
     assert login(APIClient(), "5544445555").status_code == 200
@@ -170,11 +176,15 @@ def test_rol_sensible_no_acepta_pin(api, staff):
     from . import services
 
     raw, _ = services.issue_token(tesorero, ActivationToken.Purpose.ACTIVATION)
-    r = api.post("/api/auth/activation/complete/", {"token": raw, "credential": PIN}, format="json")
+    r = api.post(
+        "/api/auth/activation/complete/",
+        {"token": raw, "credential": PIN, "acepta_privacidad": True},
+        format="json",
+    )
     assert r.status_code == 400
     r = api.post(
         "/api/auth/activation/complete/",
-        {"token": raw, "credential": "Alabanza-2026"},
+        {"token": raw, "credential": "Alabanza-2026", "acepta_privacidad": True},
         format="json",
     )
     assert r.status_code == 200

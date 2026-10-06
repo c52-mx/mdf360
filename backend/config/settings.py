@@ -33,10 +33,12 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
     "rest_framework",
     "drf_spectacular",
     "apps.core",
     "apps.accounts",
+    "apps.personas",
 ]
 
 MIDDLEWARE = [
@@ -95,6 +97,10 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Fotos de personas: carpeta local (la ruta se guarda en la base de datos). No se sirven como
+# archivos públicos: solo por la API, con sesión y permisos.
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

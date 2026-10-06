@@ -1,10 +1,12 @@
 export class ApiError extends Error {
   status: number
   code?: string
-  constructor(message: string, status: number, code?: string) {
+  data: Record<string, unknown>
+  constructor(message: string, status: number, code?: string, data: Record<string, unknown> = {}) {
     super(message)
     this.status = status
     this.code = code
+    this.data = data
   }
 }
 
@@ -21,7 +23,7 @@ async function csrfToken(): Promise<string> {
 }
 
 interface Options {
-  method?: 'GET' | 'POST'
+  method?: 'GET' | 'POST' | 'PATCH'
   body?: unknown
 }
 
@@ -41,7 +43,34 @@ export async function api<T>(path: string, { method = 'GET', body }: Options = {
   if (res.status === 204) return undefined as T
   const data = (await res.json().catch(() => ({}))) as { detail?: string; code?: string }
   if (!res.ok) {
-    throw new ApiError(data.detail ?? 'Ocurrió un error. Intenta de nuevo.', res.status, data.code)
+    throw new ApiError(
+      data.detail ?? 'Ocurrió un error. Intenta de nuevo.',
+      res.status,
+      data.code,
+      data as Record<string, unknown>,
+    )
+  }
+  return data as T
+}
+
+/** Envía un archivo (multipart). El navegador define el Content-Type con su separador. */
+export async function apiUpload<T>(path: string, field: string, file: File): Promise<T> {
+  const form = new FormData()
+  form.append(field, file)
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'X-CSRFToken': await csrfToken() },
+    body: form,
+    credentials: 'same-origin',
+  })
+  const data = (await res.json().catch(() => ({}))) as { detail?: string; code?: string }
+  if (!res.ok) {
+    throw new ApiError(
+      data.detail ?? 'No se pudo subir el archivo.',
+      res.status,
+      data.code,
+      data as Record<string, unknown>,
+    )
   }
   return data as T
 }
