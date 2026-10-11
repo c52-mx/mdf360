@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Alert, AuthLayout, Button, Field } from '@/design-system'
+import { Alert, AuthLayout, Button, CheckboxField, Field } from '@/design-system'
 import { api } from '@/lib/api'
 import { useAuth, type User } from './use-auth'
 
@@ -18,6 +18,14 @@ export function ActivatePage() {
   const [credential, setCredential] = useState('')
   const [confirm, setConfirm] = useState('')
   const [mismatch, setMismatch] = useState(false)
+  const [aceptaPrivacidad, setAceptaPrivacidad] = useState(false)
+  const [aceptaFoto, setAceptaFoto] = useState(false)
+
+  const aviso = useQuery({
+    queryKey: ['aviso-privacidad'],
+    queryFn: () => api<{ version: string; texto: string }>('/api/personas/aviso-privacidad/'),
+    staleTime: Infinity,
+  })
 
   const info = useQuery({
     queryKey: ['activation', token],
@@ -27,7 +35,13 @@ export function ActivatePage() {
 
   const complete = useMutation({
     mutationFn: () =>
-      api<User>('/api/auth/activation/complete/', { method: 'POST', body: { token, credential } }),
+      api<User>('/api/auth/activation/complete/', { method: 'POST', body: {
+          token,
+          credential,
+          acepta_privacidad: aceptaPrivacidad,
+          acepta_foto: aceptaFoto,
+        },
+      }),
     onSuccess: (user) => {
       setUser(user)
       navigate('/', { replace: true })
@@ -97,8 +111,24 @@ export function ActivatePage() {
           error={mismatch ? 'No coinciden. Vuelve a escribirlos.' : undefined}
           required
         />
+        <details className="rounded-control border border-border p-3">
+          <summary className="cursor-pointer font-bold">Leer el aviso de privacidad</summary>
+          <p className="mt-3 whitespace-pre-line text-sm text-muted-foreground">
+            {aviso.data?.texto ?? 'Cargando aviso…'}
+          </p>
+        </details>
+        <CheckboxField
+          checked={aceptaPrivacidad}
+          onChange={(e) => setAceptaPrivacidad(e.target.checked)}
+          label="Acepto el aviso de privacidad"
+        />
+        <CheckboxField
+          checked={aceptaFoto}
+          onChange={(e) => setAceptaFoto(e.target.checked)}
+          label="Autorizo el uso de mi fotografía (opcional)"
+        />
         {complete.error ? <Alert tone="destructive">{complete.error.message}</Alert> : null}
-        <Button type="submit" size="lg" disabled={complete.isPending}>
+        <Button type="submit" size="lg" disabled={complete.isPending || !aceptaPrivacidad}>
           {complete.isPending ? 'Guardando…' : reset ? 'Guardar y entrar' : 'Activar mi cuenta'}
         </Button>
       </form>

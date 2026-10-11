@@ -22,3 +22,6 @@ frontend/dev-dist/
 .DS_Store
 Thumbs.db
 ~$*
+
+# Fotos de personas (datos personales)
+backend/media/
