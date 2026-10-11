@@ -134,3 +134,37 @@ def change_whatsapp(user: User, new_whatsapp: str, credential: str, request=None
         raise DuplicateWhatsapp from exc
     audit.log("auth.whatsapp_changed", actor=user, target=user, request=request, old=old, new=new)
     return user
+
+
+# --- roles ---
+class RolNoPermitido(Exception):
+    pass
+
+
+def asignar_roles(user: User, claves: list[str], actor, request=None) -> User:
+    """Reemplaza los roles de `user`. Nadie puede otorgar un rol más alto que el suyo."""
+    from .models import AsignacionRol, Rol
+
+    claves = sorted(set(claves))
+    roles = list(Rol.objects.filter(clave__in=claves, activo=True))
+    if len(roles) != len(claves):
+        raise ValidationError("Alguno de los roles no existe.")
+    mejor_actor = min(
+        Rol.objects.filter(asignaciones__usuario=actor).values_list("nivel", flat=True),
+        default=99,
+    )
+    actuales = set(user.asignaciones.values_list("rol_id", flat=True))
+    if any(r.nivel < mejor_actor for r in roles if r.pk not in actuales):
+        raise RolNoPermitido
+    with transaction.atomic():
+        user.asignaciones.exclude(rol__in=roles).delete()
+        for rol in roles:
+            AsignacionRol.objects.get_or_create(
+                usuario=user, rol=rol, defaults={"asignado_por": actor}
+            )
+        fuerte = any(r.exige_credencial_fuerte for r in roles)
+        if fuerte != user.requires_strong_credential:
+            user.requires_strong_credential = fuerte
+            user.save(update_fields=["requires_strong_credential"])
+    audit.log("rbac.roles_changed", actor=actor, target=user, request=request, roles=claves)
+    return user

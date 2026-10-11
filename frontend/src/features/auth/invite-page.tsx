@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { Alert, Button, Card, CardDescription, CardTitle, Field, PageHeader } from '@/design-system'
 import { api } from '@/lib/api'
-import { useAuth, type User } from './use-auth'
+import { useCan, type User } from './use-auth'
 
 interface Invitation {
   user: User
@@ -12,7 +12,7 @@ interface Invitation {
 }
 
 export function InvitePage() {
-  const { user } = useAuth()
+  const puede = useCan('usuarios.invitar')
   const [nombre, setNombre] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [email, setEmail] = useState('')
@@ -24,7 +24,7 @@ export function InvitePage() {
     onSuccess: () => setCopied(false),
   })
 
-  if (!user?.is_staff) {
+  if (!puede) {
     return <Alert tone="warning">No tienes permiso para invitar personas.</Alert>
   }
 

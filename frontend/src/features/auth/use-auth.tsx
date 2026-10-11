@@ -8,7 +8,8 @@ export interface User {
   whatsapp: string
   email: string
   requires_strong_credential: boolean
-  is_staff: boolean
+  roles: string[]
+  permisos: string[]
 }
 
 interface AuthState {
@@ -45,6 +46,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   )
+}
+
+export function useCan(permiso: string): boolean {
+  const { user } = useAuth()
+  return !!user?.permisos.includes(permiso)
 }
 
 export function useAuth(): AuthState {

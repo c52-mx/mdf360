@@ -30,9 +30,18 @@ def laura(db):
     )
 
 
+def _con_rol(user, clave):
+    from apps.accounts.models import AsignacionRol, Rol
+
+    AsignacionRol.objects.create(usuario=user, rol=Rol.objects.get(clave=clave))
+    return user
+
+
 @pytest.fixture
 def staff(db):
-    return User.objects.create_user("55 9999 0000", pin=PIN, nombre="Admin", is_staff=True)
+    return _con_rol(
+        User.objects.create_user("55 9999 0000", pin="482915", nombre="Admin"), "pastor"
+    )
 
 
 def login(api, identifier="5511112222", credential=PIN):
@@ -261,6 +270,7 @@ def test_createsuperuser_guarda_la_credencial_con_hash(db, monkeypatch):
     assert user.password.startswith("argon2$")
     assert user.is_staff and user.is_superuser and user.requires_strong_credential
     assert user.check_password("Alabanza-2026")
+    assert user.roles_clave() == ["admin_tecnico"]
 
 
 # ---------- CSRF con el frontend en otro origen (desarrollo con Vite) ----------
