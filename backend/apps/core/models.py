@@ -17,13 +17,12 @@ class AppendOnlyQuerySet(models.QuerySet):
 class AuditEvent(models.Model):
     """Bitácora de auditoría de solo-añadir (NF-03).
 
-    Nota: este bloqueo es a nivel de aplicación. En el Sprint 1 se refuerza en la base de datos
-    quitando al usuario de la aplicación los permisos UPDATE y DELETE sobre esta tabla.
+    Bloqueado en la aplicación y en la base de datos (trigger de PostgreSQL, migración 0002).
     """
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     actor = models.ForeignKey(
-        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
     actor_repr = models.CharField(max_length=200, blank=True)
     action = models.CharField(max_length=60, db_index=True)
