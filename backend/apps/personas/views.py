@@ -7,10 +7,11 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.permissions import requiere
 from apps.core import audit
 
 from . import services
@@ -52,7 +53,7 @@ class AvisoPrivacidadView(APIView):
 
 
 class CatalogoProcesosView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [requiere("personas.editar")]
 
     def get(self, request):
         procesos = ProcesoDiscipular.objects.filter(activo=True)
@@ -62,11 +63,29 @@ class CatalogoProcesosView(APIView):
 class PersonaViewSet(viewsets.ModelViewSet):
     """Expediente digital (EDU).
 
-    Provisional: solo personal con acceso técnico. En el siguiente paso pasa a permisos por rol
-    (M1-07, M1-08) y la matriz de confidencialidad aprobada.
+    Permisos por rol (M1-07): ver, crear, editar y baja/reactivación. El alcance por grupo
+    (M1-08) llega con el módulo de Grupos.
     """
 
-    permission_classes = [IsAdminUser]
+    ACCIONES = {
+        "list": "personas.ver",
+        "retrieve": "personas.ver",
+        "movimientos": "personas.ver",
+        "create": "personas.crear",
+        "partial_update": "personas.editar",
+        "nivel": "personas.editar",
+        "procesos": "personas.editar",
+        "baja": "personas.baja",
+        "reactivar": "personas.baja",
+    }
+
+    def get_permissions(self):
+        if self.action == "foto":
+            codigo = "personas.editar" if self.request.method == "POST" else "personas.ver"
+        else:
+            codigo = self.ACCIONES.get(self.action, "personas.editar")
+        return [IsAuthenticated(), requiere(codigo)()]
+
     pagination_class = PersonaPagination
     http_method_names = ["get", "post", "patch", "head", "options"]
     lookup_value_regex = r"\d+"

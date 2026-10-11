@@ -13,4 +13,7 @@ urlpatterns = [
     path("recovery/", views.RecoveryView.as_view(), name="auth-recovery"),
     path("invitations/", views.InvitationView.as_view(), name="auth-invitation"),
     path("users/<int:user_id>/reset/", views.ResetAccessView.as_view(), name="auth-reset"),
+    path("roles/", views.RolesView.as_view(), name="rbac-roles"),
+    path("users/", views.UsuariosView.as_view(), name="rbac-users"),
+    path("users/<int:user_id>/roles/", views.AsignarRolesView.as_view(), name="rbac-assign"),
 ]

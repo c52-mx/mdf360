@@ -27,9 +27,18 @@ def _aislar(settings, tmp_path):
     settings.MEDIA_ROOT = tmp_path / "media"
 
 
+def _con_rol(user, clave):
+    from apps.accounts.models import AsignacionRol, Rol
+
+    AsignacionRol.objects.create(usuario=user, rol=Rol.objects.get(clave=clave))
+    return user
+
+
 @pytest.fixture
 def staff(db):
-    return User.objects.create_user("55 9999 0000", pin="482915", nombre="Admin", is_staff=True)
+    return _con_rol(
+        User.objects.create_user("55 9999 0000", pin="482915", nombre="Admin"), "pastor"
+    )
 
 
 @pytest.fixture

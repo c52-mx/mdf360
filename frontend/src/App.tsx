@@ -1,4 +1,4 @@
-import { Home, Palette, UserCog, UserPlus, Users } from 'lucide-react'
+import { Home, Palette, ShieldCheck, UserCog, UserPlus, Users } from 'lucide-react'
 import { Outlet, Route, Routes } from 'react-router-dom'
 import { AppShell, type NavItem } from '@/design-system'
 import { AccountPage } from '@/features/auth/account-page'
@@ -7,6 +7,7 @@ import { InvitePage } from '@/features/auth/invite-page'
 import { LoginPage } from '@/features/auth/login-page'
 import { RecoveryPage } from '@/features/auth/recovery-page'
 import { RequireAuth } from '@/features/auth/require-auth'
+import { RolesPage } from '@/features/auth/roles-page'
 import { useAuth } from '@/features/auth/use-auth'
 import { DesignPage } from '@/features/design/design-page'
 import { HomePage } from '@/features/home/home-page'
@@ -16,13 +17,17 @@ import { PersonasPage } from '@/features/personas/personas-page'
 
 function PrivateLayout() {
   const { user } = useAuth()
+  const can = (permiso: string) => !!user?.permisos.includes(permiso)
   const nav: NavItem[] = [
     { to: '/', label: 'Inicio', icon: Home },
-    ...(user?.is_staff
-      ? [
-          { to: '/personas', label: 'Personas', icon: Users, module: 'admin' as const },
-          { to: '/invitar', label: 'Invitar', icon: UserPlus, module: 'admin' as const },
-        ]
+    ...(can('personas.ver')
+      ? [{ to: '/personas', label: 'Personas', icon: Users, module: 'admin' as const }]
+      : []),
+    ...(can('usuarios.invitar')
+      ? [{ to: '/invitar', label: 'Invitar', icon: UserPlus, module: 'admin' as const }]
+      : []),
+    ...(can('roles.gestionar')
+      ? [{ to: '/roles', label: 'Roles', icon: ShieldCheck, module: 'admin' as const }]
       : []),
     { to: '/cuenta', label: 'Mi cuenta', icon: UserCog },
     { to: '/diseno', label: 'Diseño', icon: Palette },
@@ -46,6 +51,7 @@ export default function App() {
           <Route path="/personas" element={<PersonasPage />} />
           <Route path="/personas/nueva" element={<NuevaPersonaPage />} />
           <Route path="/personas/:id" element={<PersonaPage />} />
+          <Route path="/roles" element={<RolesPage />} />
           <Route path="/invitar" element={<InvitePage />} />
           <Route path="/cuenta" element={<AccountPage />} />
           <Route path="/diseno" element={<DesignPage />} />

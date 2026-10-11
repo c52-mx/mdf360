@@ -36,7 +36,11 @@ class UserManager(BaseUserManager):
         extra.setdefault("is_staff", True)
         extra.setdefault("is_superuser", True)
         extra.setdefault("requires_strong_credential", True)
-        return self._create(whatsapp, pin, **extra)
+        user = self._create(whatsapp, pin, **extra)
+        rol = Rol.objects.filter(clave="admin_tecnico").first()
+        if rol:
+            AsignacionRol.objects.get_or_create(usuario=user, rol=rol)
+        return user
 
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -82,6 +86,19 @@ class User(AbstractBaseUser, PermissionsMixin):
     def save(self, *args, **kwargs):
         self.email = (self.email or "").strip().lower()
         super().save(*args, **kwargs)
+
+    # --- roles y permisos ---
+    def permisos(self) -> set[str]:
+        """Permisos de todos sus roles activos. Se calcula una vez por instancia."""
+        if not hasattr(self, "_permisos"):
+            self._permisos = set()
+            if self.is_active and self.pk:
+                for rol in Rol.objects.filter(asignaciones__usuario=self, activo=True):
+                    self._permisos.update(rol.permisos)
+        return self._permisos
+
+    def roles_clave(self) -> list[str]:
+        return list(self.asignaciones.filter(rol__activo=True).values_list("rol__clave", flat=True))
 
     # --- credencial ---
     def set_credential(self, raw: str) -> None:
@@ -133,3 +150,38 @@ class ActivationToken(models.Model):
 
     def is_valid(self) -> bool:
         return self.used_at is None and self.expires_at > timezone.now()
+
+
+class Rol(models.Model):
+    """Rol configurable con su lista de permisos (códigos de apps/accounts/roles.py)."""
+
+    clave = models.SlugField(max_length=40, unique=True)
+    nombre = models.CharField(max_length=80)
+    nivel = models.PositiveSmallIntegerField(help_text="0 es el nivel más alto de la jerarquía")
+    exige_credencial_fuerte = models.BooleanField(default=False)
+    permisos = models.JSONField(default=list)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["nivel", "nombre"]
+        verbose_name_plural = "roles"
+
+    def __str__(self):
+        return self.nombre
+
+
+class AsignacionRol(models.Model):
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name="asignaciones")
+    rol = models.ForeignKey(Rol, on_delete=models.PROTECT, related_name="asignaciones")
+    asignado_por = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["usuario", "rol"], name="asignacion_rol_unica")
+        ]
+
+    def __str__(self):
+        return f"{self.usuario} · {self.rol}"

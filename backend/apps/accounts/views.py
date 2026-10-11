@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
 from django.middleware.csrf import get_token
 from rest_framework import serializers, status
-from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
@@ -13,7 +13,8 @@ from apps.core import audit
 from apps.personas import services as personas
 
 from . import services
-from .models import ActivationToken, User
+from .models import ActivationToken, Rol, User
+from .permissions import requiere
 from .phone import normalize_whatsapp
 
 
@@ -22,9 +23,26 @@ class AuthThrottle(AnonRateThrottle):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    roles = serializers.SerializerMethodField()
+    permisos = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ["id", "nombre", "whatsapp", "email", "requires_strong_credential", "is_staff"]
+        fields = [
+            "id",
+            "nombre",
+            "whatsapp",
+            "email",
+            "requires_strong_credential",
+            "roles",
+            "permisos",
+        ]
+
+    def get_roles(self, obj) -> list[str]:
+        return obj.roles_clave()
+
+    def get_permisos(self, obj) -> list[str]:
+        return sorted(obj.permisos())
 
 
 def _error(code: str, detail: str, http_status: int):
@@ -240,10 +258,10 @@ def _invite_payload(user, raw, token, reset=False):
 class InvitationView(APIView):
     """Crea una cuenta sin PIN y devuelve el enlace para enviarlo por WhatsApp.
 
-    Provisional: solo personal con acceso técnico. En el Sprint 1 pasa a permisos por rol.
+    Requiere el permiso usuarios.invitar.
     """
 
-    permission_classes = [IsAdminUser]
+    permission_classes = [requiere("usuarios.invitar")]
 
     def post(self, request):
         data = InvitationSerializer(data=request.data)
@@ -273,9 +291,9 @@ class InvitationView(APIView):
 
 
 class ResetAccessView(APIView):
-    """Reinicia el acceso de una persona (perdió su PIN o su número). Provisional: ver arriba."""
+    """Reinicia el acceso de una persona (perdió su PIN o su número)."""
 
-    permission_classes = [IsAdminUser]
+    permission_classes = [requiere("usuarios.invitar")]
 
     def post(self, request, user_id: int):
         user = User.objects.filter(pk=user_id, is_active=True).first()
@@ -284,3 +302,49 @@ class ResetAccessView(APIView):
         raw, token = services.issue_token(user, ActivationToken.Purpose.RESET, request.user)
         audit.log("auth.reset_issued", actor=request.user, target=user, request=request)
         return Response(_invite_payload(user, raw, token, reset=True))
+
+
+class RolesView(APIView):
+    permission_classes = [requiere("roles.gestionar")]
+
+    def get(self, request):
+        return Response(
+            [
+                {"clave": r.clave, "nombre": r.nombre, "nivel": r.nivel, "permisos": r.permisos}
+                for r in Rol.objects.filter(activo=True)
+            ]
+        )
+
+
+class UsuariosView(APIView):
+    permission_classes = [requiere("roles.gestionar")]
+
+    def get(self, request):
+        usuarios = User.objects.filter(is_active=True).order_by("nombre")
+        return Response(UserSerializer(usuarios, many=True).data)
+
+
+class AsignarRolesSerializer(serializers.Serializer):
+    roles = serializers.ListField(child=serializers.SlugField(), allow_empty=True)
+
+
+class AsignarRolesView(APIView):
+    permission_classes = [requiere("roles.gestionar")]
+
+    def post(self, request, user_id: int):
+        user = User.objects.filter(pk=user_id, is_active=True).first()
+        if user is None:
+            return _error("not_found", "No existe la persona.", status.HTTP_404_NOT_FOUND)
+        data = AsignarRolesSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        try:
+            services.asignar_roles(user, data.validated_data["roles"], request.user, request)
+        except services.RolNoPermitido:
+            return _error(
+                "role_not_allowed",
+                "No puedes otorgar un rol más alto que el tuyo.",
+                status.HTTP_403_FORBIDDEN,
+            )
+        except DjangoValidationError as exc:
+            return _error("invalid_role", " ".join(exc.messages), 400)
+        return Response(UserSerializer(user).data)
