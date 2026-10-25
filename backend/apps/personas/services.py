@@ -1,9 +1,9 @@
 import io
-from datetime import date
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 from PIL import Image, ImageOps
 
 from apps.accounts.phone import normalize_whatsapp
@@ -47,7 +47,7 @@ def _movimiento(persona, tipo, motivo="", fecha=None, actor=None) -> PersonaMovi
         persona=persona,
         tipo=tipo,
         motivo=motivo,
-        fecha=fecha or date.today(),
+        fecha=fecha or timezone.localdate(),
         registrado_por=actor if getattr(actor, "pk", None) else None,
     )
 

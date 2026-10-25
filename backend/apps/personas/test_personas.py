@@ -3,6 +3,7 @@ from datetime import date
 
 import pytest
 from django.core.cache import cache
+from django.utils import timezone
 from PIL import Image
 from rest_framework.test import APIClient
 
@@ -197,7 +198,7 @@ def test_baja_registra_fecha_y_motivo_y_sale_de_la_lista(api):
     pid = alta(api).json()["id"]
     r = api.post(
         f"/api/personas/{pid}/baja/",
-        {"fecha": date.today().isoformat(), "motivo": "Se mudó"},
+        {"fecha": timezone.localdate().isoformat(), "motivo": "Se mudó"},
         format="json",
     )
     assert r.status_code == 200 and r.json()["activo"] is False
@@ -205,7 +206,7 @@ def test_baja_registra_fecha_y_motivo_y_sale_de_la_lista(api):
     assert (
         mov["tipo"] == "baja"
         and mov["motivo"] == "Se mudó"
-        and mov["fecha"] == date.today().isoformat()
+        and mov["fecha"] == timezone.localdate().isoformat()
     )
     assert api.get("/api/personas/").json()["count"] == 0
     assert api.get("/api/personas/?activo=all").json()["count"] == 1

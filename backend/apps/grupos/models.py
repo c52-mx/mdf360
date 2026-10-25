@@ -4,6 +4,7 @@ from datetime import date, timedelta
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from apps.personas.models import Persona
 
@@ -48,7 +49,7 @@ class GrupoMiembro(models.Model):
     persona = models.ForeignKey(Persona, on_delete=models.PROTECT, related_name="membresias")
     rol = models.CharField(max_length=20, choices=Rol.choices, default=Rol.ASISTENTE)
     activo = models.BooleanField(default=True)
-    desde = models.DateField(default=date.today)
+    desde = models.DateField(default=timezone.localdate)
 
     class Meta:
         constraints = [
@@ -93,7 +94,7 @@ class EstudioSemanal(models.Model):
 
 class Reunion(models.Model):
     grupo = models.ForeignKey(Grupo, on_delete=models.CASCADE, related_name="reuniones")
-    fecha = models.DateField(default=date.today)
+    fecha = models.DateField(default=timezone.localdate)
     notas = models.TextField(blank=True)
     creada_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"

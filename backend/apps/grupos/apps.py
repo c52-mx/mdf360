@@ -10,3 +10,7 @@ class GruposConfig(AppConfig):
         from .origen_peticiones import registrar_origen
 
         registrar_origen()
+
+        from .origen_tablero import registrar_origen as registrar_tablero
+
+        registrar_tablero()

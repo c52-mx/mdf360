@@ -1,4 +1,18 @@
-import { Coins, HandHeart, Home, Palette, UsersRound, ScrollText, Settings, ShieldCheck, UserCog, UserPlus, Users } from 'lucide-react'
+import {
+  Bell,
+  ChartColumn,
+  Coins,
+  HandHeart,
+  Home,
+  Palette,
+  ScrollText,
+  Settings,
+  ShieldCheck,
+  UserCog,
+  UserPlus,
+  Users,
+  UsersRound,
+} from 'lucide-react'
 import { Outlet, Route, Routes } from 'react-router-dom'
 import { AppShell, type NavItem } from '@/design-system'
 import { AuditoriaPage } from '@/features/auditoria/auditoria-page'
@@ -15,7 +29,9 @@ import { DesignPage } from '@/features/design/design-page'
 import { EstudiosPage } from '@/features/grupos/estudios-page'
 import { ListaSinConexionPage } from '@/features/grupos/lista-sin-conexion-page'
 import { GrupoPage } from '@/features/grupos/grupo-page'
+import { DashboardPage } from '@/features/grupos/dashboard-page'
 import { GruposPage } from '@/features/grupos/grupos-page'
+import { AvisosPage } from '@/features/tablero/avisos-page'
 import { OfrendasPage } from '@/features/grupos/ofrendas-page'
 import { ReunionPage } from '@/features/grupos/reunion-page'
 import { SyncBanner } from '@/features/offline/sync-banner'
@@ -33,6 +49,10 @@ function PrivateLayout() {
     { to: '/', label: 'Inicio', icon: Home },
     { to: '/grupos', label: 'Grupos', icon: UsersRound, module: 'grupos' as const },
     { to: '/ofrendas', label: 'Ofrendas', icon: Coins, module: 'grupos' as const },
+    { to: '/avisos', label: 'Avisos', icon: Bell, module: 'grupos' as const },
+    ...(user?.roles.some((r) => ['lider', 'supervisor', 'pastor', 'anciano'].includes(r))
+      ? [{ to: '/grupos/resumen', label: 'Resumen', icon: ChartColumn, module: 'grupos' as const }]
+      : []),
     { to: '/peticiones', label: 'Peticiones', icon: HandHeart, module: 'grupos' as const },
     ...(can('personas.ver')
       ? [{ to: '/personas', label: 'Personas', icon: Users, module: 'admin' as const }]
@@ -70,6 +90,8 @@ export default function App() {
         <Route element={<PrivateLayout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/grupos" element={<GruposPage />} />
+          <Route path="/grupos/resumen" element={<DashboardPage />} />
+          <Route path="/avisos" element={<AvisosPage />} />
           <Route path="/grupos/reuniones/:rid" element={<ReunionPage />} />
           <Route path="/grupos/:id/hoy" element={<ListaSinConexionPage />} />
           <Route path="/grupos/:id" element={<GrupoPage />} />

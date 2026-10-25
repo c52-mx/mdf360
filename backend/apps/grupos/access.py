@@ -86,7 +86,7 @@ def momento_captura(valor: datetime | None) -> datetime | None:
 def dia_efectivo(momento: datetime | None) -> date:
     """Día contra el que se evalúa la regla «el Secretario solo captura el mismo día»."""
     if momento is None:
-        return date.today()
+        return timezone.localdate()
     return timezone.localtime(momento).date()
 
 
@@ -95,14 +95,14 @@ def puede_modificar_asistencia(user, reunion: Reunion, dia: date | None = None) 
     capturó, si la captura se hizo sin conexión y se sincroniza después)."""
     if puede_administrar(user) or R.LIDER in roles_en(user, reunion.grupo):
         return True
-    dia = dia or date.today()
+    dia = dia or timezone.localdate()
     return R.SECRETARIO in roles_en(user, reunion.grupo) and reunion.fecha == dia
 
 
 def puede_ver_reunion(user, reunion: Reunion, dia: date | None = None) -> bool:
     if puede_ver_historial(user, reunion.grupo):
         return True
-    dia = dia or date.today()
+    dia = dia or timezone.localdate()
     return R.SECRETARIO in roles_en(user, reunion.grupo) and reunion.fecha == dia
 
 

@@ -2,6 +2,7 @@ from datetime import date
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 
 from apps.core import audit
 from apps.personas import services as personas
@@ -90,7 +91,7 @@ def guardar_asistencia(
 
 def abrir_reunion(grupo, fecha: date | None, *, actor, request=None) -> Reunion:
     reunion, creada = Reunion.objects.get_or_create(
-        grupo=grupo, fecha=fecha or date.today(), defaults={"creada_por": actor}
+        grupo=grupo, fecha=fecha or timezone.localdate(), defaults={"creada_por": actor}
     )
     if creada:
         audit.log("reunion.creada", actor=actor, target=reunion, request=request)
