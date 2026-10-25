@@ -23,10 +23,19 @@ export const visibilidadOpciones: { value: Visibilidad; label: string; ayuda: st
   },
 ]
 
+/** Quién podrá leer la petición según su alcance (para la leyenda de privacidad al capturar). */
+export const quienLee: Record<Visibilidad, string> = {
+  lideres: 'el Líder, el Supervisor y la dirección de la iglesia',
+  grupo: 'todos los integrantes del grupo, el Líder, el Supervisor y la dirección de la iglesia',
+  equipo:
+    'todos los integrantes del grupo, el equipo de oración de la iglesia, el Líder, el Supervisor y la dirección',
+}
+
 export interface Formulario {
   version: number
   campos: Campo[]
   visibilidad_por_defecto?: Visibilidad
+  dias_retencion?: number
 }
 
 export interface Origen {

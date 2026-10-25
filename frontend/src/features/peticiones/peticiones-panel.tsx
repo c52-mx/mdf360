@@ -14,6 +14,7 @@ import { api } from '@/lib/api'
 import { FormularioDinamico } from './formulario-dinamico'
 import { OrigenBadge } from './origen-badge'
 import {
+  quienLee,
   visibilidadOpciones,
   type Formulario,
   type Pagina,
@@ -187,7 +188,7 @@ export function PeticionesPanel({ origenTipo, origenId, referenciaId, puedeRegis
           <SelectField
             label="¿Quién puede verla?"
             value={alcanceActual}
-            hint={`${opcion?.ayuda ?? ''} Pídele su autorización a quien la comparte.`}
+            hint={opcion?.ayuda}
             onChange={(e) => setAlcance(e.target.value as Visibilidad)}
             options={visibilidadOpciones.map((o) => ({ value: o.value, label: o.label }))}
           />
@@ -198,6 +199,16 @@ export function PeticionesPanel({ origenTipo, origenId, referenciaId, puedeRegis
               label="Ocultar el nombre de quien la pide (solo lo verán los líderes)"
             />
           ) : null}
+          <Alert tone="info">
+            <span className="block">
+              Antes de guardar, confirma que la persona que comparte esta petición está de acuerdo en que
+              la lea {quienLee[alcanceActual]}.{' '}
+              {ocultarNombre && alcanceActual !== 'lideres'
+                ? 'Su nombre solo lo verán los líderes. '
+                : ''}
+              Se guarda cifrada y se borra sola a los {formulario.data.dias_retencion ?? 30} días.
+            </span>
+          </Alert>
           {confirmada ? <Alert tone="success">Petición registrada.</Alert> : null}
           {registrar.error ? <Alert tone="destructive">{registrar.error.message}</Alert> : null}
           <Button type="submit" disabled={registrar.isPending}>

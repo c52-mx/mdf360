@@ -160,3 +160,12 @@ def test_el_rol_equipo_de_oracion_se_asigna_desde_roles(rico):
     # el rol no abre nada más: ni personas ni bitácora
     assert api_de(persona).get("/api/personas/").status_code == 403
     assert api_de(persona).get("/api/auditoria/").status_code == 403
+
+
+def test_el_formulario_informa_los_dias_de_conservacion_para_la_leyenda(rico):
+    api = api_de(rico["lider"])
+    assert api.get("/api/peticiones/formulario/").json()["dias_retencion"] == 30
+    api_de(rico["pastor"]).patch(
+        "/api/config/peticiones.dias_retencion/", {"valor": 15}, format="json"
+    )
+    assert api.get("/api/peticiones/formulario/").json()["dias_retencion"] == 15

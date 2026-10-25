@@ -41,6 +41,7 @@ class FormularioView(APIView):
                 "version": f.version,
                 "campos": f.campos,
                 "visibilidad_por_defecto": config.obtener("peticiones.visibilidad_por_defecto"),
+                "dias_retencion": int(config.obtener("peticiones.dias_retencion")),
             }
         )
 
