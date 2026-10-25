@@ -16,6 +16,7 @@ PERMISOS = {
     "grupos.ver_todos": "Ver todos los Grupos de Conexión",
     "grupos.gestionar": "Crear y administrar Grupos de Conexión",
     "grupos.material": "Subir el estudio semanal",
+    "ofrendas.ver_todas": "Ver las ofrendas de todos los grupos",
 }
 
 # clave: (nombre, nivel jerárquico (0 = más alto), exige contraseña fuerte, permisos)

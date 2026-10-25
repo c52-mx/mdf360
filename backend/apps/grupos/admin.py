@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from .models import Asistencia, EstudioSemanal, Grupo, GrupoMiembro, Reunion
+from .models import (
+    Asistencia,
+    EstudioSemanal,
+    Grupo,
+    GrupoMiembro,
+    Ofrenda,
+    OfrendaMovimiento,
+    Reunion,
+)
 
 
 @admin.register(Grupo)
@@ -13,3 +21,5 @@ admin.site.register(GrupoMiembro)
 admin.site.register(EstudioSemanal)
 admin.site.register(Reunion)
 admin.site.register(Asistencia)
+admin.site.register(Ofrenda)
+admin.site.register(OfrendaMovimiento)

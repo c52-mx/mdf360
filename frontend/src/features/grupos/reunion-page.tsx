@@ -12,6 +12,7 @@ import {
   TextareaField,
 } from '@/design-system'
 import { api } from '@/lib/api'
+import { OfrendasReunion } from './ofrendas'
 import { fechaLarga, type ReunionDetalle } from './types'
 
 export function ReunionPage() {
@@ -141,6 +142,8 @@ function Lista({ reunion }: { reunion: ReunionDetalle }) {
           </Button>
         ) : null}
       </Card>
+
+      <OfrendasReunion reunionId={reunion.id} />
     </div>
   )
 }

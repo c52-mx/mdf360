@@ -125,3 +125,62 @@ class Asistencia(models.Model):
 
     def __str__(self):
         return f"{self.persona} · {'presente' if self.presente else 'ausente'}"
+
+
+class Ofrenda(models.Model):
+    class Tipo(models.TextChoices):
+        REGULAR = "regular", "Ofrenda regular"
+        ESPECIAL = "especial", "Ofrenda especial"
+
+    class Estado(models.TextChoices):
+        PENDIENTE = "pendiente", "Pendiente de aval"
+        AVALADA = "avalada", "Avalada"
+        DIFERENCIA = "diferencia", "Con diferencia"
+
+    reunion = models.ForeignKey(Reunion, on_delete=models.PROTECT, related_name="ofrendas")
+    tipo = models.CharField(max_length=20, choices=Tipo.choices, default=Tipo.REGULAR)
+    concepto = models.CharField(max_length=150, blank=True)
+    monto = models.DecimalField("monto capturado", max_digits=10, decimal_places=2)
+    estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.PENDIENTE)
+    capturada_por = models.ForeignKey(
+        "accounts.User", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    creada_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-reunion__fecha", "-creada_en"]
+        constraints = [
+            # Una ofrenda regular por reunión; las especiales se distinguen por concepto
+            models.UniqueConstraint(
+                fields=["reunion", "tipo", "concepto"], name="ofrenda_unica_por_concepto"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.reunion} · {self.get_tipo_display()} · {self.monto}"
+
+
+class OfrendaMovimiento(models.Model):
+    """Historial de captura, corrección y aval. Solo se agregan filas."""
+
+    class Tipo(models.TextChoices):
+        CAPTURA = "captura", "Captura"
+        CORRECCION = "correccion", "Corrección"
+        AVAL = "aval", "Aval"
+
+    ofrenda = models.ForeignKey(Ofrenda, on_delete=models.CASCADE, related_name="movimientos")
+    tipo = models.CharField(max_length=20, choices=Tipo.choices)
+    monto_anterior = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    monto = models.DecimalField(max_digits=10, decimal_places=2)
+    diferencia = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    motivo = models.CharField(max_length=300, blank=True)
+    usuario = models.ForeignKey(
+        "accounts.User", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["creado_en", "id"]
+
+    def __str__(self):
+        return f"{self.ofrenda_id} · {self.get_tipo_display()} · {self.monto}"
