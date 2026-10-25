@@ -1,17 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  CardDescription,
-  CardTitle,
-  PageHeader,
-  TextareaField,
-} from '@/design-system'
+import { Alert, Button, Card, CardDescription, CardTitle, PageHeader } from '@/design-system'
+import { useAuth } from '@/features/auth/use-auth'
 import { api } from '@/lib/api'
+import { esErrorDeRed, pendientes } from '@/lib/outbox'
+import { ListaAsistencia, type ResultadoGuardado } from './lista-asistencia'
 import { OfrendasReunion } from './ofrendas'
 import { fechaLarga, type ReunionDetalle } from './types'
 
@@ -23,35 +16,38 @@ export function ReunionPage() {
   })
   if (reunion.isPending) return <p className="text-muted-foreground">Cargando…</p>
   if (reunion.isError) return <Alert tone="destructive">{reunion.error.message}</Alert>
-  return <Lista key={reunion.data.id} reunion={reunion.data} />
+  return <Reunion key={reunion.data.id} reunion={reunion.data} />
 }
 
-function Lista({ reunion }: { reunion: ReunionDetalle }) {
+function Reunion({ reunion }: { reunion: ReunionDetalle }) {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
-  const [presentes, setPresentes] = useState<Record<number, boolean>>(() =>
-    Object.fromEntries(reunion.personas.map((p) => [p.persona_id, p.presente])),
-  )
-  const [notas, setNotas] = useState(reunion.notas)
-  const total = Object.values(presentes).filter(Boolean).length
+  const e = reunion.estudio
 
-  const guardar = useMutation({
-    mutationFn: () =>
-      api(`/api/grupos/reuniones/${reunion.id}/`, {
-        method: 'PUT',
-        body: {
-          asistencias: Object.entries(presentes).map(([id, presente]) => ({
-            persona_id: Number(id),
-            presente,
-          })),
-          notas,
-        },
-      }),
-    onSuccess: () => {
+  const guardar = async (
+    asistencias: { persona_id: number; presente: boolean }[],
+    notas: string,
+  ): Promise<ResultadoGuardado> => {
+    try {
+      await api(`/api/grupos/reuniones/${reunion.id}/`, { method: 'PUT', body: { asistencias, notas } })
       void queryClient.invalidateQueries({ queryKey: ['grupo', String(reunion.grupo.id)] })
       void queryClient.invalidateQueries({ queryKey: ['reunion', String(reunion.id)] })
-    },
-  })
-  const e = reunion.estudio
+      return 'enviado'
+    } catch (error) {
+      if (!esErrorDeRed(error) || !user) throw error
+      pendientes.agregar({
+        usuarioId: user.id,
+        grupoId: reunion.grupo.id,
+        grupoNombre: reunion.grupo.nombre,
+        fecha: reunion.fecha,
+        reunionId: reunion.id,
+        asistencias,
+        notas,
+        capturadoEn: new Date().toISOString(),
+      })
+      return 'en-cola'
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -98,50 +94,12 @@ function Lista({ reunion }: { reunion: ReunionDetalle }) {
         )}
       </Card>
 
-      <Card className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <CardTitle>Pasar lista</CardTitle>
-          <span className="font-bold text-success">
-            {total} de {reunion.personas.length} presentes
-          </span>
-        </div>
-        {!reunion.puede_modificar ? (
-          <Alert tone="warning">Solo puedes consultar esta lista.</Alert>
-        ) : null}
-        <ul className="flex flex-col gap-2">
-          {reunion.personas.map((p) => (
-            <li key={p.persona_id} className="flex items-center justify-between gap-3">
-              <span>
-                <span className="font-bold">{p.nombre}</span>{' '}
-                {p.invitado ? <Badge tone="warning">Invitado</Badge> : null}
-              </span>
-              <Button
-                type="button"
-                variant={presentes[p.persona_id] ? 'success' : 'outline'}
-                disabled={!reunion.puede_modificar}
-                aria-pressed={presentes[p.persona_id]}
-                onClick={() => setPresentes((m) => ({ ...m, [p.persona_id]: !m[p.persona_id] }))}
-                className="min-w-28"
-              >
-                {presentes[p.persona_id] ? 'Presente' : 'Ausente'}
-              </Button>
-            </li>
-          ))}
-        </ul>
-        <TextareaField
-          label="Notas de la reunión"
-          value={notas}
-          disabled={!reunion.puede_modificar}
-          onChange={(ev) => setNotas(ev.target.value)}
-        />
-        {guardar.isSuccess ? <Alert tone="success">Lista guardada.</Alert> : null}
-        {guardar.error ? <Alert tone="destructive">{guardar.error.message}</Alert> : null}
-        {reunion.puede_modificar ? (
-          <Button size="lg" onClick={() => guardar.mutate()} disabled={guardar.isPending}>
-            {guardar.isPending ? 'Guardando…' : 'Guardar lista'}
-          </Button>
-        ) : null}
-      </Card>
+      <ListaAsistencia
+        personas={reunion.personas}
+        notasIniciales={reunion.notas}
+        puedeModificar={reunion.puede_modificar}
+        onGuardar={guardar}
+      />
 
       <OfrendasReunion reunionId={reunion.id} />
     </div>

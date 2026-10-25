@@ -7,7 +7,9 @@ Sigue la matriz de confidencialidad aprobada (v3.2, sec. 3.3):
 - Tesorero y Anfitrión no acceden a la asistencia.
 """
 
-from datetime import date
+from datetime import date, datetime, timedelta
+
+from django.utils import timezone
 
 from apps.accounts.permissions import tiene_permiso
 
@@ -61,17 +63,47 @@ def puede_capturar(user, grupo: Grupo) -> bool:
     return puede_administrar(user) or bool(roles_en(user, grupo) & {R.LIDER, R.SECRETARIO})
 
 
-def puede_modificar_asistencia(user, reunion: Reunion) -> bool:
-    """Líder y Pastor siempre; Secretario solo el mismo día de la reunión."""
+VENTANA_SINCRONIZACION = timedelta(days=7)
+
+
+class CapturaInvalida(Exception):
+    pass
+
+
+def momento_captura(valor: datetime | None) -> datetime | None:
+    """Momento en que se capturó sin conexión. Se acota para que no se pueda adelantar ni usar
+    una captura demasiado antigua; devuelve None si no se envió."""
+    if valor is None:
+        return None
+    ahora = timezone.now()
+    if valor > ahora + timedelta(minutes=10):
+        return ahora  # reloj del teléfono adelantado
+    if valor < ahora - VENTANA_SINCRONIZACION:
+        raise CapturaInvalida("La captura sin conexión es demasiado antigua para sincronizarse.")
+    return valor
+
+
+def dia_efectivo(momento: datetime | None) -> date:
+    """Día contra el que se evalúa la regla «el Secretario solo captura el mismo día»."""
+    if momento is None:
+        return date.today()
+    return timezone.localtime(momento).date()
+
+
+def puede_modificar_asistencia(user, reunion: Reunion, dia: date | None = None) -> bool:
+    """Líder y Pastor siempre; Secretario solo el mismo día de la reunión (el día en que
+    capturó, si la captura se hizo sin conexión y se sincroniza después)."""
     if puede_administrar(user) or R.LIDER in roles_en(user, reunion.grupo):
         return True
-    return R.SECRETARIO in roles_en(user, reunion.grupo) and reunion.fecha == date.today()
+    dia = dia or date.today()
+    return R.SECRETARIO in roles_en(user, reunion.grupo) and reunion.fecha == dia
 
 
-def puede_ver_reunion(user, reunion: Reunion) -> bool:
+def puede_ver_reunion(user, reunion: Reunion, dia: date | None = None) -> bool:
     if puede_ver_historial(user, reunion.grupo):
         return True
-    return R.SECRETARIO in roles_en(user, reunion.grupo) and reunion.fecha == date.today()
+    dia = dia or date.today()
+    return R.SECRETARIO in roles_en(user, reunion.grupo) and reunion.fecha == dia
 
 
 def puede_ver_estudios(user) -> bool:

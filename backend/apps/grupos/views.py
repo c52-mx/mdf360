@@ -236,6 +236,15 @@ class IntegranteView(APIView):
 # ---------- reuniones y asistencia ----------
 class AbrirReunionSerializer(serializers.Serializer):
     fecha = serializers.DateField(required=False)
+    capturado_en = serializers.DateTimeField(required=False)
+
+
+def _momento(datos):
+    """Valida el momento de captura sin conexión; devuelve (momento, respuesta_de_error)."""
+    try:
+        return access.momento_captura(datos.get("capturado_en")), None
+    except access.CapturaInvalida as exc:
+        return None, _error("too_old", str(exc))
 
 
 class ReunionesView(APIView):
@@ -250,10 +259,14 @@ class ReunionesView(APIView):
         data = AbrirReunionSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         fecha = data.validated_data.get("fecha")
-        # El Secretario solo puede abrir la reunión de hoy
-        if fecha and fecha != date.today() and not access.puede_ver_historial(request.user, grupo):
+        momento, error = _momento(data.validated_data)
+        if error:
+            return error
+        dia = access.dia_efectivo(momento)
+        # El Secretario solo abre la reunión del día en que captura (sin conexión, el día real)
+        if fecha and fecha != dia and not access.puede_ver_historial(request.user, grupo):
             return _denegado()
-        reunion = services.abrir_reunion(grupo, fecha, actor=request.user, request=request)
+        reunion = services.abrir_reunion(grupo, fecha or dia, actor=request.user, request=request)
         return Response({"id": reunion.pk, "fecha": reunion.fecha.isoformat()}, status=201)
 
 
@@ -265,14 +278,15 @@ class AsistenciaItem(serializers.Serializer):
 class AsistenciaSerializer(serializers.Serializer):
     asistencias = AsistenciaItem(many=True)
     notas = serializers.CharField(required=False, allow_blank=True)
+    capturado_en = serializers.DateTimeField(required=False)
 
 
 class ReunionView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def _reunion(self, request, rid):
+    def _reunion(self, request, rid, dia=None):
         reunion = get_object_or_404(Reunion.objects.select_related("grupo"), pk=rid)
-        if not access.puede_ver_reunion(request.user, reunion):
+        if not access.puede_ver_reunion(request.user, reunion, dia):
             raise Http404
         return reunion
 
@@ -293,21 +307,29 @@ class ReunionView(APIView):
         )
 
     def put(self, request, rid):
-        reunion = self._reunion(request, rid)
-        if not access.puede_modificar_asistencia(request.user, reunion):
-            return _denegado()
         data = AsistenciaSerializer(data=request.data)
         data.is_valid(raise_exception=True)
+        momento, error = _momento(data.validated_data)
+        if error:
+            return error
+        dia = access.dia_efectivo(momento)
+        reunion = self._reunion(request, rid, dia)
+        if not access.puede_modificar_asistencia(request.user, reunion, dia):
+            return _denegado()
         try:
-            presentes = services.guardar_asistencia(
-                reunion, data.validated_data["asistencias"], actor=request.user, request=request
+            presentes, omitidos = services.guardar_asistencia(
+                reunion,
+                data.validated_data["asistencias"],
+                actor=request.user,
+                request=request,
+                capturado_en=momento,
             )
         except DjangoValidationError as exc:
             return _error("invalid", _detalle(exc))
-        if "notas" in data.validated_data:
+        if "notas" in data.validated_data and (momento is None or not reunion.notas):
             reunion.notas = data.validated_data["notas"]
             reunion.save(update_fields=["notas"])
-        return Response({"presentes": presentes})
+        return Response({"presentes": presentes, "omitidos": omitidos})
 
 
 # ---------- estudio semanal ----------

@@ -49,16 +49,30 @@ def agregar_integrante(
 
 
 @transaction.atomic
-def guardar_asistencia(reunion: Reunion, items, *, actor, request=None) -> int:
-    """`items`: lista de dicts {persona_id, presente}. Solo personas activas del grupo."""
+def guardar_asistencia(
+    reunion: Reunion, items, *, actor, request=None, capturado_en=None
+) -> tuple[int, int]:
+    """`items`: lista de dicts {persona_id, presente}. Solo personas activas del grupo.
+
+    Si viene `capturado_en` (captura sin conexión), no se pisa un registro más reciente que esa
+    captura: se omite y se cuenta. Devuelve (presentes, omitidos).
+    """
     validas = set(
         GrupoMiembro.objects.filter(grupo=reunion.grupo, activo=True).values_list(
             "persona_id", flat=True
         )
     )
+    omitidos = 0
     for item in items:
         if item["persona_id"] not in validas:
             raise ValidationError("Una de las personas no pertenece al grupo.")
+        if capturado_en is not None:
+            existente = Asistencia.objects.filter(
+                reunion=reunion, persona_id=item["persona_id"]
+            ).first()
+            if existente and existente.actualizada_en > capturado_en:
+                omitidos += 1
+                continue
         Asistencia.objects.update_or_create(
             reunion=reunion,
             persona_id=item["persona_id"],
@@ -67,9 +81,11 @@ def guardar_asistencia(reunion: Reunion, items, *, actor, request=None) -> int:
     presentes = reunion.asistencias.filter(presente=True).count()
     audit.log(
         "asistencia.guardada", actor=actor, target=reunion, request=request,
-        total=len(items), presentes=presentes,
+        total=len(items), presentes=presentes, omitidos=omitidos,
+        diferida=capturado_en is not None,
+        capturado_en=capturado_en.isoformat() if capturado_en else None,
     )  # fmt: skip
-    return presentes
+    return presentes, omitidos
 
 
 def abrir_reunion(grupo, fecha: date | None, *, actor, request=None) -> Reunion:

@@ -6,7 +6,17 @@ import App from './App'
 import { AuthProvider } from './features/auth/use-auth'
 import './styles/theme.css'
 
-const queryClient = new QueryClient()
+// networkMode «always»: con el navegador sin red, la petición se intenta igual para que el
+// service worker responda desde su caché y las escrituras puedan quedar en la cola local.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      networkMode: 'always',
+      retry: (intentos, error) => !(error instanceof TypeError) && intentos < 1,
+    },
+    mutations: { networkMode: 'always' },
+  },
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

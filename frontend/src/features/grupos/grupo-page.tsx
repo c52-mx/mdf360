@@ -14,6 +14,7 @@ import {
   SelectField,
 } from '@/design-system'
 import { api } from '@/lib/api'
+import { esErrorDeRed } from '@/lib/outbox'
 import { fechaLarga, rolesGrupo, type GrupoDetalle } from './types'
 
 const RESERVADOS = ['lider', 'supervisor']
@@ -55,6 +56,10 @@ export function GrupoPage() {
     mutationFn: () =>
       api<{ id: number }>(`/api/grupos/${id}/reuniones/`, { method: 'POST', body: {} }),
     onSuccess: (r) => navigate(`/grupos/reuniones/${r.id}`),
+    // Sin señal no se puede abrir la reunión en el servidor: se pasa lista en el teléfono
+    onError: (error) => {
+      if (esErrorDeRed(error)) navigate(`/grupos/${id}/hoy`)
+    },
   })
 
   if (grupo.isPending) return <p className="text-muted-foreground">Cargando…</p>

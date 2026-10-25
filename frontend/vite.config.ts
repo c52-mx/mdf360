@@ -11,6 +11,27 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        // Las rutas del servidor (API, panel técnico, estáticos, PDF y audios del estudio) nunca
+        // deben responderse con la aplicación: se dejan pasar al servidor.
+        navigateFallbackDenylist: [/^\/api\//, /^\/admin\//, /^\/static\//],
+        runtimeCaching: [
+          {
+            // Lectura para uso sin conexión: sesión, grupos y reuniones. NO se guardan finanzas,
+            // personas, estudios ni la bitácora.
+            urlPattern: ({ url, request }) =>
+              request.method === 'GET' &&
+              /^\/api\/(auth\/me\/|grupos\/(\d+\/|reuniones\/\d+\/)?)$/.test(url.pathname),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'mdf-api',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 80, maxAgeSeconds: 7 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+        ],
+      },
       manifest: {
         name: 'MDF360 · Mundo de Fe México',
         short_name: 'MDF360',
