@@ -13,6 +13,9 @@ PERMISOS = {
     "usuarios.invitar": "Invitar personas y reiniciar accesos",
     "roles.gestionar": "Asignar roles",
     "bitacora.ver": "Consultar la bitácora",
+    "grupos.ver_todos": "Ver todos los Grupos de Conexión",
+    "grupos.gestionar": "Crear y administrar Grupos de Conexión",
+    "grupos.material": "Subir el estudio semanal",
 }
 
 # clave: (nombre, nivel jerárquico (0 = más alto), exige contraseña fuerte, permisos)
@@ -24,7 +27,18 @@ ROLES = {
         ["usuarios.invitar", "roles.gestionar", "bitacora.ver"],
     ),
     "pastor": ("Pastor General", 1, True, list(PERMISOS)),
-    "anciano": ("Anciano", 2, False, ["personas.ver", "personas.crear", "personas.editar"]),
+    "anciano": (
+        "Anciano",
+        2,
+        False,
+        [
+            "personas.ver",
+            "personas.crear",
+            "personas.editar",
+            "grupos.ver_todos",
+            "grupos.material",
+        ],
+    ),
     "supervisor": (
         "Supervisor / Director de Área",
         3,

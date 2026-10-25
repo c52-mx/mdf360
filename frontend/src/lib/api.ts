@@ -23,7 +23,7 @@ async function csrfToken(): Promise<string> {
 }
 
 interface Options {
-  method?: 'GET' | 'POST' | 'PATCH'
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: unknown
 }
 
@@ -67,6 +67,26 @@ export async function apiUpload<T>(path: string, field: string, file: File): Pro
   if (!res.ok) {
     throw new ApiError(
       data.detail ?? 'No se pudo subir el archivo.',
+      res.status,
+      data.code,
+      data as Record<string, unknown>,
+    )
+  }
+  return data as T
+}
+
+/** Envía un formulario con varios archivos (multipart). */
+export async function apiForm<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'X-CSRFToken': await csrfToken() },
+    body: form,
+    credentials: 'same-origin',
+  })
+  const data = (await res.json().catch(() => ({}))) as { detail?: string; code?: string }
+  if (!res.ok) {
+    throw new ApiError(
+      data.detail ?? 'No se pudo guardar.',
       res.status,
       data.code,
       data as Record<string, unknown>,

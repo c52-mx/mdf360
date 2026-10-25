@@ -57,6 +57,6 @@ cd frontend && npm run lint && npm run lint:styles && npm test && npm run build
 
 ## Documentación
 
-- Requerimientos vigentes: `docs/requerimientos/v3.4 - MVP.docx`
+- Requerimientos vigentes: `docs/requerimientos/v3.5 - MVP.docx`
 - Matriz de trazabilidad: `docs/trazabilidad/Matriz de Trazabilidad MDF.xlsx`
 - Cómo contribuir y reglas de estilo: [CONTRIBUTING.md](CONTRIBUTING.md)
