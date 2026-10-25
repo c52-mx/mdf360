@@ -10,7 +10,7 @@ from apps.accounts.models import AsignacionRol, Rol, User
 from apps.core.models import AuditEvent
 from apps.personas import services as personas
 
-from .models import Asistencia, Grupo, GrupoMiembro, lunes_de
+from .models import Asistencia, Grupo, GrupoMiembro, Reunion, lunes_de
 
 PIN = "482915"
 
@@ -358,3 +358,125 @@ def test_permiso_nuevo_en_roles(db):
 
 
 _ = io  # noqa: F841
+
+
+# ---------- captura sin conexión y sincronización diferida (NF-06) ----------
+from django.utils import timezone  # noqa: E402
+
+
+def _ayer_noche():
+    """Ayer a las 9 pm hora local: el secretario capturó sin señal y sincroniza hoy."""
+    return (
+        timezone.localtime(timezone.now()).replace(hour=21, minute=0) - timedelta(days=1)
+    ).isoformat()
+
+
+def _hace(**kw):
+    return (timezone.now() - timedelta(**kw)).isoformat()
+
+
+def test_el_secretario_sincroniza_al_dia_siguiente_una_lista_del_dia_de_la_reunion(mundo):
+    # La reunión fue "ayer": el secretario capturó sin señal ayer y sincroniza hoy.
+    ayer = date.today() - timedelta(days=1)
+    reunion = Reunion.objects.create(grupo=mundo["norte"], fecha=ayer)
+    p = personas.crear_persona(datos={"nombre": "A", "whatsapp": "5511000001"}, acepta_datos=True)
+    GrupoMiembro.objects.create(grupo=mundo["norte"], persona=p, rol="asistente")
+    api = api_de(mundo["secre"])
+    capturado = _ayer_noche()
+    sin_dato = api.put(f"/api/grupos/reuniones/{reunion.pk}/", {"asistencias": []}, format="json")
+    assert sin_dato.status_code == 404  # sin momento de captura, rige "solo hoy"
+    r = api.put(
+        f"/api/grupos/reuniones/{reunion.pk}/",
+        {"asistencias": [{"persona_id": p.pk, "presente": True}], "capturado_en": capturado},
+        format="json",
+    )
+    assert r.status_code == 200 and r.json() == {"presentes": 1, "omitidos": 0}
+    evento = AuditEvent.objects.filter(action="asistencia.guardada").latest("created_at")
+    assert evento.detail["diferida"] is True and evento.detail["capturado_en"]
+
+
+def test_el_secretario_abre_la_reunion_del_dia_que_capturo(mundo):
+    ayer = (date.today() - timedelta(days=1)).isoformat()
+    api = api_de(mundo["secre"])
+    gid = mundo["norte"].pk
+    ok = api.post(
+        f"/api/grupos/{gid}/reuniones/",
+        {"fecha": ayer, "capturado_en": _ayer_noche()},
+        format="json",
+    )
+    assert ok.status_code == 201 and ok.json()["fecha"] == ayer
+    # sin momento de captura no puede abrir una reunión de otro día
+    assert (
+        api.post(f"/api/grupos/{gid}/reuniones/", {"fecha": ayer}, format="json").status_code == 403
+    )
+    # ni abrir la de otro día distinto al que capturó
+    otra = (date.today() - timedelta(days=4)).isoformat()
+    assert (
+        api.post(
+            f"/api/grupos/{gid}/reuniones/",
+            {"fecha": otra, "capturado_en": _ayer_noche()},
+            format="json",
+        ).status_code
+        == 403
+    )
+
+
+def test_captura_demasiado_antigua_se_rechaza(mundo):
+    reunion = Reunion.objects.create(grupo=mundo["norte"], fecha=date.today() - timedelta(days=10))
+    r = api_de(mundo["lider"]).put(
+        f"/api/grupos/reuniones/{reunion.pk}/",
+        {"asistencias": [], "capturado_en": _hace(days=9)},
+        format="json",
+    )
+    assert r.status_code == 400 and r.json()["code"] == "too_old"
+
+
+def test_no_se_pisa_un_registro_mas_reciente_que_la_captura(mundo):
+    p = personas.crear_persona(datos={"nombre": "A", "whatsapp": "5511000002"}, acepta_datos=True)
+    GrupoMiembro.objects.create(grupo=mundo["norte"], persona=p, rol="asistente")
+    api = api_de(mundo["lider"])
+    rid = api.post(f"/api/grupos/{mundo['norte'].pk}/reuniones/", {}, format="json").json()["id"]
+    # sin conexión, el secretario marcó presente hace 30 minutos...
+    capturado = _hace(minutes=30)
+    # ...pero mientras tanto el líder marcó ausente en línea (más reciente)
+    api.put(
+        f"/api/grupos/reuniones/{rid}/",
+        {"asistencias": [{"persona_id": p.pk, "presente": False}]},
+        format="json",
+    )
+    r = api_de(mundo["secre"]).put(
+        f"/api/grupos/reuniones/{rid}/",
+        {"asistencias": [{"persona_id": p.pk, "presente": True}], "capturado_en": capturado},
+        format="json",
+    )
+    assert r.json() == {"presentes": 0, "omitidos": 1}
+    assert Asistencia.objects.get(reunion_id=rid, persona=p).presente is False
+
+
+def test_reenviar_la_misma_captura_es_idempotente(mundo):
+    p = personas.crear_persona(datos={"nombre": "A", "whatsapp": "5511000003"}, acepta_datos=True)
+    GrupoMiembro.objects.create(grupo=mundo["norte"], persona=p, rol="asistente")
+    api = api_de(mundo["lider"])
+    rid = api.post(f"/api/grupos/{mundo['norte'].pk}/reuniones/", {}, format="json").json()["id"]
+    cuerpo = {
+        "asistencias": [{"persona_id": p.pk, "presente": True}],
+        "capturado_en": _hace(minutes=5),
+    }
+    a = api.put(f"/api/grupos/reuniones/{rid}/", cuerpo, format="json")
+    assert a.status_code == 200 and a.json()["omitidos"] == 0
+    b = api.put(
+        f"/api/grupos/reuniones/{rid}/", cuerpo, format="json"
+    )  # reintento tras perder la respuesta
+    assert b.status_code == 200
+    assert Asistencia.objects.filter(reunion_id=rid).count() == 1
+
+
+def test_un_reloj_adelantado_no_permite_saltarse_la_regla_del_dia(mundo):
+    reunion = Reunion.objects.create(grupo=mundo["norte"], fecha=date.today() - timedelta(days=2))
+    futuro = (timezone.now() + timedelta(days=5)).isoformat()
+    r = api_de(mundo["secre"]).put(
+        f"/api/grupos/reuniones/{reunion.pk}/",
+        {"asistencias": [], "capturado_en": futuro},
+        format="json",
+    )
+    assert r.status_code == 404  # se trata como "ahora", y la reunión no es de hoy

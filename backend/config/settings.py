@@ -118,7 +118,11 @@ CSRF_TRUSTED_ORIGINS = [
     *env_list("DJANGO_CSRF_TRUSTED_ORIGINS"),
 ]
 if DEBUG:
-    CSRF_TRUSTED_ORIGINS += ["http://localhost:5173", "http://127.0.0.1:5173"]
+    CSRF_TRUSTED_ORIGINS += [
+        "http://localhost:5173",  # vite dev
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",  # vite preview (pruebas del service worker)
+    ]
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 90  # sesión de 90 días, se renueva con el uso
 SESSION_SAVE_EVERY_REQUEST = True
 
