@@ -22,6 +22,9 @@ export function OfrendasPage() {
         module="grupos"
       />
       {pendientes.isError ? <Alert tone="destructive">{pendientes.error.message}</Alert> : null}
+      {pendientes.data?.some((o) => o.estado === 'diferencia') ? (
+        <Alert tone="destructive">Hay ofrendas con diferencia. Revisa la cifra capturada y la contada.</Alert>
+      ) : null}
       {pendientes.data && pendientes.data.length === 0 ? (
         <Alert tone="success">No tienes ofrendas pendientes.</Alert>
       ) : null}

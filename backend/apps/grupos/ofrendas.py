@@ -1,9 +1,11 @@
 """Ofrendas del grupo con aval del Tesorero (M3-04).
 
 Reglas (matriz de confidencialidad aprobada, v3.2, sec. 3.3):
-- El Secretario captura. Líder y Supervisor solo consultan; el Pastor consulta todo.
+- El Secretario captura. Si el grupo no tiene Secretario, el Líder lo suple. Líder y Supervisor
+  consultan; el Pastor consulta todo.
 - El Anciano no ve finanzas.
-- El Tesorero cuenta, escribe su cifra y confirma con su PIN (aval electrónico simple).
+- El Tesorero cuenta, escribe su cifra y confirma con su PIN (aval electrónico simple). Si el
+  grupo no tiene Tesorero, lo suple el Líder o el Pastor. Toda suplencia queda en bitácora.
 - Una ofrenda avalada no se edita sin motivo; la corrección exige un nuevo aval.
 - Quien capturó no puede avalar su propia captura.
 """
@@ -15,37 +17,70 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from apps.accounts.permissions import tiene_permiso
-from apps.core import audit
+from apps.core import audit, config
 
 from .access import roles_en
 from .models import GrupoMiembro, Ofrenda, OfrendaMovimiento, Reunion
 
 R = GrupoMiembro.Rol
-MONTO_MAXIMO = Decimal("1000000")
 
 
 # ---------- permisos ----------
+def _tiene_activo(grupo, rol) -> bool:
+    return GrupoMiembro.objects.filter(grupo=grupo, rol=rol, activo=True).exists()
+
+
+def captura_suplente(user, reunion: Reunion) -> bool:
+    """El Líder captura cuando el grupo no tiene Secretario."""
+    roles = roles_en(user, reunion.grupo)
+    return (
+        R.LIDER in roles
+        and R.SECRETARIO not in roles
+        and not _tiene_activo(reunion.grupo, R.SECRETARIO)
+    )
+
+
 def puede_capturar_ofrenda(user, reunion: Reunion) -> bool:
     if tiene_permiso(user, "grupos.gestionar"):
         return True
-    return R.SECRETARIO in roles_en(user, reunion.grupo) and reunion.fecha == date.today()
+    if reunion.fecha != date.today():
+        return False
+    return R.SECRETARIO in roles_en(user, reunion.grupo) or captura_suplente(user, reunion)
+
+
+def aval_suplente(user, grupo) -> bool:
+    """Sin Tesorero en el grupo, avalan el Líder o el Pastor."""
+    if _tiene_activo(grupo, R.TESORERO):
+        return False
+    return R.LIDER in roles_en(user, grupo) or tiene_permiso(user, "grupos.gestionar")
 
 
 def puede_avalar(user, grupo) -> bool:
-    return R.TESORERO in roles_en(user, grupo)
+    return R.TESORERO in roles_en(user, grupo) or aval_suplente(user, grupo)
 
 
 def puede_ver_ofrendas(user, reunion: Reunion) -> bool:
+    return puede_ver_finanzas_grupo(user, reunion.grupo, reunion.fecha)
+
+
+def puede_ver_finanzas_grupo(user, grupo, fecha=None) -> bool:
     if tiene_permiso(user, "ofrendas.ver_todas"):
         return True
-    roles = roles_en(user, reunion.grupo)
+    roles = roles_en(user, grupo)
     if roles & {R.LIDER, R.SUPERVISOR, R.TESORERO}:
         return True
-    return R.SECRETARIO in roles and reunion.fecha == date.today()
+    return R.SECRETARIO in roles and fecha == date.today()
 
 
 def puede_corregir(user, ofrenda: Ofrenda) -> bool:
     return puede_capturar_ofrenda(user, ofrenda.reunion)
+
+
+def diferencias_visibles(user, grupo) -> int | None:
+    """Cantidad de ofrendas «Con diferencia» del grupo, solo si el usuario puede ver finanzas."""
+    if not puede_ver_finanzas_grupo(user, grupo):
+        return None
+    return Ofrenda.objects.filter(reunion__grupo=grupo, estado=Ofrenda.Estado.DIFERENCIA).count()
 
 
 # ---------- operaciones ----------
@@ -58,8 +93,9 @@ def _monto(valor) -> Decimal:
         monto = Decimal(str(valor)).quantize(Decimal("0.01"))
     except Exception as exc:
         raise ValidationError("El monto no es válido.") from exc
-    if monto <= 0 or monto > MONTO_MAXIMO:
-        raise ValidationError("El monto debe ser mayor que cero y menor a 1,000,000.")
+    maximo = config.obtener_monto("ofrendas.monto_maximo")
+    if monto <= 0 or monto > maximo:
+        raise ValidationError(f"El monto debe ser mayor que cero y no pasar de {maximo:,.2f}.")
     return monto
 
 
@@ -71,17 +107,23 @@ def capturar(reunion, *, tipo, concepto, monto, actor, request=None) -> Ofrenda:
         raise ValidationError("Escribe el concepto de la ofrenda especial.")
     if tipo == Ofrenda.Tipo.REGULAR:
         concepto = ""
-    if Ofrenda.objects.filter(reunion=reunion, tipo=tipo, concepto=concepto).exists():
+    repetida = Ofrenda.objects.filter(reunion=reunion, tipo=tipo, concepto=concepto).exists()
+    unica = tipo == Ofrenda.Tipo.ESPECIAL or config.obtener("ofrendas.una_regular_por_reunion")
+    if repetida and unica:
         raise ValidationError(
             "Ya hay una ofrenda de este tipo en la reunión. Corrígela con motivo."
         )
+    suplencia = captura_suplente(actor, reunion)
     ofrenda = Ofrenda.objects.create(
         reunion=reunion, tipo=tipo, concepto=concepto, monto=monto, capturada_por=actor
     )
-    OfrendaMovimiento.objects.create(ofrenda=ofrenda, tipo="captura", monto=monto, usuario=actor)
+    OfrendaMovimiento.objects.create(
+        ofrenda=ofrenda, tipo="captura", monto=monto, usuario=actor,
+        motivo="Captura como suplente del Secretario" if suplencia else "",
+    )  # fmt: skip
     audit.log(
         "ofrenda.capturada", actor=actor, target=ofrenda, request=request,
-        tipo=tipo, monto=str(monto),
+        tipo=tipo, monto=str(monto), suplencia=suplencia,
     )  # fmt: skip
     return ofrenda
 
@@ -96,13 +138,14 @@ def corregir(ofrenda: Ofrenda, *, monto, motivo, actor, request=None) -> Ofrenda
     ofrenda.monto = nuevo
     ofrenda.estado = Ofrenda.Estado.PENDIENTE  # requiere un nuevo aval
     ofrenda.save(update_fields=["monto", "estado"])
+    suplencia = captura_suplente(actor, ofrenda.reunion)
     OfrendaMovimiento.objects.create(
         ofrenda=ofrenda, tipo="correccion", monto_anterior=anterior, monto=nuevo,
         motivo=motivo, usuario=actor,
     )  # fmt: skip
     audit.log(
         "ofrenda.corregida", actor=actor, target=ofrenda, request=request,
-        anterior=str(anterior), nuevo=str(nuevo), motivo=motivo,
+        anterior=str(anterior), nuevo=str(nuevo), motivo=motivo, suplencia=suplencia,
     )  # fmt: skip
     return ofrenda
 
@@ -116,14 +159,17 @@ def avalar(ofrenda: Ofrenda, *, monto_contado, actor, request=None) -> Ofrenda:
     diferencia = contado - ofrenda.monto
     ofrenda.estado = Ofrenda.Estado.AVALADA if diferencia == 0 else Ofrenda.Estado.DIFERENCIA
     ofrenda.save(update_fields=["estado"])
+    suplencia = R.TESORERO not in roles_en(actor, ofrenda.reunion.grupo)
     OfrendaMovimiento.objects.create(
         ofrenda=ofrenda, tipo="aval", monto_anterior=ofrenda.monto, monto=contado,
         diferencia=diferencia, usuario=actor,
+        motivo="Aval como suplente del Tesorero" if suplencia else "",
     )  # fmt: skip
     audit.log(
         "ofrenda.avalada" if diferencia == 0 else "ofrenda.diferencia",
         actor=actor, target=ofrenda, request=request,
         capturado=str(ofrenda.monto), contado=str(contado), diferencia=str(diferencia),
+        suplencia=suplencia,
     )  # fmt: skip
     return ofrenda
 
@@ -140,6 +186,7 @@ def ofrenda_dict(o: Ofrenda, *, detalle: bool = True) -> dict:
         "monto": str(o.monto),
         "estado": o.estado,
         "estado_display": o.get_estado_display(),
+        "con_diferencia": o.estado == Ofrenda.Estado.DIFERENCIA,
     }
     if detalle:
         base["movimientos"] = [

@@ -12,6 +12,7 @@ export interface GrupoResumen {
   lideres: string[]
   integrantes: number
   mis_roles: string[]
+  ofrendas_con_diferencia: number | null
 }
 
 export interface Miembro {

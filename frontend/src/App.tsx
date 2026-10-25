@@ -1,7 +1,8 @@
-import { Coins, Home, Palette, UsersRound, ScrollText, ShieldCheck, UserCog, UserPlus, Users } from 'lucide-react'
+import { Coins, Home, Palette, UsersRound, ScrollText, Settings, ShieldCheck, UserCog, UserPlus, Users } from 'lucide-react'
 import { Outlet, Route, Routes } from 'react-router-dom'
 import { AppShell, type NavItem } from '@/design-system'
 import { AuditoriaPage } from '@/features/auditoria/auditoria-page'
+import { ConfigPage } from '@/features/config/config-page'
 import { AccountPage } from '@/features/auth/account-page'
 import { ActivatePage } from '@/features/auth/activate-page'
 import { InvitePage } from '@/features/auth/invite-page'
@@ -40,6 +41,9 @@ function PrivateLayout() {
     ...(can('bitacora.ver')
       ? [{ to: '/bitacora', label: 'Bitácora', icon: ScrollText, module: 'admin' as const }]
       : []),
+    ...(can('config.gestionar')
+      ? [{ to: '/configuracion', label: 'Configuración', icon: Settings, module: 'admin' as const }]
+      : []),
     { to: '/cuenta', label: 'Mi cuenta', icon: UserCog },
     { to: '/diseno', label: 'Diseño', icon: Palette },
   ]
@@ -68,6 +72,7 @@ export default function App() {
           <Route path="/personas/nueva" element={<NuevaPersonaPage />} />
           <Route path="/personas/:id" element={<PersonaPage />} />
           <Route path="/bitacora" element={<AuditoriaPage />} />
+          <Route path="/configuracion" element={<ConfigPage />} />
           <Route path="/roles" element={<RolesPage />} />
           <Route path="/invitar" element={<InvitePage />} />
           <Route path="/cuenta" element={<AccountPage />} />

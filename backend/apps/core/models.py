@@ -48,3 +48,21 @@ class AuditEvent(models.Model):
 
     def delete(self, *args, **kwargs):
         raise AppendOnlyError("La bitácora no se puede borrar.")
+
+
+class Configuracion(models.Model):
+    """Valor vigente de un parámetro configurable (ver config.py)."""
+
+    clave = models.CharField(max_length=80, unique=True)
+    valor = models.JSONField()
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "configuración"
+        verbose_name_plural = "configuración"
+
+    def __str__(self):
+        return f"{self.clave} = {self.valor}"

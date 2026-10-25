@@ -60,3 +60,59 @@ class AuditListView(APIView):
             for e in page
         ]
         return paginator.get_paginated_response(filas)
+
+
+class ConfigView(APIView):
+    """Lista de parámetros configurables con su valor vigente (permiso config.gestionar)."""
+
+    def get_permissions(self):
+        from apps.accounts.permissions import requiere
+
+        return [requiere("config.gestionar")()]
+
+    def get(self, request):
+        from . import config
+
+        return Response(
+            [
+                {
+                    "clave": clave,
+                    "descripcion": d["descripcion"],
+                    "tipo": d["tipo"],
+                    "valor": config.obtener(clave),
+                    "por_defecto": d["default"],
+                }
+                for clave, d in config.DEFINICIONES.items()
+            ]
+        )
+
+
+class ConfigItemView(APIView):
+    def get_permissions(self):
+        from apps.accounts.permissions import requiere
+
+        return [requiere("config.gestionar")()]
+
+    def patch(self, request, clave):
+        from django.core.exceptions import ValidationError
+
+        from . import audit, config
+        from .models import Configuracion
+
+        if clave not in config.DEFINICIONES:
+            from django.http import Http404
+
+            raise Http404
+        try:
+            valor = config.validar(clave, request.data.get("valor"))
+        except ValidationError as exc:
+            return Response({"code": "invalid", "detail": " ".join(exc.messages)}, status=400)
+        anterior = config.obtener(clave)
+        Configuracion.objects.update_or_create(
+            clave=clave, defaults={"valor": valor, "actualizado_por": request.user}
+        )
+        audit.log(
+            "config.cambiada", actor=request.user, request=request,
+            clave=clave, anterior=anterior, nuevo=valor,
+        )  # fmt: skip
+        return Response({"clave": clave, "valor": valor})

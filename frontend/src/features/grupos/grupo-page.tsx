@@ -81,6 +81,12 @@ export function GrupoPage() {
         }
       />
       {abrir.error ? <Alert tone="destructive">{abrir.error.message}</Alert> : null}
+      {g.ofrendas_con_diferencia ? (
+        <Alert tone="destructive">
+          Hay {g.ofrendas_con_diferencia === 1 ? '1 ofrenda' : `${g.ofrendas_con_diferencia} ofrendas`} con
+          diferencia entre lo capturado y lo contado. Revísalas en la reunión correspondiente.
+        </Alert>
+      ) : null}
 
       <Card className="flex flex-col gap-3">
         <CardTitle>Integrantes</CardTitle>
