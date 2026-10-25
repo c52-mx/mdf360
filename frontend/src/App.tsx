@@ -1,4 +1,4 @@
-import { Coins, Home, Palette, UsersRound, ScrollText, Settings, ShieldCheck, UserCog, UserPlus, Users } from 'lucide-react'
+import { Coins, HandHeart, Home, Palette, UsersRound, ScrollText, Settings, ShieldCheck, UserCog, UserPlus, Users } from 'lucide-react'
 import { Outlet, Route, Routes } from 'react-router-dom'
 import { AppShell, type NavItem } from '@/design-system'
 import { AuditoriaPage } from '@/features/auditoria/auditoria-page'
@@ -19,6 +19,8 @@ import { GruposPage } from '@/features/grupos/grupos-page'
 import { OfrendasPage } from '@/features/grupos/ofrendas-page'
 import { ReunionPage } from '@/features/grupos/reunion-page'
 import { SyncBanner } from '@/features/offline/sync-banner'
+import { FormularioPage } from '@/features/peticiones/formulario-page'
+import { PeticionesPage } from '@/features/peticiones/peticiones-page'
 import { HomePage } from '@/features/home/home-page'
 import { NuevaPersonaPage } from '@/features/personas/nueva-persona-page'
 import { PersonaPage } from '@/features/personas/persona-page'
@@ -31,6 +33,7 @@ function PrivateLayout() {
     { to: '/', label: 'Inicio', icon: Home },
     { to: '/grupos', label: 'Grupos', icon: UsersRound, module: 'grupos' as const },
     { to: '/ofrendas', label: 'Ofrendas', icon: Coins, module: 'grupos' as const },
+    { to: '/peticiones', label: 'Peticiones', icon: HandHeart, module: 'grupos' as const },
     ...(can('personas.ver')
       ? [{ to: '/personas', label: 'Personas', icon: Users, module: 'admin' as const }]
       : []),
@@ -71,6 +74,8 @@ export default function App() {
           <Route path="/grupos/:id/hoy" element={<ListaSinConexionPage />} />
           <Route path="/grupos/:id" element={<GrupoPage />} />
           <Route path="/ofrendas" element={<OfrendasPage />} />
+          <Route path="/peticiones" element={<PeticionesPage />} />
+          <Route path="/peticiones/formulario" element={<FormularioPage />} />
           <Route path="/estudios" element={<EstudiosPage />} />
           <Route path="/personas" element={<PersonasPage />} />
           <Route path="/personas/nueva" element={<NuevaPersonaPage />} />

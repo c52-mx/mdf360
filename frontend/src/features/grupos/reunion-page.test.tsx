@@ -67,6 +67,7 @@ describe('ReunionPage', () => {
         if (url.includes('/auth/me/')) return json(200, usuario)
         if (url.includes('/csrf/')) return json(200, { csrfToken: 'x' })
         if (url.includes('/ofrendas/')) return json(404, {})
+        if (url.includes('/peticiones/')) return json(403, {})
         if (init?.method === 'PUT') return put()
         return json(200, reunion)
       }),
@@ -91,6 +92,7 @@ describe('ReunionPage', () => {
         if (url.includes('/auth/me/')) return json(200, usuario)
         if (url.includes('/csrf/')) return json(200, { csrfToken: 'x' })
         if (url.includes('/ofrendas/')) return json(404, {})
+        if (url.includes('/peticiones/')) return json(403, {})
         if (init?.method === 'PUT') return Promise.reject(new TypeError('Failed to fetch'))
         return json(200, reunion)
       }),

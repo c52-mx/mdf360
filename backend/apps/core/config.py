@@ -14,6 +14,17 @@ DEFINICIONES = {
         "tipo": "monto",
         "descripcion": "Monto máximo permitido por ofrenda (MXN)",
     },
+    "peticiones.dias_retencion": {
+        "default": 30,
+        "tipo": "entero",
+        "descripcion": "Días que se conservan las peticiones de oración antes de borrarse",
+    },
+    "peticiones.visibilidad_por_defecto": {
+        "default": "lideres",
+        "tipo": "opcion",
+        "opciones": ["lideres", "grupo", "equipo"],
+        "descripcion": "Alcance por defecto de una petición nueva (líderes, grupo o equipo)",
+    },
     "ofrendas.una_regular_por_reunion": {
         "default": True,
         "tipo": "booleano",
@@ -56,4 +67,14 @@ def validar(clave: str, valor):
         if numero <= 0 or numero > Decimal("1000000000"):
             raise ValidationError("El monto debe ser mayor que cero y menor a 1,000,000,000.")
         return int(numero) if numero == numero.to_integral() else float(numero)
+    if tipo == "opcion":
+        if valor not in definicion(clave)["opciones"]:
+            raise ValidationError("La opción no es válida.")
+        return valor
+    if tipo == "entero":
+        if isinstance(valor, bool) or not isinstance(valor, (int, float)) or int(valor) != valor:
+            raise ValidationError("El valor debe ser un número entero.")
+        if not 1 <= valor <= 3650:
+            raise ValidationError("Debe estar entre 1 y 3650 días.")
+        return int(valor)
     raise ValidationError("Tipo de parámetro no soportado.")

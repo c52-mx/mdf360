@@ -354,10 +354,8 @@ def test_la_configuracion_exige_permiso_y_valida(m):
     )
     pastor = api_de(m["pastor"])
     lista = pastor.get("/api/config/").json()
-    assert {c["clave"] for c in lista} == {
-        "ofrendas.monto_maximo",
-        "ofrendas.una_regular_por_reunion",
-    }
+    claves = {c["clave"] for c in lista}
+    assert {"ofrendas.monto_maximo", "ofrendas.una_regular_por_reunion"} <= claves
     assert (
         pastor.patch("/api/config/ofrendas.monto_maximo/", {"valor": -1}, format="json").status_code
         == 400

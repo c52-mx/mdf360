@@ -9,23 +9,26 @@ import {
   CheckboxField,
   Field,
   PageHeader,
+  SelectField,
 } from '@/design-system'
 import { useCan } from '@/features/auth/use-auth'
+import { visibilidadOpciones } from '@/features/peticiones/types'
 import { api } from '@/lib/api'
 
 interface Parametro {
   clave: string
   descripcion: string
-  tipo: 'monto' | 'booleano'
-  valor: number | boolean
-  por_defecto: number | boolean
+  tipo: 'monto' | 'booleano' | 'entero' | 'opcion'
+  valor: number | boolean | string
+  por_defecto: number | boolean | string
+  opciones?: string[] | null
 }
 
 function Fila({ p }: { p: Parametro }) {
   const queryClient = useQueryClient()
   const [valor, setValor] = useState(String(p.valor))
   const guardar = useMutation({
-    mutationFn: (nuevo: number | boolean) =>
+    mutationFn: (nuevo: number | boolean | string) =>
       api(`/api/config/${p.clave}/`, { method: 'PATCH', body: { valor: nuevo } }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['config'] }),
   })
@@ -35,10 +38,26 @@ function Fila({ p }: { p: Parametro }) {
       <div>
         <CardTitle>{p.descripcion}</CardTitle>
         <CardDescription>
-          Valor por defecto: {typeof p.por_defecto === 'boolean' ? (p.por_defecto ? 'Sí' : 'No') : p.por_defecto}
+          Valor por defecto:{' '}
+          {typeof p.por_defecto === 'boolean'
+            ? p.por_defecto
+              ? 'Sí'
+              : 'No'
+            : (visibilidadOpciones.find((v) => v.value === p.por_defecto)?.label ?? p.por_defecto)}
         </CardDescription>
       </div>
-      {p.tipo === 'booleano' ? (
+      {p.tipo === 'opcion' ? (
+        <SelectField
+          label="Valor"
+          value={String(p.valor)}
+          disabled={guardar.isPending}
+          onChange={(e) => guardar.mutate(e.target.value)}
+          options={(p.opciones ?? []).map((o) => ({
+            value: o,
+            label: visibilidadOpciones.find((v) => v.value === o)?.label ?? o,
+          }))}
+        />
+      ) : p.tipo === 'booleano' ? (
         <CheckboxField
           checked={Boolean(p.valor)}
           disabled={guardar.isPending}
