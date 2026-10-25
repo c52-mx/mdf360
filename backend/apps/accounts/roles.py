@@ -17,6 +17,7 @@ PERMISOS = {
     "grupos.gestionar": "Crear y administrar Grupos de Conexión",
     "grupos.material": "Subir el estudio semanal",
     "ofrendas.ver_todas": "Ver las ofrendas de todos los grupos",
+    "config.gestionar": "Cambiar los parámetros configurables",
 }
 
 # clave: (nombre, nivel jerárquico (0 = más alto), exige contraseña fuerte, permisos)
@@ -25,7 +26,7 @@ ROLES = {
         "Administrador Técnico",
         0,
         True,
-        ["usuarios.invitar", "roles.gestionar", "bitacora.ver"],
+        ["usuarios.invitar", "roles.gestionar", "bitacora.ver", "config.gestionar"],
     ),
     "pastor": ("Pastor General", 1, True, list(PERMISOS)),
     "anciano": (

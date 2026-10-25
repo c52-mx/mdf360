@@ -32,6 +32,7 @@ export interface Ofrenda {
   monto: string
   estado: 'pendiente' | 'avalada' | 'diferencia'
   estado_display: string
+  con_diferencia: boolean
   movimientos?: Movimiento[]
 }
 
@@ -154,6 +155,11 @@ export function OfrendasReunion({ reunionId }: { reunionId: number }) {
   return (
     <Card className="flex flex-col gap-4">
       <CardTitle>Ofrendas</CardTitle>
+      {ofrendas.some((o) => o.estado === 'diferencia') ? (
+        <Alert tone="destructive">
+          Hay una diferencia entre lo capturado y lo contado por el Tesorero. Verifica la cifra.
+        </Alert>
+      ) : null}
       {ofrendas.length === 0 ? <CardDescription>Aún no se captura la ofrenda de esta reunión.</CardDescription> : null}
       <ul className="flex flex-col gap-3">
         {ofrendas.map((o) => (

@@ -14,6 +14,7 @@ from apps.accounts.permissions import requiere
 from apps.core import audit
 
 from . import access, services
+from . import ofrendas as ofr
 from .models import EstudioSemanal, Grupo, GrupoMiembro, Reunion
 
 DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
@@ -50,6 +51,7 @@ def grupo_resumen(grupo: Grupo, user) -> dict:
         "lideres": lideres,
         "integrantes": miembros.values("persona_id").distinct().count(),
         "mis_roles": sorted(access.roles_en(user, grupo)),
+        "ofrendas_con_diferencia": ofr.diferencias_visibles(user, grupo),
     }
 
 

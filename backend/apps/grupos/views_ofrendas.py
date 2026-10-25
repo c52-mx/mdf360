@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from apps.core import audit
 
 from . import ofrendas as of
-from .models import GrupoMiembro, Ofrenda, Reunion
+from .models import Grupo, GrupoMiembro, Ofrenda, Reunion
 
 
 def _error(code, detail, http_status=status.HTTP_400_BAD_REQUEST):
@@ -140,19 +140,27 @@ class AvalView(APIView):
 
 
 class OfrendasPendientesView(APIView):
-    """Ofrendas por avalar (o con diferencia) de los grupos donde la persona es Tesorera."""
+    """Ofrendas por avalar (o con diferencia) de los grupos donde la persona es Tesorera.
+
+    Si un grupo no tiene Tesorero, también aparecen para su Líder y para el Pastor (suplencia).
+    """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         persona = getattr(request.user, "persona", None)
-        if persona is None:
-            return Response([])
-        grupos = GrupoMiembro.objects.filter(
-            persona=persona, activo=True, rol=GrupoMiembro.Rol.TESORERO
-        ).values_list("grupo_id", flat=True)
+        ids = set()
+        if persona is not None:
+            ids |= set(
+                GrupoMiembro.objects.filter(
+                    persona=persona, activo=True, rol=GrupoMiembro.Rol.TESORERO
+                ).values_list("grupo_id", flat=True)
+            )
+        for grupo in Grupo.objects.filter(activo=True):
+            if of.aval_suplente(request.user, grupo):
+                ids.add(grupo.pk)
         lista = Ofrenda.objects.filter(
-            reunion__grupo_id__in=list(grupos),
+            reunion__grupo_id__in=list(ids),
             estado__in=[Ofrenda.Estado.PENDIENTE, Ofrenda.Estado.DIFERENCIA],
         ).select_related("reunion__grupo")
         return Response([of.ofrenda_dict(o, detalle=False) for o in lista])

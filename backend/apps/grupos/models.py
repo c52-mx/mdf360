@@ -149,12 +149,7 @@ class Ofrenda(models.Model):
 
     class Meta:
         ordering = ["-reunion__fecha", "-creada_en"]
-        constraints = [
-            # Una ofrenda regular por reunión; las especiales se distinguen por concepto
-            models.UniqueConstraint(
-                fields=["reunion", "tipo", "concepto"], name="ofrenda_unica_por_concepto"
-            )
-        ]
+        # La unicidad por tipo y concepto es configurable (ofrendas.una_regular_por_reunion)
 
     def __str__(self):
         return f"{self.reunion} · {self.get_tipo_display()} · {self.monto}"

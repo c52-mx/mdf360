@@ -243,3 +243,144 @@ def test_pendientes_solo_de_sus_grupos(m):
 def test_permiso_de_finanzas_solo_para_el_pastor(db):
     assert "ofrendas.ver_todas" in Rol.objects.get(clave="pastor").permisos
     assert "ofrendas.ver_todas" not in Rol.objects.get(clave="anciano").permisos
+
+
+# ---------- suplencias (el Líder suple al Secretario y al Tesorero) ----------
+@pytest.fixture
+def sin_cargos(m):
+    GrupoMiembro.objects.filter(grupo=m["grupo"], rol__in=["secretario", "tesorero"]).update(
+        activo=False
+    )
+    return m
+
+
+def test_el_lider_captura_si_no_hay_secretario(sin_cargos):
+    r = capturar(sin_cargos, usuario="lider")
+    assert r.status_code == 201
+    assert r.json()["movimientos"][0]["motivo"] == "Captura como suplente del Secretario"
+    evento = AuditEvent.objects.get(action="ofrenda.capturada")
+    assert evento.detail["suplencia"] is True
+
+
+def test_el_lider_no_captura_si_hay_secretario(m):
+    assert capturar(m, usuario="lider").status_code in (403, 404)
+
+
+def test_sin_tesorero_avalan_el_pastor_o_el_lider_pero_no_quien_capturo(sin_cargos):
+    o = capturar(sin_cargos, usuario="lider").json()["id"]
+    propio = avalar(sin_cargos, o, "1250", pin=PIN, usuario="lider")
+    assert propio.status_code == 403 and propio.json()["code"] == "own_capture"
+    r = avalar(sin_cargos, o, "1250", pin=FUERTE, usuario="pastor")
+    assert r.status_code == 200 and r.json()["estado"] == "avalada"
+    assert r.json()["movimientos"][-1]["motivo"] == "Aval como suplente del Tesorero"
+    assert AuditEvent.objects.filter(action="ofrenda.avalada", detail__suplencia=True).exists()
+
+
+def test_con_secretario_pero_sin_tesorero_el_lider_avala(m):
+    GrupoMiembro.objects.filter(grupo=m["grupo"], rol="tesorero").update(activo=False)
+    o = capturar(m).json()["id"]
+    r = avalar(m, o, "1250", pin=PIN, usuario="lider")
+    assert r.status_code == 200 and r.json()["estado"] == "avalada"
+    pend = capturar(m, tipo="especial", concepto="Retiro").json()["id"]
+    assert pend in [
+        p["id"] for p in api_de(m["lider"]).get("/api/grupos/ofrendas/pendientes/").json()
+    ]
+
+
+def test_con_tesorero_nadie_mas_avala(m):
+    o = capturar(m).json()["id"]
+    assert avalar(m, o, "1250", pin=PIN, usuario="lider").status_code == 404
+    assert avalar(m, o, "1250", pin=FUERTE, usuario="pastor").status_code == 404
+
+
+# ---------- diferencias visibles ----------
+def test_las_diferencias_se_ven_en_el_grupo_para_quien_consulta(m):
+    o = capturar(m).json()["id"]
+    avalar(m, o, "1200")
+    for quien in ("lider", "sup", "pastor"):
+        grupos = api_de(m[quien]).get("/api/grupos/").json()
+        norte = next(g for g in grupos if g["nombre"] == "Conexión Norte")
+        assert norte["ofrendas_con_diferencia"] == 1, quien
+    # el Tesorero la ve de inmediato en su pantalla de ofrendas
+    pend = api_de(m["tesorero"]).get("/api/grupos/ofrendas/pendientes/").json()
+    assert pend[0]["con_diferencia"] is True
+    # el Anciano ve el grupo pero no las finanzas
+    norte = next(
+        g
+        for g in api_de(m["anciano"]).get("/api/grupos/").json()
+        if g["nombre"] == "Conexión Norte"
+    )
+    assert norte["ofrendas_con_diferencia"] is None
+    detalle = api_de(m["lider"]).get(f"/api/grupos/{m['grupo'].pk}/").json()
+    assert detalle["ofrendas_con_diferencia"] == 1
+    assert (
+        api_de(m["lider"])
+        .get(f"/api/grupos/reuniones/{m['reunion'].pk}/ofrendas/")
+        .json()["ofrendas"][0]["con_diferencia"]
+    )
+
+
+# ---------- parámetros configurables ----------
+def test_monto_maximo_configurable(m):
+    assert capturar(m, monto="2000000").status_code == 400
+    api_de(m["pastor"]).patch(
+        "/api/config/ofrendas.monto_maximo/", {"valor": 5000000}, format="json"
+    )
+    assert capturar(m, monto="2000000").status_code == 201
+    api_de(m["pastor"]).patch("/api/config/ofrendas.monto_maximo/", {"valor": 500}, format="json")
+    assert capturar(m, monto="600", tipo="especial", concepto="X").status_code == 400
+
+
+def test_una_regular_por_reunion_configurable(m):
+    assert capturar(m).status_code == 201
+    assert capturar(m).status_code == 400
+    api_de(m["pastor"]).patch(
+        "/api/config/ofrendas.una_regular_por_reunion/", {"valor": False}, format="json"
+    )
+    assert capturar(m, monto="300").status_code == 201
+    assert Ofrenda.objects.filter(reunion=m["reunion"], tipo="regular").count() == 2
+    # las especiales con el mismo concepto siguen sin repetirse
+    assert capturar(m, tipo="especial", concepto="Retiro").status_code == 201
+    assert capturar(m, tipo="especial", concepto="Retiro").status_code == 400
+
+
+def test_la_configuracion_exige_permiso_y_valida(m):
+    assert api_de(m["lider"]).get("/api/config/").status_code == 403
+    assert (
+        api_de(m["anciano"])
+        .patch("/api/config/ofrendas.monto_maximo/", {"valor": 1}, format="json")
+        .status_code
+        == 403
+    )
+    pastor = api_de(m["pastor"])
+    lista = pastor.get("/api/config/").json()
+    assert {c["clave"] for c in lista} == {
+        "ofrendas.monto_maximo",
+        "ofrendas.una_regular_por_reunion",
+    }
+    assert (
+        pastor.patch("/api/config/ofrendas.monto_maximo/", {"valor": -1}, format="json").status_code
+        == 400
+    )
+    assert (
+        pastor.patch(
+            "/api/config/ofrendas.monto_maximo/", {"valor": "abc"}, format="json"
+        ).status_code
+        == 400
+    )
+    assert (
+        pastor.patch(
+            "/api/config/ofrendas.una_regular_por_reunion/", {"valor": "si"}, format="json"
+        ).status_code
+        == 400
+    )
+    assert pastor.patch("/api/config/no.existe/", {"valor": 1}, format="json").status_code == 404
+    ok = pastor.patch("/api/config/ofrendas.monto_maximo/", {"valor": 750000}, format="json")
+    assert ok.status_code == 200
+    evento = AuditEvent.objects.get(action="config.cambiada")
+    assert evento.detail == {"clave": "ofrendas.monto_maximo", "anterior": 1000000, "nuevo": 750000}
+
+
+def test_el_admin_tecnico_tambien_configura(db):
+    admin = cuenta("55 0000 0050", "Admin", "admin_tecnico", credencial=FUERTE)
+    assert api_de(admin).get("/api/config/").status_code == 200

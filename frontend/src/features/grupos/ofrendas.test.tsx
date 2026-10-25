@@ -14,6 +14,7 @@ const ofrenda: Ofrenda = {
   monto: '1250.00',
   estado: 'pendiente',
   estado_display: 'Pendiente de aval',
+  con_diferencia: false,
 }
 
 const json = (status: number, body: unknown) =>

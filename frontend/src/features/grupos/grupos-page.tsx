@@ -135,6 +135,13 @@ export function GruposPage() {
                   ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {g.ofrendas_con_diferencia ? (
+                    <Badge tone="destructive">
+                      {g.ofrendas_con_diferencia === 1
+                        ? '1 ofrenda con diferencia'
+                        : `${g.ofrendas_con_diferencia} ofrendas con diferencia`}
+                    </Badge>
+                  ) : null}
                   {g.tipo === 'lideres' ? <Badge tone="primary">Líderes</Badge> : null}
                   {g.mis_roles.map((r) => (
                     <Badge key={r} tone="success">
