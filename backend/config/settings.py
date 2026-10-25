@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.personas",
     "apps.grupos",
+    "apps.peticiones",
 ]
 
 MIDDLEWARE = [
@@ -110,6 +111,9 @@ AUTH_LOCKOUT_ATTEMPTS = int(os.environ.get("AUTH_LOCKOUT_ATTEMPTS", "5"))
 AUTH_LOCKOUT_MINUTES = int(os.environ.get("AUTH_LOCKOUT_MINUTES", "15"))
 ACTIVATION_TOKEN_HOURS = int(os.environ.get("ACTIVATION_TOKEN_HOURS", "72"))
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
+# Claves de cifrado de las peticiones de oración (ver apps/peticiones/crypto.py)
+PETICIONES_ENCRYPTION_KEYS = os.environ.get("PETICIONES_ENCRYPTION_KEYS", "")
 
 # El navegador envía como Origin la dirección del frontend; debe ser un origen de confianza.
 _frontend = urlsplit(FRONTEND_URL)

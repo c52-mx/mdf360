@@ -13,6 +13,7 @@ import {
   PageHeader,
   SelectField,
 } from '@/design-system'
+import { PeticionesPanel } from '@/features/peticiones/peticiones-panel'
 import { api } from '@/lib/api'
 import { esErrorDeRed } from '@/lib/outbox'
 import { fechaLarga, rolesGrupo, type GrupoDetalle } from './types'
@@ -151,6 +152,8 @@ export function GrupoPage() {
           </form>
         </Card>
       ) : null}
+
+      <PeticionesPanel origenTipo="grupo" origenId={g.id} puedeRegistrar={g.puede_capturar} />
 
       <Card className="flex flex-col gap-3">
         <CardTitle>Reuniones</CardTitle>

@@ -26,6 +26,7 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?define DJANGO_SECRET_KEY}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?define DJANGO_ALLOWED_HOSTS}
       FRONTEND_URL: ${FRONTEND_URL:?define FRONTEND_URL}
+      PETICIONES_ENCRYPTION_KEYS: ${PETICIONES_ENCRYPTION_KEYS:-}
       DJANGO_SECURE_SSL_REDIRECT: ${DJANGO_SECURE_SSL_REDIRECT:-true}
       POSTGRES_HOST: db
       POSTGRES_DB: ${POSTGRES_DB:-mdf360}
@@ -41,6 +42,27 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  # Tareas diarias: borra las peticiones de oración vencidas aunque nadie abra la aplicación
+  tareas:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    environment:
+      DJANGO_DEBUG: "false"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?define DJANGO_SECRET_KEY}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?define DJANGO_ALLOWED_HOSTS}
+      FRONTEND_URL: ${FRONTEND_URL:?define FRONTEND_URL}
+      PETICIONES_ENCRYPTION_KEYS: ${PETICIONES_ENCRYPTION_KEYS:-}
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:-mdf360}
+      POSTGRES_USER: ${POSTGRES_USER:-mdf360}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command: ["sh", "-c", "sleep 90; while true; do python manage.py purgar_peticiones; sleep 86400; done"]
+    depends_on:
+      backend:
+        condition: service_started
 
   web:
     build:

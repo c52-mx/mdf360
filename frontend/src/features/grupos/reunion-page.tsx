@@ -5,6 +5,7 @@ import { useAuth } from '@/features/auth/use-auth'
 import { api } from '@/lib/api'
 import { esErrorDeRed, pendientes } from '@/lib/outbox'
 import { ListaAsistencia, type ResultadoGuardado } from './lista-asistencia'
+import { PeticionesPanel } from '@/features/peticiones/peticiones-panel'
 import { OfrendasReunion } from './ofrendas'
 import { fechaLarga, type ReunionDetalle } from './types'
 
@@ -99,6 +100,13 @@ function Reunion({ reunion }: { reunion: ReunionDetalle }) {
         notasIniciales={reunion.notas}
         puedeModificar={reunion.puede_modificar}
         onGuardar={guardar}
+      />
+
+      <PeticionesPanel
+        origenTipo="grupo"
+        origenId={reunion.grupo.id}
+        referenciaId={reunion.id}
+        puedeRegistrar={reunion.puede_modificar}
       />
 
       <OfrendasReunion reunionId={reunion.id} />
