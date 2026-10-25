@@ -38,6 +38,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await api('/api/auth/logout/', { method: 'POST' })
     queryClient.clear()
+    try {
+      await caches.delete('mdf-api') // datos de grupos guardados para uso sin conexión
+    } catch {
+      // sin Cache Storage (navegador antiguo o contexto no seguro): no hay nada que borrar
+    }
     setUser(null)
   }
 

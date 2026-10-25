@@ -12,10 +12,12 @@ import { RolesPage } from '@/features/auth/roles-page'
 import { useAuth } from '@/features/auth/use-auth'
 import { DesignPage } from '@/features/design/design-page'
 import { EstudiosPage } from '@/features/grupos/estudios-page'
+import { ListaSinConexionPage } from '@/features/grupos/lista-sin-conexion-page'
 import { GrupoPage } from '@/features/grupos/grupo-page'
 import { GruposPage } from '@/features/grupos/grupos-page'
 import { OfrendasPage } from '@/features/grupos/ofrendas-page'
 import { ReunionPage } from '@/features/grupos/reunion-page'
+import { SyncBanner } from '@/features/offline/sync-banner'
 import { HomePage } from '@/features/home/home-page'
 import { NuevaPersonaPage } from '@/features/personas/nueva-persona-page'
 import { PersonaPage } from '@/features/personas/persona-page'
@@ -45,6 +47,7 @@ function PrivateLayout() {
   ]
   return (
     <AppShell nav={nav}>
+      <SyncBanner />
       <Outlet />
     </AppShell>
   )
@@ -61,6 +64,7 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/grupos" element={<GruposPage />} />
           <Route path="/grupos/reuniones/:rid" element={<ReunionPage />} />
+          <Route path="/grupos/:id/hoy" element={<ListaSinConexionPage />} />
           <Route path="/grupos/:id" element={<GrupoPage />} />
           <Route path="/ofrendas" element={<OfrendasPage />} />
           <Route path="/estudios" element={<EstudiosPage />} />
