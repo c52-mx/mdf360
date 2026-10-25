@@ -1,8 +1,9 @@
-from datetime import date, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
 from django.core.cache import cache
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.accounts.models import AsignacionRol, Rol, User
@@ -53,7 +54,7 @@ def m(db):
                        ("tesorero", "tesorero")):  # fmt: skip
         GrupoMiembro.objects.create(grupo=grupo, persona=gente[clave].persona, rol=rol)
     GrupoMiembro.objects.create(grupo=otro, persona=gente["ajeno"].persona, rol="tesorero")
-    reunion = Reunion.objects.create(grupo=grupo, fecha=date.today())
+    reunion = Reunion.objects.create(grupo=grupo, fecha=timezone.localdate())
     return {**gente, "grupo": grupo, "reunion": reunion}
 
 
@@ -84,7 +85,7 @@ def test_el_pastor_puede_capturar_por_si_hace_falta(m):
 
 
 def test_el_secretario_solo_captura_hoy(m):
-    vieja = Reunion.objects.create(grupo=m["grupo"], fecha=date.today() - timedelta(days=7))
+    vieja = Reunion.objects.create(grupo=m["grupo"], fecha=timezone.localdate() - timedelta(days=7))
     r = api_de(m["secre"]).post(
         f"/api/grupos/reuniones/{vieja.pk}/ofrendas/", {"monto": "10"}, format="json"
     )

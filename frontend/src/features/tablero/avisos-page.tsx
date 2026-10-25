@@ -1,0 +1,75 @@
+import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { Alert, Badge, Button, Card, CardDescription, CardTitle, PageHeader } from '@/design-system'
+import { api } from '@/lib/api'
+import { TableroPanel } from './tablero-panel'
+
+interface Tablero {
+  tipo: string
+  tipo_display: string
+  id: number
+  etiqueta: string
+  no_leidos: number
+  puede_publicar: boolean
+}
+
+/** Los tableros de mensajes de todos los lugares donde la persona participa. */
+export function AvisosPage() {
+  const [abierto, setAbierto] = useState<string | null>(null)
+  const tableros = useQuery({
+    queryKey: ['tablero-no-leidos', 'mis-tableros'],
+    queryFn: () => api<Tablero[]>('/api/tablero/mis-tableros/'),
+  })
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Avisos"
+        description="Mensajes de tus grupos y de los lugares donde participas."
+        module="grupos"
+      />
+      {tableros.isError ? <Alert tone="destructive">{tableros.error.message}</Alert> : null}
+      {tableros.data && tableros.data.length === 0 ? (
+        <Alert>Todavía no participas en ningún grupo con avisos.</Alert>
+      ) : null}
+      <ul className="flex flex-col gap-3">
+        {tableros.data?.map((t) => {
+          const clave = `${t.tipo}:${t.id}`
+          const activo = abierto === clave
+          return (
+            <li key={clave}>
+              {activo ? (
+                <div className="flex flex-col gap-3">
+                  <Button variant="ghost" onClick={() => setAbierto(null)}>
+                    Cerrar {t.etiqueta}
+                  </Button>
+                  <TableroPanel
+                    origenTipo={t.tipo}
+                    origenId={t.id}
+                    puedePublicar={t.puede_publicar}
+                    titulo={t.etiqueta}
+                  />
+                </div>
+              ) : (
+                <Card className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <CardTitle>{t.etiqueta}</CardTitle>
+                    <CardDescription>{t.tipo_display}</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {t.no_leidos > 0 ? (
+                      <Badge tone="destructive">
+                        {t.no_leidos === 1 ? '1 mensaje nuevo' : `${t.no_leidos} mensajes nuevos`}
+                      </Badge>
+                    ) : null}
+                    <Button onClick={() => setAbierto(clave)}>Abrir</Button>
+                  </div>
+                </Card>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}

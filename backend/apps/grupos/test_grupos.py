@@ -1,5 +1,5 @@
 import io
-from datetime import date, timedelta
+from datetime import UTC, timedelta
 
 import pytest
 from django.core.cache import cache
@@ -200,7 +200,7 @@ def test_secretario_captura_hoy_pero_no_ve_el_historial(mundo):
         == 200
     )
     # no abre reuniones de otro día
-    ayer = (date.today() - timedelta(days=3)).isoformat()
+    ayer = (timezone.localdate() - timedelta(days=3)).isoformat()
     assert (
         api.post(f"/api/grupos/{gid}/reuniones/", {"fecha": ayer}, format="json").status_code == 403
     )
@@ -256,7 +256,11 @@ def audio(nombre="lectura.mp3", peso=2048):
 
 def test_solo_pastor_y_anciano_suben_el_estudio(mundo):
     def datos():  # un archivo nuevo por petición: el anterior ya quedó leído
-        return {"titulo": "Lección 1", "semana": date.today().isoformat(), "pdf_adultos": pdf()}
+        return {
+            "titulo": "Lección 1",
+            "semana": timezone.localdate().isoformat(),
+            "pdf_adultos": pdf(),
+        }
 
     assert (
         api_de(mundo["lider"])
@@ -266,12 +270,12 @@ def test_solo_pastor_y_anciano_suben_el_estudio(mundo):
     )
     r = api_de(mundo["anciano"]).post("/api/grupos/estudios/", datos(), format="multipart")
     assert r.status_code == 201 and r.json()["pdf_adultos"] and not r.json()["pdf_ninos"]
-    assert r.json()["semana"] == lunes_de(date.today()).isoformat()
+    assert r.json()["semana"] == lunes_de(timezone.localdate()).isoformat()
 
 
 def test_validaciones_de_archivos(mundo):
     api = api_de(mundo["pastor"])
-    base = {"titulo": "X", "semana": date.today().isoformat()}
+    base = {"titulo": "X", "semana": timezone.localdate().isoformat()}
     falso = SimpleUploadedFile("malo.pdf", b"no soy pdf")
     assert (
         api.post(
@@ -303,7 +307,7 @@ def test_validaciones_de_archivos(mundo):
 def test_el_lider_lee_el_estudio_de_la_semana_en_la_reunion(mundo):
     api_de(mundo["pastor"]).post(
         "/api/grupos/estudios/",
-        {"titulo": "Lección 2", "semana": date.today().isoformat(), "pdf_adultos": pdf(), "pdf_ninos": pdf("ninos.pdf"), "audio": audio()},
+        {"titulo": "Lección 2", "semana": timezone.localdate().isoformat(), "pdf_adultos": pdf(), "pdf_ninos": pdf("ninos.pdf"), "audio": audio()},
         format="multipart",
     )  # fmt: skip
     lider = api_de(mundo["lider"])
@@ -319,7 +323,7 @@ def test_el_lider_lee_el_estudio_de_la_semana_en_la_reunion(mundo):
 def test_el_audio_admite_rangos(mundo):
     r = api_de(mundo["pastor"]).post(
         "/api/grupos/estudios/",
-        {"titulo": "A", "semana": date.today().isoformat(), "audio": audio(peso=997)},
+        {"titulo": "A", "semana": timezone.localdate().isoformat(), "audio": audio(peso=997)},
         format="multipart",
     )
     url = r.json()["audio"]
@@ -337,7 +341,7 @@ def test_el_audio_admite_rangos(mundo):
 def test_sin_grupo_no_ve_los_estudios(mundo):
     api_de(mundo["pastor"]).post(
         "/api/grupos/estudios/",
-        {"titulo": "A", "semana": date.today().isoformat(), "pdf_adultos": pdf()},
+        {"titulo": "A", "semana": timezone.localdate().isoformat(), "pdf_adultos": pdf()},
         format="multipart",
     )
     simple = api_de(cuenta("55 0000 0098", "Miembro", "miembro"))
@@ -377,7 +381,7 @@ def _hace(**kw):
 
 def test_el_secretario_sincroniza_al_dia_siguiente_una_lista_del_dia_de_la_reunion(mundo):
     # La reunión fue "ayer": el secretario capturó sin señal ayer y sincroniza hoy.
-    ayer = date.today() - timedelta(days=1)
+    ayer = timezone.localdate() - timedelta(days=1)
     reunion = Reunion.objects.create(grupo=mundo["norte"], fecha=ayer)
     p = personas.crear_persona(datos={"nombre": "A", "whatsapp": "5511000001"}, acepta_datos=True)
     GrupoMiembro.objects.create(grupo=mundo["norte"], persona=p, rol="asistente")
@@ -396,7 +400,7 @@ def test_el_secretario_sincroniza_al_dia_siguiente_una_lista_del_dia_de_la_reuni
 
 
 def test_el_secretario_abre_la_reunion_del_dia_que_capturo(mundo):
-    ayer = (date.today() - timedelta(days=1)).isoformat()
+    ayer = (timezone.localdate() - timedelta(days=1)).isoformat()
     api = api_de(mundo["secre"])
     gid = mundo["norte"].pk
     ok = api.post(
@@ -410,7 +414,7 @@ def test_el_secretario_abre_la_reunion_del_dia_que_capturo(mundo):
         api.post(f"/api/grupos/{gid}/reuniones/", {"fecha": ayer}, format="json").status_code == 403
     )
     # ni abrir la de otro día distinto al que capturó
-    otra = (date.today() - timedelta(days=4)).isoformat()
+    otra = (timezone.localdate() - timedelta(days=4)).isoformat()
     assert (
         api.post(
             f"/api/grupos/{gid}/reuniones/",
@@ -422,7 +426,9 @@ def test_el_secretario_abre_la_reunion_del_dia_que_capturo(mundo):
 
 
 def test_captura_demasiado_antigua_se_rechaza(mundo):
-    reunion = Reunion.objects.create(grupo=mundo["norte"], fecha=date.today() - timedelta(days=10))
+    reunion = Reunion.objects.create(
+        grupo=mundo["norte"], fecha=timezone.localdate() - timedelta(days=10)
+    )
     r = api_de(mundo["lider"]).put(
         f"/api/grupos/reuniones/{reunion.pk}/",
         {"asistencias": [], "capturado_en": _hace(days=9)},
@@ -436,8 +442,9 @@ def test_no_se_pisa_un_registro_mas_reciente_que_la_captura(mundo):
     GrupoMiembro.objects.create(grupo=mundo["norte"], persona=p, rol="asistente")
     api = api_de(mundo["lider"])
     rid = api.post(f"/api/grupos/{mundo['norte'].pk}/reuniones/", {}, format="json").json()["id"]
-    # sin conexión, el secretario marcó presente hace 30 minutos...
-    capturado = _hace(minutes=30)
+    # sin conexión, el secretario marcó presente (momento tomado ya, sin restar horas para que la
+    # prueba no dependa de la hora del día en que se ejecuta)...
+    capturado = timezone.now().isoformat()
     # ...pero mientras tanto el líder marcó ausente en línea (más reciente)
     api.put(
         f"/api/grupos/reuniones/{rid}/",
@@ -472,7 +479,9 @@ def test_reenviar_la_misma_captura_es_idempotente(mundo):
 
 
 def test_un_reloj_adelantado_no_permite_saltarse_la_regla_del_dia(mundo):
-    reunion = Reunion.objects.create(grupo=mundo["norte"], fecha=date.today() - timedelta(days=2))
+    reunion = Reunion.objects.create(
+        grupo=mundo["norte"], fecha=timezone.localdate() - timedelta(days=2)
+    )
     futuro = (timezone.now() + timedelta(days=5)).isoformat()
     r = api_de(mundo["secre"]).put(
         f"/api/grupos/reuniones/{reunion.pk}/",
@@ -480,3 +489,23 @@ def test_un_reloj_adelantado_no_permite_saltarse_la_regla_del_dia(mundo):
         format="json",
     )
     assert r.status_code == 404  # se trata como "ahora", y la reunión no es de hoy
+
+
+# ---------- zona horaria: «hoy» es la fecha de México, no la del servidor (UTC) ----------
+def test_una_reunion_de_la_tarde_noche_lleva_la_fecha_de_mexico(mundo):
+    from datetime import datetime
+    from unittest import mock
+
+    # 25-oct 01:30 UTC = 24-oct 19:30 en la Ciudad de México
+    momento = datetime(2026, 10, 25, 1, 30, tzinfo=UTC)
+    with mock.patch("django.utils.timezone.now", return_value=momento):
+        r = api_de(mundo["lider"]).post(
+            f"/api/grupos/{mundo['norte'].pk}/reuniones/", {}, format="json"
+        )
+        assert r.status_code == 201 and r.json()["fecha"] == "2026-10-24"
+        # y el Secretario puede pasar lista ese mismo día
+        rid = r.json()["id"]
+        ok = api_de(mundo["secre"]).put(
+            f"/api/grupos/reuniones/{rid}/", {"asistencias": []}, format="json"
+        )
+        assert ok.status_code == 200

@@ -4,6 +4,7 @@ from datetime import date
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import FileResponse, Http404, HttpResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -108,6 +109,17 @@ class GruposView(APIView):
         return Response(grupo_resumen(grupo, request.user), status=status.HTTP_201_CREATED)
 
 
+class DashboardView(APIView):
+    """Reporte de supervisión de los grupos que la persona puede consultar (M3-07)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from . import dashboard
+
+        return Response(dashboard.construir(request.user))
+
+
 class GrupoView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -132,7 +144,7 @@ class GrupoView(APIView):
                     }
                 )
         else:  # el Secretario solo llega a la reunión de hoy
-            hoy = grupo.reuniones.filter(fecha=date.today()).first()
+            hoy = grupo.reuniones.filter(fecha=timezone.localdate()).first()
             if hoy:
                 reuniones.append({"id": hoy.pk, "fecha": hoy.fecha.isoformat()})
         return Response(

@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "apps.personas",
     "apps.grupos",
     "apps.peticiones",
+    "apps.tablero",
 ]
 
 MIDDLEWARE = [

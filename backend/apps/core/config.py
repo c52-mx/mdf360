@@ -25,6 +25,18 @@ DEFINICIONES = {
         "opciones": ["lideres", "grupo", "equipo"],
         "descripcion": "Alcance por defecto de una petición nueva (líderes, grupo o equipo)",
     },
+    "tablero.dias_retencion": {
+        "default": 90,
+        "tipo": "entero",
+        "descripcion": "Días que se conservan los mensajes del tablero",
+    },
+    "grupos.asistencia_minima_pct": {
+        "default": 60,
+        "tipo": "entero",
+        "min": 1,
+        "max": 100,
+        "descripcion": "Asistencia mínima (%) por debajo de la cual el dashboard avisa",
+    },
     "ofrendas.una_regular_por_reunion": {
         "default": True,
         "tipo": "booleano",
@@ -74,7 +86,8 @@ def validar(clave: str, valor):
     if tipo == "entero":
         if isinstance(valor, bool) or not isinstance(valor, (int, float)) or int(valor) != valor:
             raise ValidationError("El valor debe ser un número entero.")
-        if not 1 <= valor <= 3650:
-            raise ValidationError("Debe estar entre 1 y 3650 días.")
+        minimo, maximo = definicion(clave).get("min", 1), definicion(clave).get("max", 3650)
+        if not minimo <= valor <= maximo:
+            raise ValidationError(f"Debe estar entre {minimo} y {maximo}.")
         return int(valor)
     raise ValidationError("Tipo de parámetro no soportado.")

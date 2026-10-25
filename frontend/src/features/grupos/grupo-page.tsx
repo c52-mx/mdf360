@@ -14,6 +14,7 @@ import {
   SelectField,
 } from '@/design-system'
 import { PeticionesPanel } from '@/features/peticiones/peticiones-panel'
+import { TableroPanel } from '@/features/tablero/tablero-panel'
 import { api } from '@/lib/api'
 import { esErrorDeRed } from '@/lib/outbox'
 import { fechaLarga, rolesGrupo, type GrupoDetalle } from './types'
@@ -152,6 +153,12 @@ export function GrupoPage() {
           </form>
         </Card>
       ) : null}
+
+      <TableroPanel
+        origenTipo="grupo"
+        origenId={g.id}
+        puedePublicar={g.mis_roles.some((r) => ['lider', 'supervisor', 'secretario'].includes(r)) || g.puede_administrar}
+      />
 
       <PeticionesPanel origenTipo="grupo" origenId={g.id} puedeRegistrar={g.puede_capturar} />
 

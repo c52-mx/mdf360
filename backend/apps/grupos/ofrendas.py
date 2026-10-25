@@ -10,11 +10,11 @@ Reglas (matriz de confidencialidad aprobada, v3.2, sec. 3.3):
 - Quien capturó no puede avalar su propia captura.
 """
 
-from datetime import date
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 
 from apps.accounts.permissions import tiene_permiso
 from apps.core import audit, config
@@ -43,7 +43,7 @@ def captura_suplente(user, reunion: Reunion) -> bool:
 def puede_capturar_ofrenda(user, reunion: Reunion) -> bool:
     if tiene_permiso(user, "grupos.gestionar"):
         return True
-    if reunion.fecha != date.today():
+    if reunion.fecha != timezone.localdate():
         return False
     return R.SECRETARIO in roles_en(user, reunion.grupo) or captura_suplente(user, reunion)
 
@@ -69,7 +69,7 @@ def puede_ver_finanzas_grupo(user, grupo, fecha=None) -> bool:
     roles = roles_en(user, grupo)
     if roles & {R.LIDER, R.SUPERVISOR, R.TESORERO}:
         return True
-    return R.SECRETARIO in roles and fecha == date.today()
+    return R.SECRETARIO in roles and fecha == timezone.localdate()
 
 
 def puede_corregir(user, ofrenda: Ofrenda) -> bool:

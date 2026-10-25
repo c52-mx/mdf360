@@ -1,6 +1,5 @@
 import os
 import uuid
-from datetime import date
 
 from django.conf import settings
 from django.db import models
@@ -116,7 +115,7 @@ class Persona(models.Model):
     def edad(self) -> int | None:
         if not self.fecha_nacimiento:
             return None
-        hoy = date.today()
+        hoy = timezone.localdate()
         cumplio = (hoy.month, hoy.day) >= (self.fecha_nacimiento.month, self.fecha_nacimiento.day)
         return hoy.year - self.fecha_nacimiento.year - (0 if cumplio else 1)
 
