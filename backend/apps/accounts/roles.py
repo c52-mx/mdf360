@@ -20,6 +20,7 @@ PERMISOS = {
     "config.gestionar": "Cambiar los parámetros configurables",
     "peticiones.ver_todas": "Ver las peticiones de oración de todos los orígenes",
     "peticiones.configurar": "Editar el formulario de peticiones de oración",
+    "peticiones.equipo_oracion": "Leer las peticiones compartidas con el equipo de oración",
 }
 
 # clave: (nombre, nivel jerárquico (0 = más alto), exige contraseña fuerte, permisos)
@@ -61,4 +62,5 @@ ROLES = {
     "tesorero": ("Tesorero", 5, True, []),
     "servidor": ("Servidor", 6, False, []),
     "miembro": ("Miembro / Asistente", 7, False, []),
+    "equipo_oracion": ("Equipo de oración", 8, False, ["peticiones.equipo_oracion"]),
 }

@@ -106,6 +106,11 @@ function Editor({ formulario }: { formulario: Formulario }) {
                   onChange={(e) => cambiar(i, { requerido: e.target.checked })}
                 />
                 <CheckboxField
+                  label="Identifica a la persona"
+                  checked={Boolean(c.identifica)}
+                  onChange={(e) => cambiar(i, { identifica: e.target.checked })}
+                />
+                <CheckboxField
                   label="Activo"
                   checked={c.activo}
                   onChange={(e) => cambiar(i, { activo: e.target.checked })}
@@ -130,7 +135,15 @@ function Editor({ formulario }: { formulario: Formulario }) {
           onClick={() =>
             setCampos((l) => [
               ...l,
-              { clave: nuevaClave(l), etiqueta: '', tipo: 'texto', requerido: false, activo: true, opciones: [] },
+              {
+                clave: nuevaClave(l),
+                etiqueta: '',
+                tipo: 'texto',
+                requerido: false,
+                activo: true,
+                identifica: false,
+                opciones: [],
+              },
             ])
           }
         >

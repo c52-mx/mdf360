@@ -33,9 +33,7 @@ function PrivateLayout() {
     { to: '/', label: 'Inicio', icon: Home },
     { to: '/grupos', label: 'Grupos', icon: UsersRound, module: 'grupos' as const },
     { to: '/ofrendas', label: 'Ofrendas', icon: Coins, module: 'grupos' as const },
-    ...(can('peticiones.ver_todas') || user?.roles.some((r) => ['lider', 'supervisor'].includes(r))
-      ? [{ to: '/peticiones', label: 'Peticiones', icon: HandHeart, module: 'grupos' as const }]
-      : []),
+    { to: '/peticiones', label: 'Peticiones', icon: HandHeart, module: 'grupos' as const },
     ...(can('personas.ver')
       ? [{ to: '/personas', label: 'Personas', icon: Users, module: 'admin' as const }]
       : []),

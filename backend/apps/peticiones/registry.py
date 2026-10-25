@@ -16,10 +16,14 @@ class Origen:
     # (id, referencia_id) -> etiqueta fija que se guarda con la petición, o None si no existe
     etiqueta: Callable[[int, int | None], str | None]
     puede_registrar: Callable[[object, int], bool]
-    puede_ver: Callable[[object, int], bool]
-    # Ids visibles para el usuario: None = todos, lista = solo esos
-    ids_visibles: Callable[[object], list[int] | None]
+    # Nivel de acceso del usuario a ese origen: LIDER (ve todo), MIEMBRO (pertenece) o None
+    acceso: Callable[[object, int], str | None]
+    # Ids por nivel de acceso: {"lider": None (todos) | [ids], "miembro": [ids]}
+    ids_por_acceso: Callable[[object], dict[str, list[int] | None]]
 
+
+LIDER = "lider"
+MIEMBRO = "miembro"
 
 _ORIGENES: dict[str, Origen] = {}
 

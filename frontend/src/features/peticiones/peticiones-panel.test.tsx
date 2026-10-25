@@ -23,6 +23,10 @@ const peticion = {
   },
   estado: 'activa',
   estado_display: 'Activa',
+  visibilidad: 'grupo',
+  visibilidad_display: 'Mi grupo',
+  ocultar_nombre: false,
+  puede_gestionar: true,
   creada_en: '2026-10-22T20:00:00Z',
   expira_en: '2026-11-21T20:00:00Z',
   datos: { peticion: 'Por la salud de mi mamá', solicitante: 'María' },
@@ -94,6 +98,57 @@ describe('PeticionesPanel', () => {
       origen_id: 3,
       referencia_id: 5,
       datos: { peticion: 'Por mi trabajo' },
+      visibilidad: 'lideres',
+      ocultar_nombre: false,
     })
+  })
+
+  it('permite elegir el alcance y ocultar el nombre; lo envía al registrar', async () => {
+    const post = vi.fn((body: Record<string, unknown>) => json(201, { ...peticion, recibido: body }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url.includes('/csrf/')) return json(200, { csrfToken: 'x' })
+        if (init?.method === 'POST') return post(JSON.parse(String(init.body)) as Record<string, unknown>)
+        if (url.includes('/formulario/')) return json(200, { ...formulario, visibilidad_por_defecto: 'grupo' })
+        return json(200, { count: 0, next: null, previous: null, results: [] })
+      }),
+    )
+    montar(true)
+    const alcance = await screen.findByLabelText('¿Quién puede verla?')
+    expect(alcance).toHaveValue('grupo') // el valor por defecto viene de la configuración
+    expect(screen.getByLabelText(/Ocultar el nombre/)).toBeInTheDocument()
+    fireEvent.change(alcance, { target: { value: 'equipo' } })
+    fireEvent.click(screen.getByLabelText(/Ocultar el nombre/))
+    fireEvent.change(screen.getByLabelText('Petición'), { target: { value: 'Por mi familia' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar petición' }))
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
+    expect(post.mock.calls[0][0]).toMatchObject({ visibilidad: 'equipo', ocultar_nombre: true })
+    fireEvent.change(alcance, { target: { value: 'lideres' } })
+    expect(screen.queryByLabelText(/Ocultar el nombre/)).toBeNull() // no aplica si es solo líderes
+  })
+
+  it('muestra el alcance de cada petición y solo da el botón de atender a quien puede gestionarla', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        url.includes('/formulario/')
+          ? json(200, formulario)
+          : json(200, {
+              count: 2,
+              next: null,
+              previous: null,
+              results: [
+                { ...peticion, id: 1 },
+                { ...peticion, id: 2, puede_gestionar: false, visibilidad_display: 'Equipo de oración', ocultar_nombre: true },
+              ],
+            }),
+      ),
+    )
+    montar(false)
+    expect(await screen.findByText('Mi grupo')).toBeInTheDocument()
+    expect(screen.getByText('Equipo de oración')).toBeInTheDocument()
+    expect(screen.getByText(/nombre de quien la pide está oculto/)).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Marcar como atendida' })).toHaveLength(1)
   })
 })

@@ -6,12 +6,27 @@ export interface Campo {
   tipo: TipoCampo
   requerido: boolean
   activo: boolean
+  /** Si el campo identifica a la persona; se oculta cuando se pide ocultar el nombre. */
+  identifica?: boolean
   opciones: string[]
 }
+
+export type Visibilidad = 'lideres' | 'grupo' | 'equipo'
+
+export const visibilidadOpciones: { value: Visibilidad; label: string; ayuda: string }[] = [
+  { value: 'lideres', label: 'Solo líderes', ayuda: 'La ven el Líder, el Supervisor y la dirección.' },
+  { value: 'grupo', label: 'Mi grupo', ayuda: 'La ven todos los integrantes del grupo.' },
+  {
+    value: 'equipo',
+    label: 'Equipo de oración',
+    ayuda: 'La ve el grupo y el equipo de oración de la iglesia.',
+  },
+]
 
 export interface Formulario {
   version: number
   campos: Campo[]
+  visibilidad_por_defecto?: Visibilidad
 }
 
 export interface Origen {
@@ -29,6 +44,10 @@ export interface Peticion {
   origen: Origen
   estado: 'activa' | 'atendida'
   estado_display: string
+  visibilidad: Visibilidad
+  visibilidad_display: string
+  ocultar_nombre: boolean
+  puede_gestionar?: boolean
   creada_en: string
   expira_en: string
   datos?: Valores

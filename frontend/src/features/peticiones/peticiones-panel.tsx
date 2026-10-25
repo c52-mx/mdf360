@@ -1,10 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { Alert, Badge, Button, Card, CardDescription, CardTitle } from '@/design-system'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardDescription,
+  CardTitle,
+  CheckboxField,
+  SelectField,
+} from '@/design-system'
 import { api } from '@/lib/api'
 import { FormularioDinamico } from './formulario-dinamico'
 import { OrigenBadge } from './origen-badge'
-import type { Formulario, Pagina, Peticion, Valores } from './types'
+import {
+  visibilidadOpciones,
+  type Formulario,
+  type Pagina,
+  type Peticion,
+  type Valores,
+  type Visibilidad,
+} from './types'
 
 interface Props {
   origenTipo: string
@@ -40,8 +56,14 @@ export function PeticionItem({
     <div className="flex flex-col gap-2 rounded-control border border-border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <OrigenBadge origen={p.origen} />
-        <Badge tone={p.estado === 'atendida' ? 'success' : 'warning'}>{p.estado_display}</Badge>
+        <div className="flex flex-wrap gap-2">
+          <Badge tone="neutral">{p.visibilidad_display}</Badge>
+          <Badge tone={p.estado === 'atendida' ? 'success' : 'warning'}>{p.estado_display}</Badge>
+        </div>
       </div>
+      {p.ocultar_nombre ? (
+        <CardDescription>El nombre de quien la pide está oculto para quien no es líder.</CardDescription>
+      ) : null}
       {p.ilegible ? (
         <Alert tone="warning">No se puede leer esta petición (cambió la clave de cifrado).</Alert>
       ) : p.datos ? (
@@ -60,7 +82,7 @@ export function PeticionItem({
         Registrada el {new Date(p.creada_en).toLocaleDateString('es-MX')} · se borra el{' '}
         {new Date(p.expira_en).toLocaleDateString('es-MX')}
       </CardDescription>
-      {onEstado ? (
+      {onEstado && p.puede_gestionar ? (
         <div>
           <Button
             size="sm"
@@ -91,12 +113,23 @@ export function PeticionesPanel({ origenTipo, origenId, referenciaId, puedeRegis
   })
   const [valores, setValores] = useState<Valores>({})
   const [confirmada, setConfirmada] = useState(false)
+  const [alcance, setAlcance] = useState<Visibilidad | ''>('')
+  const [ocultarNombre, setOcultarNombre] = useState(false)
+  const alcanceActual: Visibilidad = alcance || formulario.data?.visibilidad_por_defecto || 'lideres'
+  const opcion = visibilidadOpciones.find((o) => o.value === alcanceActual)
 
   const registrar = useMutation({
     mutationFn: () =>
       api('/api/peticiones/', {
         method: 'POST',
-        body: { origen_tipo: origenTipo, origen_id: origenId, referencia_id: referenciaId, datos: valores },
+        body: {
+          origen_tipo: origenTipo,
+          origen_id: origenId,
+          referencia_id: referenciaId,
+          datos: valores,
+          visibilidad: alcanceActual,
+          ocultar_nombre: ocultarNombre && alcanceActual !== 'lideres',
+        },
       }),
     onSuccess: () => {
       setValores({})
@@ -151,13 +184,27 @@ export function PeticionesPanel({ origenTipo, origenId, referenciaId, puedeRegis
               setValores(v)
             }}
           />
+          <SelectField
+            label="¿Quién puede verla?"
+            value={alcanceActual}
+            hint={`${opcion?.ayuda ?? ''} Pídele su autorización a quien la comparte.`}
+            onChange={(e) => setAlcance(e.target.value as Visibilidad)}
+            options={visibilidadOpciones.map((o) => ({ value: o.value, label: o.label }))}
+          />
+          {alcanceActual !== 'lideres' ? (
+            <CheckboxField
+              checked={ocultarNombre}
+              onChange={(e) => setOcultarNombre(e.target.checked)}
+              label="Ocultar el nombre de quien la pide (solo lo verán los líderes)"
+            />
+          ) : null}
           {confirmada ? <Alert tone="success">Petición registrada.</Alert> : null}
           {registrar.error ? <Alert tone="destructive">{registrar.error.message}</Alert> : null}
           <Button type="submit" disabled={registrar.isPending}>
             Guardar petición
           </Button>
           <CardDescription>
-            Es confidencial: solo la ven el Líder y los superiores, y se borra automáticamente.
+            Es confidencial: solo la ven quienes corresponden según el alcance y se borra automáticamente.
           </CardDescription>
         </form>
       ) : null}

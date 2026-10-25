@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import requiere
-from apps.core import audit
+from apps.core import audit, config
 
 from . import crypto, registry, services
 from .models import Peticion
@@ -36,7 +36,13 @@ class FormularioView(APIView):
 
     def get(self, request):
         f = services.formulario_vigente()
-        return Response({"version": f.version, "campos": f.campos})
+        return Response(
+            {
+                "version": f.version,
+                "campos": f.campos,
+                "visibilidad_por_defecto": config.obtener("peticiones.visibilidad_por_defecto"),
+            }
+        )
 
     def put(self, request):
         if not requiere("peticiones.configurar")().has_permission(request, self):
@@ -55,6 +61,8 @@ class CrearSerializer(serializers.Serializer):
     origen_id = serializers.IntegerField(min_value=1)
     referencia_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     datos = serializers.DictField()
+    visibilidad = serializers.ChoiceField(choices=Peticion.Visibilidad.choices, required=False)
+    ocultar_nombre = serializers.BooleanField(required=False, default=False)
 
 
 class Paginacion(PageNumberPagination):
@@ -63,11 +71,11 @@ class Paginacion(PageNumberPagination):
     page_size_query_param = "page_size"
 
 
-def _con_contenido(p: Peticion) -> dict:
+def _con_contenido(p: Peticion, viewer) -> dict:
     try:
-        return services.peticion_dict(p, con_contenido=True)
+        return services.peticion_dict(p, con_contenido=True, viewer=viewer)
     except crypto.NoSePuedeDescifrar:
-        return {**services.peticion_dict(p, con_contenido=False), "ilegible": True}
+        return {**services.peticion_dict(p, con_contenido=False, viewer=viewer), "ilegible": True}
 
 
 class PeticionesView(APIView):
@@ -89,7 +97,7 @@ class PeticionesView(APIView):
             "peticion.consultadas", actor=request.user, request=request,
             cantidad=len(pagina), origen=p.get("origen_tipo", ""), origen_id=p.get("origen_id", ""),
         )  # fmt: skip
-        return paginador.get_paginated_response([_con_contenido(x) for x in pagina])
+        return paginador.get_paginated_response([_con_contenido(x, request.user) for x in pagina])
 
     def post(self, request):
         services.purgar_vencidas()
@@ -108,7 +116,8 @@ class PeticionesView(APIView):
         # Quien puede registrar no siempre puede leer (ej. el Secretario): solo ve la confirmación
         visible = services.puede_ver(request.user, peticion)
         return Response(
-            services.peticion_dict(peticion, con_contenido=visible), status=status.HTTP_201_CREATED
+            services.peticion_dict(peticion, con_contenido=visible, viewer=request.user),
+            status=status.HTTP_201_CREATED,
         )
 
 
@@ -119,10 +128,12 @@ class PeticionView(APIView):
         peticion = get_object_or_404(Peticion, pk=pk)
         if not services.puede_ver(request.user, peticion):
             raise Http404
+        if not services.puede_gestionar(request.user, peticion):
+            return _denegado()
         try:
             services.cambiar_estado(
                 peticion, request.data.get("estado"), actor=request.user, request=request
             )
         except DjangoValidationError as exc:
             return _error("invalid", " ".join(exc.messages))
-        return Response(_con_contenido(peticion))
+        return Response(_con_contenido(peticion, request.user))

@@ -2,6 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from apps.accounts.permissions import tiene_permiso
 from apps.core import audit, config
 
 from . import crypto, registry
@@ -44,6 +45,7 @@ def _validar_campo(c) -> dict:
         "clave": clave,
         "etiqueta": etiqueta,
         "tipo": tipo,
+        "identifica": bool(c.get("identifica", False)),
         "requerido": bool(c.get("requerido", False)),
         "activo": bool(c.get("activo", True)),
         "opciones": opciones if tipo == "seleccion" else [],
@@ -119,7 +121,15 @@ def purgar_vencidas(*, actor=None) -> int:
 
 @transaction.atomic
 def registrar_peticion(
-    *, origen_tipo, origen_id, referencia_id=None, datos, actor, request=None
+    *,
+    origen_tipo,
+    origen_id,
+    referencia_id=None,
+    datos,
+    actor,
+    request=None,
+    visibilidad=None,
+    ocultar_nombre=False,
 ) -> Peticion:
     origen = registry.obtener(origen_tipo)
     if origen is None:
@@ -129,6 +139,9 @@ def registrar_peticion(
     etiqueta = origen.etiqueta(origen_id, referencia_id)
     if etiqueta is None:
         raise ValidationError("El origen de la petición no existe.")
+    visibilidad = visibilidad or config.obtener("peticiones.visibilidad_por_defecto")
+    if visibilidad not in Peticion.Visibilidad.values:
+        raise ValidationError("Alcance no válido.")
     formulario = formulario_vigente()
     limpio = _validar_datos(datos, formulario)
     dias = int(config.obtener("peticiones.dias_retencion"))
@@ -139,33 +152,74 @@ def registrar_peticion(
         referencia_id=referencia_id,
         formulario_version=formulario.version,
         datos_cifrados=crypto.cifrar(limpio),
+        visibilidad=visibilidad,
+        ocultar_nombre=bool(ocultar_nombre) and visibilidad != Peticion.Visibilidad.LIDERES,
         creada_por=actor,
         expira_en=Peticion.calcular_expiracion(dias),
     )
     audit.log(
         "peticion.creada", actor=actor, target=peticion, request=request,
-        origen=origen_tipo, origen_id=origen_id,
+        origen=origen_tipo, origen_id=origen_id, visibilidad=visibilidad,
+        ocultar_nombre=peticion.ocultar_nombre,
     )  # fmt: skip
     return peticion
 
 
+def _acceso(user, peticion: Peticion) -> str | None:
+    origen = registry.obtener(peticion.origen_tipo)
+    return origen.acceso(user, peticion.origen_id) if origen else None
+
+
 def peticiones_visibles(user):
-    """Peticiones que `user` puede ver, según el módulo dueño de cada origen."""
+    """Peticiones que `user` puede leer.
+
+    - Quien tiene acceso de líder a un origen ve todas las de ese origen.
+    - Quien pertenece al origen ve las de alcance «grupo» y «equipo».
+    - Quien tiene el rol de Equipo de oración ve las de alcance «equipo» de cualquier origen.
+    """
     from django.db.models import Q
 
+    V = Peticion.Visibilidad
     condicion = Q(pk__in=[])
     for origen in registry.todos():
-        ids = origen.ids_visibles(user)
-        if ids is None:
+        niveles = origen.ids_por_acceso(user)
+        lider = niveles.get(registry.LIDER)
+        if lider is None:
             condicion |= Q(origen_tipo=origen.tipo)
-        elif ids:
-            condicion |= Q(origen_tipo=origen.tipo, origen_id__in=ids)
+        elif lider:
+            condicion |= Q(origen_tipo=origen.tipo, origen_id__in=lider)
+        miembro = niveles.get(registry.MIEMBRO) or []
+        if miembro:
+            condicion |= Q(
+                origen_tipo=origen.tipo,
+                origen_id__in=miembro,
+                visibilidad__in=[V.GRUPO, V.EQUIPO],
+            )
+    if tiene_permiso(user, "peticiones.equipo_oracion"):
+        condicion |= Q(visibilidad=V.EQUIPO)
     return Peticion.objects.filter(condicion)
 
 
 def puede_ver(user, peticion: Peticion) -> bool:
-    origen = registry.obtener(peticion.origen_tipo)
-    return bool(origen and origen.puede_ver(user, peticion.origen_id))
+    V = Peticion.Visibilidad
+    nivel = _acceso(user, peticion)
+    if nivel == registry.LIDER:
+        return True
+    if peticion.visibilidad == V.LIDERES:
+        return False
+    if nivel == registry.MIEMBRO:
+        return True
+    return peticion.visibilidad == V.EQUIPO and tiene_permiso(user, "peticiones.equipo_oracion")
+
+
+def puede_gestionar(user, peticion: Peticion) -> bool:
+    """Marcar como atendida o reactivar: solo líder del origen o superiores."""
+    return _acceso(user, peticion) == registry.LIDER
+
+
+def _claves_que_identifican(version: int) -> set[str]:
+    formulario = FormularioPeticion.objects.filter(version=version).first()
+    return {c["clave"] for c in (formulario.campos if formulario else []) if c.get("identifica")}
 
 
 def cambiar_estado(peticion: Peticion, estado: str, *, actor, request=None) -> Peticion:
@@ -179,7 +233,7 @@ def cambiar_estado(peticion: Peticion, estado: str, *, actor, request=None) -> P
     return peticion
 
 
-def peticion_dict(p: Peticion, *, con_contenido: bool) -> dict:
+def peticion_dict(p: Peticion, *, con_contenido: bool, viewer=None) -> dict:
     origen = registry.obtener(p.origen_tipo)
     base = {
         "id": p.pk,
@@ -192,10 +246,22 @@ def peticion_dict(p: Peticion, *, con_contenido: bool) -> dict:
         },
         "estado": p.estado,
         "estado_display": p.get_estado_display(),
+        "visibilidad": p.visibilidad,
+        "visibilidad_display": p.get_visibilidad_display(),
+        "ocultar_nombre": p.ocultar_nombre,
         "creada_en": p.creada_en.isoformat(),
         "expira_en": p.expira_en.isoformat(),
     }
+    if viewer is not None:
+        base["puede_gestionar"] = puede_gestionar(viewer, p)
     if con_contenido:
-        base["datos"] = crypto.descifrar(p.datos_cifrados)
+        datos = crypto.descifrar(p.datos_cifrados)
+        # Alcance amplio con nombre oculto: solo líderes y quien la registró ven quién la pide
+        es_lider = viewer is not None and _acceso(viewer, p) == registry.LIDER
+        es_autor = viewer is not None and p.creada_por_id == getattr(viewer, "pk", None)
+        if p.ocultar_nombre and not (es_lider or es_autor):
+            for clave in _claves_que_identifican(p.formulario_version):
+                datos.pop(clave, None)
+        base["datos"] = datos
         base["formulario_version"] = p.formulario_version
     return base

@@ -420,8 +420,11 @@ def test_otro_modulo_puede_registrarse_como_origen(m):
             nombre="Curso",
             etiqueta=lambda i, r: f"Curso · número {i}",
             puede_registrar=lambda u, i: u.pk == m["secre"].pk,
-            puede_ver=lambda u, i: u.pk == m["anciano"].pk,
-            ids_visibles=lambda u: [7] if u.pk == m["anciano"].pk else [],
+            acceso=lambda u, i: registry.LIDER if u.pk == m["anciano"].pk else None,
+            ids_por_acceso=lambda u: {
+                registry.LIDER: [7] if u.pk == m["anciano"].pk else [],
+                registry.MIEMBRO: [],
+            },
         )
     )
     try:

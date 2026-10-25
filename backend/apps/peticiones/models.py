@@ -37,6 +37,11 @@ class Peticion(models.Model):
         ACTIVA = "activa", "Activa"
         ATENDIDA = "atendida", "Atendida"
 
+    class Visibilidad(models.TextChoices):
+        LIDERES = "lideres", "Solo líderes"
+        GRUPO = "grupo", "Mi grupo"
+        EQUIPO = "equipo", "Equipo de oración"
+
     # --- Origen: siempre presente e inmutable (de dónde viene la petición) ---
     origen_tipo = models.CharField(max_length=40, db_index=True)
     origen_id = models.PositiveIntegerField()
@@ -48,6 +53,12 @@ class Peticion(models.Model):
     datos_cifrados = models.TextField()
 
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.ACTIVA)
+    # Quién puede leerla: lo elige quien la registra (con autorización de quien la pide)
+    visibilidad = models.CharField(
+        max_length=20, choices=Visibilidad.choices, default=Visibilidad.LIDERES
+    )
+    # Si es verdadero, los campos que identifican a la persona se ocultan a quien no es líder
+    ocultar_nombre = models.BooleanField(default=False)
     creada_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )

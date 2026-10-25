@@ -27,7 +27,7 @@ def pastor(db):
 
 
 def test_catalogo_sembrado(db):
-    assert Rol.objects.count() == 9
+    assert Rol.objects.count() == 10  # incluye el Equipo de oración
     assert "bitacora.ver" in Rol.objects.get(clave="admin_tecnico").permisos
     assert Rol.objects.get(clave="tesorero").exige_credencial_fuerte
 

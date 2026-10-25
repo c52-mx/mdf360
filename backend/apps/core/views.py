@@ -81,6 +81,7 @@ class ConfigView(APIView):
                     "tipo": d["tipo"],
                     "valor": config.obtener(clave),
                     "por_defecto": d["default"],
+                    "opciones": d.get("opciones"),
                 }
                 for clave, d in config.DEFINICIONES.items()
             ]
