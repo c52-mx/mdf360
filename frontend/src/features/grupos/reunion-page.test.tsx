@@ -36,6 +36,7 @@ describe('ReunionPage', () => {
       'fetch',
       vi.fn((url: string, init?: RequestInit) => {
         if (url.includes('/csrf/')) return json(200, { csrfToken: 'x' })
+        if (url.includes('/ofrendas/')) return json(404, {})
         if (init?.method === 'PUT') return put()
         return json(200, reunion)
       }),
