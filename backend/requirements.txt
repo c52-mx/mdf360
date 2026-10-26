@@ -7,3 +7,4 @@ gunicorn>=23.0
 whitenoise>=6.9
 Pillow>=11.0
 cryptography>=44.0
+pywebpush>=2.0

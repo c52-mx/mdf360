@@ -24,6 +24,8 @@ El dominio de QA se asigna al servicio **web**, puerto 80, con HTTPS (Let's Encr
 | `DJANGO_SECURE_SSL_REDIRECT` | `true` (usa `false` solo si todavía no hay HTTPS) |
 | `BACKUP_RETENTION_DAYS` | opcional, 14 por defecto |
 | `EMAIL_*` | opcional; sin ellos los correos de recuperación se imprimen en el log |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | claves de las notificaciones push; sin ellas quedan apagadas. Se generan con `python manage.py generar_vapid` y no deben cambiar (si cambian, cada persona tiene que volver a activar los avisos) |
+| `VAPID_SUBJECT` | opcional; contacto que se manda al servicio push, `mailto:edgar.vargas@codigo52.com.mx` por defecto |
 
 ## Primer arranque
 

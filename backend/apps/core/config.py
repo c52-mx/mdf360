@@ -30,6 +30,11 @@ DEFINICIONES = {
         "tipo": "entero",
         "descripcion": "Días que se conservan los mensajes del tablero",
     },
+    "notificaciones.activas": {
+        "default": True,
+        "tipo": "booleano",
+        "descripcion": "Enviar notificaciones push (mensajes del tablero y estudio nuevo)",
+    },
     "grupos.asistencia_minima_pct": {
         "default": 60,
         "tipo": "entero",

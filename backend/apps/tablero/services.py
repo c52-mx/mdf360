@@ -5,6 +5,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 
 from apps.core import audit, config
+from apps.notificaciones import push
 
 from . import registry
 from .models import Lectura, Mensaje
@@ -58,6 +59,14 @@ def publicar(*, origen_tipo, origen_id, texto, actor, fijado=False, request=None
         "tablero.publicado", actor=actor, target=mensaje, request=request,
         origen=origen_tipo, origen_id=origen_id, fijado=mensaje.fijado,
     )  # fmt: skip
+    push.notificar(
+        titulo=etiqueta,
+        cuerpo=f"{mensaje.autor_nombre}: {texto}",
+        url=origen.ruta(origen_id) if origen.ruta else "/avisos",
+        etiqueta=f"tablero-{origen_tipo}-{origen_id}",
+        puede_recibir=lambda u: origen.puede_leer(u, origen_id),
+        excluir=actor,
+    )
     return mensaje
 
 

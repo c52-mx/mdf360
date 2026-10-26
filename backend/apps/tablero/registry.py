@@ -19,6 +19,8 @@ class Origen:
     ids_legibles: Callable[[object], list[int] | None]
     # [(id, etiqueta)] de los tableros que el usuario puede leer (para la pantalla «Avisos»)
     listar: Callable[[object], list[tuple[int, str]]] | None = None
+    # Pantalla donde se lee el tablero (al tocar la notificación); None = «Avisos»
+    ruta: Callable[[int], str] | None = None
 
 
 _ORIGENES: dict[str, Origen] = {}
