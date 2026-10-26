@@ -48,8 +48,8 @@ function PrivateLayout() {
   const nav: NavItem[] = [
     { to: '/', label: 'Inicio', icon: Home },
     { to: '/grupos', label: 'Grupos', icon: UsersRound, module: 'grupos' as const },
-    { to: '/ofrendas', label: 'Ofrendas', icon: Coins, module: 'grupos' as const },
     { to: '/avisos', label: 'Avisos', icon: Bell, module: 'grupos' as const },
+    { to: '/ofrendas', label: 'Ofrendas', icon: Coins, module: 'grupos' as const },
     ...(user?.roles.some((r) => ['lider', 'supervisor', 'pastor', 'anciano'].includes(r))
       ? [{ to: '/grupos/resumen', label: 'Resumen', icon: ChartColumn, module: 'grupos' as const }]
       : []),
@@ -70,7 +70,8 @@ function PrivateLayout() {
       ? [{ to: '/configuracion', label: 'Configuración', icon: Settings, module: 'admin' as const }]
       : []),
     { to: '/cuenta', label: 'Mi cuenta', icon: UserCog },
-    { to: '/diseno', label: 'Diseño', icon: Palette },
+    // Catálogo interno del sistema de diseño: solo para quien administra el sistema
+    ...(can('config.gestionar') ? [{ to: '/diseno', label: 'Diseño', icon: Palette }] : []),
   ]
   return (
     <AppShell nav={nav}>

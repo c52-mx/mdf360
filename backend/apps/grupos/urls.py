@@ -12,6 +12,11 @@ urlpatterns = [
         views.IntegranteView.as_view(),
         name="grupo-integrante",
     ),
+    path(
+        "<int:pk>/integrantes/<int:miembro_id>/restaurar/",
+        views.IntegranteRestaurarView.as_view(),
+        name="grupo-integrante-restaurar",
+    ),
     path("<int:pk>/reuniones/", views.ReunionesView.as_view(), name="grupo-reuniones"),
     path("reuniones/<int:rid>/", views.ReunionView.as_view(), name="reunion"),
     path(

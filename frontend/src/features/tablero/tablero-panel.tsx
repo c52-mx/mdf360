@@ -10,6 +10,7 @@ import {
   CardTitle,
   CheckboxField,
   TextareaField,
+  useToast,
 } from '@/design-system'
 import { api } from '@/lib/api'
 
@@ -38,6 +39,7 @@ interface Props {
  */
 export function TableroPanel({ origenTipo, origenId, puedePublicar, titulo }: Props) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const clave = ['tablero', origenTipo, origenId]
   const [texto, setTexto] = useState('')
   const [fijar, setFijar] = useState(false)
@@ -75,9 +77,18 @@ export function TableroPanel({ origenTipo, origenId, puedePublicar, titulo }: Pr
       api(`/api/tablero/${id}/`, { method: 'PATCH', body: { fijado } }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: clave }),
   })
+  const restaurar = useMutation({
+    mutationFn: (id: number) => api(`/api/tablero/${id}/restaurar/`, { method: 'POST', body: {} }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: clave }),
+  })
+  const restaurarMensaje = restaurar.mutate
   const borrar = useMutation({
     mutationFn: (id: number) => api(`/api/tablero/${id}/`, { method: 'DELETE' }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: clave }),
+    onSuccess: (_, id) => {
+      void queryClient.invalidateQueries({ queryKey: clave })
+      // Se borra al instante, pero se puede deshacer unos segundos
+      toast.mostrar('Mensaje borrado.', { etiqueta: 'Deshacer', onClick: () => restaurarMensaje(id) })
+    },
   })
 
   if (mensajes.isError) return null // sin permiso de lectura en este origen

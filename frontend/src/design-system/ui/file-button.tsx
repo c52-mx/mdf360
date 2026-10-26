@@ -18,7 +18,7 @@ export function FileButton({ children, accept = 'image/*', onFile, disabled }: F
   return (
     <label
       className={cn(
-        'inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-control border-2 border-primary bg-card px-4 text-base font-bold text-primary hover:bg-primary-soft',
+        'presionable inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-control border-2 border-primary bg-card px-4 text-base font-bold text-primary hover:bg-primary-soft',
         disabled && 'pointer-events-none opacity-50',
       )}
     >

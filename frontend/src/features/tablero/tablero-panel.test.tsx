@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ToastProvider } from '@/design-system'
 import { TableroPanel, type Mensaje } from './tablero-panel'
 
 const mensaje: Mensaje = {
@@ -20,7 +21,9 @@ const json = (status: number, body: unknown) =>
 function montar(puedePublicar: boolean) {
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <TableroPanel origenTipo="grupo" origenId={3} puedePublicar={puedePublicar} />
+      <ToastProvider>
+        <TableroPanel origenTipo="grupo" origenId={3} puedePublicar={puedePublicar} />
+      </ToastProvider>
     </QueryClientProvider>,
   )
 }
@@ -76,6 +79,32 @@ describe('TableroPanel', () => {
     vi.stubGlobal('fetch', vi.fn(() => json(404, { detail: 'No encontrado' })))
     montar(true)
     await waitFor(() => expect(document.body.textContent).not.toContain('Tablero de mensajes'))
+  })
+
+  it('al borrar ofrece deshacer y lo restaura', async () => {
+    const llamadas: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url.includes('/csrf/')) return json(200, { csrfToken: 'x' })
+        if (url.includes('/visto/')) return Promise.resolve(new Response(null, { status: 204 }))
+        if (init?.method === 'DELETE') {
+          llamadas.push('DELETE')
+          return Promise.resolve(new Response(null, { status: 204 }))
+        }
+        if (url.includes('/restaurar/')) {
+          llamadas.push('RESTAURAR')
+          return json(200, mensaje)
+        }
+        return json(200, [mensaje])
+      }),
+    )
+    montar(false)
+    fireEvent.click(await screen.findByRole('button', { name: /Borrar/ }))
+    expect(await screen.findByText('Mensaje borrado.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Deshacer' }))
+    await waitFor(() => expect(llamadas).toEqual(['DELETE', 'RESTAURAR']))
+    await waitFor(() => expect(screen.queryByText('Mensaje borrado.')).toBeNull())
   })
 
   it('quien puede moderar ve fijar y borrar', async () => {

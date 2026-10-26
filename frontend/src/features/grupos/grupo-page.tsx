@@ -12,6 +12,7 @@ import {
   Field,
   PageHeader,
   SelectField,
+  useToast,
 } from '@/design-system'
 import { PeticionesPanel } from '@/features/peticiones/peticiones-panel'
 import { TableroPanel } from '@/features/tablero/tablero-panel'
@@ -25,6 +26,7 @@ export function GrupoPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [whatsapp, setWhatsapp] = useState('')
   const [nombre, setNombre] = useState('')
   const [rol, setRol] = useState('asistente')
@@ -49,10 +51,23 @@ export function GrupoPage() {
       void refrescar()
     },
   })
-  const quitar = useMutation({
+  const restaurar = useMutation({
     mutationFn: (miembroId: number) =>
-      api(`/api/grupos/${id}/integrantes/${miembroId}/`, { method: 'DELETE' }),
+      api(`/api/grupos/${id}/integrantes/${miembroId}/restaurar/`, { method: 'POST', body: {} }),
     onSuccess: () => void refrescar(),
+  })
+  const restaurarIntegrante = restaurar.mutate
+  const quitar = useMutation({
+    mutationFn: ({ miembroId }: { miembroId: number; nombre: string }) =>
+      api(`/api/grupos/${id}/integrantes/${miembroId}/`, { method: 'DELETE' }),
+    onSuccess: (_, { miembroId, nombre: quien }) => {
+      void refrescar()
+      // Se quita al instante, pero se puede deshacer unos segundos
+      toast.mostrar(`${quien} salió del grupo.`, {
+        etiqueta: 'Deshacer',
+        onClick: () => restaurarIntegrante(miembroId),
+      })
+    },
   })
   const abrir = useMutation({
     mutationFn: () =>
@@ -106,7 +121,11 @@ export function GrupoPage() {
                 {m.invitado ? <Badge tone="warning">Invitado</Badge> : null}
               </span>
               {g.puede_gestionar && (g.puede_administrar || !RESERVADOS.includes(m.rol)) ? (
-                <Button size="sm" variant="ghost" onClick={() => quitar.mutate(m.id)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => quitar.mutate({ miembroId: m.id, nombre: m.nombre })}
+                >
                   Quitar
                 </Button>
               ) : null}
