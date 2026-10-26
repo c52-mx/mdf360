@@ -8,4 +8,5 @@ urlpatterns = [
     path("mis-tableros/", views.MisTablerosView.as_view(), name="tablero-mis-tableros"),
     path("visto/", views.VistoView.as_view(), name="tablero-visto"),
     path("<int:pk>/", views.MensajeView.as_view(), name="tablero-mensaje"),
+    path("<int:pk>/restaurar/", views.MensajeRestaurarView.as_view(), name="tablero-restaurar"),
 ]

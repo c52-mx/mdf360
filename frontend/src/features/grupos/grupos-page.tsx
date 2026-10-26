@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   Card,
+  CardLink,
   CardDescription,
   CardTitle,
   Field,
@@ -121,8 +122,7 @@ export function GruposPage() {
       <ul className="flex flex-col gap-3">
         {grupos.data?.map((g) => (
           <li key={g.id}>
-            <Link to={`/grupos/${g.id}`} className="block rounded-card">
-              <Card className="flex flex-wrap items-center justify-between gap-3 hover:bg-primary-soft">
+            <CardLink to={`/grupos/${g.id}`} className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <CardTitle>{g.nombre}</CardTitle>
                   <CardDescription>
@@ -149,8 +149,7 @@ export function GruposPage() {
                     </Badge>
                   ))}
                 </div>
-              </Card>
-            </Link>
+            </CardLink>
           </li>
         ))}
       </ul>

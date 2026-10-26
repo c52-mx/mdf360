@@ -245,6 +245,29 @@ class IntegranteView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class IntegranteRestaurarView(APIView):
+    """Deshace «quitar»: el integrante vuelve al grupo con el mismo rol."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk, miembro_id):
+        grupo = get_object_or_404(Grupo, pk=pk)
+        if not access.puede_ver_grupo(request.user, grupo):
+            raise Http404
+        miembro = get_object_or_404(GrupoMiembro, pk=miembro_id, grupo=grupo, activo=False)
+        if not access.puede_gestionar_integrantes(request.user, grupo):
+            return _denegado()
+        if miembro.rol in ROLES_RESERVADOS and not access.puede_administrar(request.user):
+            return _denegado()
+        miembro.activo = True
+        miembro.save(update_fields=["activo"])
+        audit.log(
+            "grupo.integrante_restaurado", actor=request.user, target=grupo, request=request,
+            persona=miembro.persona_id, rol=miembro.rol,
+        )  # fmt: skip
+        return Response(miembro_dict(miembro))
+
+
 # ---------- reuniones y asistencia ----------
 class AbrirReunionSerializer(serializers.Serializer):
     fecha = serializers.DateField(required=False)

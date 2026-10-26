@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { CloudOff, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { Alert, Button } from '@/design-system'
+import { Alert, Button, ConfirmButton } from '@/design-system'
 import { useAuth } from '@/features/auth/use-auth'
 import { instantanea, pendientes, sincronizar, type Pendiente } from '@/lib/outbox'
 
@@ -94,9 +94,15 @@ export function SyncBanner() {
             <span>
               No se pudo enviar la lista de {p.grupoNombre} ({p.fecha}): {p.error}
             </span>
-            <Button size="sm" variant="outline" onClick={() => pendientes.quitar(p.id)}>
+            <ConfirmButton
+              size="sm"
+              variant="outline"
+              pregunta="Se perderá esta lista."
+              etiquetaConfirmar="Sí, descartar"
+              onConfirm={() => pendientes.quitar(p.id)}
+            >
               Descartar
-            </Button>
+            </ConfirmButton>
           </span>
         </Alert>
       ))}

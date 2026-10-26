@@ -63,8 +63,71 @@
     font-family: var(--font-display);
     font-weight: 700;
   }
+  /* Tracking según el tamaño: el texto grande pide letras más juntas; el cuerpo, normal. */
+  h1 {
+    letter-spacing: -0.02em;
+  }
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
+  }
   :focus-visible {
     outline: 3px solid var(--color-ring);
     outline-offset: 2px;
   }
+}
+
+/* Hoja que sube desde abajo (menú «Más»). Entra y sale por el mismo lado. */
+@keyframes hoja-sube {
+  from {
+    transform: translateY(2rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes fondo-aparece {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+dialog.hoja[open] {
+  animation: hoja-sube 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+dialog.hoja[open]::backdrop {
+  animation: fondo-aparece 200ms ease-out;
+}
+
+/*
+ * Movimiento reducido: sin deslizamientos ni escalas. Se conserva el cambio de opacidad y de
+ * color, que ayuda a entender qué pasó, pero sin movimiento.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .presionable:active {
+    transform: none !important;
+  }
+}
+
+/* Respuesta inmediata al tocar (en el teléfono no existe «hover»). */
+.presionable {
+  transition:
+    transform 100ms ease-out,
+    background-color 150ms ease-out,
+    color 150ms ease-out;
+}
+.presionable:active {
+  transform: scale(0.97);
 }

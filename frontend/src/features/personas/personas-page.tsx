@@ -2,7 +2,17 @@ import { useQuery } from '@tanstack/react-query'
 import { UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Alert, Avatar, Badge, Button, Card, Field, PageHeader, SelectField } from '@/design-system'
+import {
+  Alert,
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  CardLink,
+  Field,
+  PageHeader,
+  SelectField,
+} from '@/design-system'
 import { api } from '@/lib/api'
 import { fotoUrl, nivelLabel, type Nivel, type Pagina, type PersonaResumen } from './types'
 
@@ -95,8 +105,7 @@ export function PersonasPage() {
             <ul className="flex flex-col gap-3">
               {lista.data.results.map((p) => (
                 <li key={p.id}>
-                  <Link to={`/personas/${p.id}`} className="block rounded-card">
-                    <Card className="flex items-center gap-4 hover:bg-primary-soft">
+                  <CardLink to={`/personas/${p.id}`} className="flex items-center gap-4">
                       <Avatar name={p.nombre_completo} src={fotoUrl(p)} />
                       <div className="flex-1">
                         <p className="font-bold">{p.nombre_completo}</p>
@@ -108,8 +117,7 @@ export function PersonasPage() {
                         <Badge tone={nivelTone[p.nivel]}>{nivelLabel[p.nivel]}</Badge>
                         {!p.activo ? <Badge tone="warning">Baja</Badge> : null}
                       </div>
-                    </Card>
-                  </Link>
+                  </CardLink>
                 </li>
               ))}
             </ul>

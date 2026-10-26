@@ -91,6 +91,25 @@ class MensajeView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class MensajeRestaurarView(APIView):
+    """Deshace un borrado: el mensaje vuelve al tablero (lo puede pedir quien puede moderarlo)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        mensaje = get_object_or_404(Mensaje, pk=pk, eliminado=True)
+        if services.mensajes_de(request.user, mensaje.origen_tipo, mensaje.origen_id) is None:
+            raise Http404
+        if not services.puede_moderar(request.user, mensaje):
+            return _error(
+                "forbidden", "No puedes restaurar este mensaje.", status.HTTP_403_FORBIDDEN
+            )
+        mensaje.eliminado = False
+        mensaje.save(update_fields=["eliminado"])
+        audit.log("tablero.restaurado", actor=request.user, target=mensaje, request=request)
+        return Response(services.mensaje_dict(mensaje, request.user))
+
+
 class VistoView(APIView):
     permission_classes = [IsAuthenticated]
 
