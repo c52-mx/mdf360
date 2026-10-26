@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, useContext, type ReactNode } from 'react'
 import { api, ApiError } from '@/lib/api'
+import { quitarDispositivo } from '@/lib/push'
 
 export interface User {
   id: number
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setUser = (user: User | null) => queryClient.setQueryData(['me'], user)
   const logout = async () => {
+    await quitarDispositivo() // antes de cerrar sesión: aún tiene permiso para darlo de baja
     await api('/api/auth/logout/', { method: 'POST' })
     queryClient.clear()
     try {

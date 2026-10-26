@@ -1,4 +1,5 @@
 import { Card, CardDescription, CardTitle, PageHeader } from '@/design-system'
+import { InvitacionAvisos } from '@/features/notificaciones/notificaciones-card'
 
 export function HomePage() {
   return (
@@ -8,6 +9,7 @@ export function HomePage() {
         description="Plataforma de gestión y discipulado de Mundo de Fe México."
         module="admin"
       />
+      <InvitacionAvisos />
       <Card>
         <CardTitle>Sprint 0</CardTitle>
         <CardDescription>

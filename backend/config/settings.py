@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "apps.grupos",
     "apps.peticiones",
     "apps.tablero",
+    "apps.notificaciones",
 ]
 
 MIDDLEWARE = [
@@ -161,3 +162,9 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000
     SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Notificaciones push (M1-09). Sin claves VAPID la función queda apagada.
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:edgar.vargas@codigo52.com.mx")
+PUSH_EN_SEGUNDO_PLANO = env_bool("PUSH_EN_SEGUNDO_PLANO", True)

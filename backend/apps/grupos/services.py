@@ -5,9 +5,11 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.core import audit
+from apps.notificaciones import push
 from apps.personas import services as personas
 from apps.personas.models import Persona
 
+from . import access
 from .models import Asistencia, EstudioSemanal, GrupoMiembro, Reunion, lunes_de
 
 LIMITE_PDF = 15 * 1024 * 1024
@@ -141,6 +143,15 @@ def guardar_estudio(*, semana: date, titulo: str, archivos: dict, actor, request
         "estudio.guardado", actor=actor, target=estudio, request=request,
         archivos=sorted(archivos),
     )  # fmt: skip
+    if archivos:
+        push.notificar(
+            titulo="Estudio de la semana",
+            cuerpo=estudio.titulo,
+            url="/estudios",
+            etiqueta="estudio",
+            puede_recibir=access.puede_ver_estudios,
+            excluir=actor,
+        )
     return estudio
 
 

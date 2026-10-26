@@ -69,5 +69,6 @@ def registrar_origen():
             puede_leer=_puede_leer,
             ids_legibles=_ids_legibles,
             listar=_listar,
+            ruta=lambda grupo_id: f"/grupos/{grupo_id}",
         )
     )

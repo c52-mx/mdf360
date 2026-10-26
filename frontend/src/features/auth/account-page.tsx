@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { Alert, Button, Card, CardDescription, CardTitle, Field, PageHeader } from '@/design-system'
+import { NotificacionesCard } from '@/features/notificaciones/notificaciones-card'
 import { api } from '@/lib/api'
 import { useAuth, type User } from './use-auth'
 
@@ -35,6 +36,8 @@ export function AccountPage() {
         <CardDescription>WhatsApp: {user.whatsapp}</CardDescription>
         <CardDescription>Correo: {user.email || 'Sin correo registrado'}</CardDescription>
       </Card>
+
+      <NotificacionesCard />
 
       <Card>
         <form onSubmit={onSubmit} className="flex max-w-md flex-col gap-4">

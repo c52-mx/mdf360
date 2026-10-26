@@ -11,27 +11,11 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      workbox: {
-        // Las rutas del servidor (API, panel técnico, estáticos, PDF y audios del estudio) nunca
-        // deben responderse con la aplicación: se dejan pasar al servidor.
-        navigateFallbackDenylist: [/^\/api\//, /^\/admin\//, /^\/static\//],
-        runtimeCaching: [
-          {
-            // Lectura para uso sin conexión: sesión, grupos y reuniones. NO se guardan finanzas,
-            // personas, estudios ni la bitácora.
-            urlPattern: ({ url, request }) =>
-              request.method === 'GET' &&
-              /^\/api\/(auth\/me\/|grupos\/(\d+\/|reuniones\/\d+\/)?)$/.test(url.pathname),
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'mdf-api',
-              networkTimeoutSeconds: 4,
-              expiration: { maxEntries: 80, maxAgeSeconds: 7 * 24 * 60 * 60 },
-              cacheableResponse: { statuses: [200] },
-            },
-          },
-        ],
-      },
+      // Service worker propio (src/sw.js): caché, lectura sin conexión y notificaciones push.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+      injectManifest: { globPatterns: ['**/*.{js,css,html,svg,png}'] },
       manifest: {
         name: 'MDF360 · Mundo de Fe México',
         short_name: 'MDF360',
@@ -40,7 +24,12 @@ export default defineConfig({
         start_url: '/',
         theme_color: '#884088',
         background_color: '#ffffff',
-        icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+        icons: [
+          { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
       },
     }),
   ],
