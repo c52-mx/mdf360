@@ -25,3 +25,8 @@ Thumbs.db
 
 # Fotos de personas (datos personales)
 backend/media/
+
+# Herramientas de asistente (locales)
+.agents/
+.claude/
+skills-lock.json
