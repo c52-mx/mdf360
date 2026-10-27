@@ -16,7 +16,7 @@ import {
 } from '@/design-system'
 import { useCan } from '@/features/auth/use-auth'
 import { api } from '@/lib/api'
-import { dias, type GrupoResumen } from './types'
+import { dias, SECTORES, type GrupoResumen } from './types'
 
 export function GruposPage() {
   const queryClient = useQueryClient()
@@ -27,8 +27,27 @@ export function GruposPage() {
   const [dia, setDia] = useState('')
   const [hora, setHora] = useState('')
   const [colonia, setColonia] = useState('')
+  const [sector, setSector] = useState('')
+  const [casa, setCasa] = useState('')
+  const [q, setQ] = useState('')
+  const [filtroDia, setFiltroDia] = useState('')
+  const [filtroSector, setFiltroSector] = useState('')
+  const [filtroLider, setFiltroLider] = useState('')
+  const [estado, setEstado] = useState('')
 
-  const grupos = useQuery({ queryKey: ['grupos'], queryFn: () => api<GrupoResumen[]>('/api/grupos/') })
+  const grupos = useQuery({
+    queryKey: ['grupos', { q, filtroDia, filtroSector, filtroLider, estado }],
+    placeholderData: (previo) => previo,
+    queryFn: () => {
+      const params = new URLSearchParams()
+      if (q.trim()) params.set('q', q.trim())
+      if (filtroDia) params.set('dia', filtroDia)
+      if (filtroSector) params.set('sector', filtroSector)
+      if (filtroLider.trim()) params.set('lider', filtroLider.trim())
+      if (estado) params.set('estado', estado)
+      return api<GrupoResumen[]>(`/api/grupos/?${params.toString()}`)
+    },
+  })
   const crear = useMutation({
     mutationFn: () =>
       api<GrupoResumen>('/api/grupos/', {
@@ -37,6 +56,8 @@ export function GruposPage() {
           nombre,
           tipo,
           colonia,
+          sector,
+          casa: casa === '' ? null : Number(casa),
           dia_semana: dia === '' ? null : Number(dia),
           hora: hora || null,
         },
@@ -44,6 +65,8 @@ export function GruposPage() {
     onSuccess: () => {
       setCreando(false)
       setNombre('')
+      setSector('')
+      setCasa('')
       void queryClient.invalidateQueries({ queryKey: ['grupos'] })
     },
   })
@@ -101,6 +124,25 @@ export function GruposPage() {
               ]}
             />
             <Field label="Hora" type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+            <div className="grid grid-cols-2 gap-4">
+              <SelectField
+                label="Sector"
+                value={sector}
+                onChange={(e) => setSector(e.target.value)}
+                options={[
+                  { value: '', label: 'Sin definir' },
+                  ...SECTORES.map((s) => ({ value: s, label: s })),
+                ]}
+              />
+              <Field
+                label="Casa"
+                type="number"
+                min={1}
+                inputMode="numeric"
+                value={casa}
+                onChange={(e) => setCasa(e.target.value)}
+              />
+            </div>
             <Field
               label="Zona o colonia"
               hint="No escribas el domicilio exacto del anfitrión."
@@ -115,9 +157,48 @@ export function GruposPage() {
         </Card>
       ) : null}
 
+      <Card className="grid grid-cols-1 gap-4 md:grid-cols-5">
+        <Field
+          label="Buscar"
+          type="search"
+          placeholder="Nombre o colonia"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <Field
+          label="Líder"
+          type="search"
+          placeholder="Nombre del líder"
+          value={filtroLider}
+          onChange={(e) => setFiltroLider(e.target.value)}
+        />
+        <SelectField
+          label="Día"
+          value={filtroDia}
+          onChange={(e) => setFiltroDia(e.target.value)}
+          options={[{ value: '', label: 'Todos' }, ...dias.map((d, i) => ({ value: String(i), label: d }))]}
+        />
+        <SelectField
+          label="Sector"
+          value={filtroSector}
+          onChange={(e) => setFiltroSector(e.target.value)}
+          options={[{ value: '', label: 'Todos' }, ...SECTORES.map((s) => ({ value: s, label: s }))]}
+        />
+        <SelectField
+          label="Estado"
+          value={estado}
+          onChange={(e) => setEstado(e.target.value)}
+          options={[
+            { value: '', label: 'Todos' },
+            { value: 'activos', label: 'Activos' },
+            { value: 'suspendidos', label: 'Suspendidos' },
+          ]}
+        />
+      </Card>
+
       {grupos.isError ? <Alert tone="destructive">{grupos.error.message}</Alert> : null}
       {grupos.data && grupos.data.length === 0 ? (
-        <Alert>Todavía no perteneces a ningún grupo.</Alert>
+        <Alert>No hay grupos con esos filtros, o todavía no perteneces a ninguno.</Alert>
       ) : null}
       <ul className="flex flex-col gap-3">
         {grupos.data?.map((g) => (
@@ -126,7 +207,7 @@ export function GruposPage() {
                 <div>
                   <CardTitle>{g.nombre}</CardTitle>
                   <CardDescription>
-                    {[g.dia && `${g.dia} ${g.hora}`.trim(), g.colonia, `${g.integrantes} integrantes`]
+                    {[g.dia && `${g.dia} ${g.hora}`.trim(), g.ubicacion, g.colonia, `${g.integrantes} integrantes`]
                       .filter(Boolean)
                       .join(' · ')}
                   </CardDescription>
@@ -142,6 +223,7 @@ export function GruposPage() {
                         : `${g.ofrendas_con_diferencia} ofrendas con diferencia`}
                     </Badge>
                   ) : null}
+                  {g.suspendido ? <Badge tone="warning">Suspendido</Badge> : null}
                   {g.tipo === 'lideres' ? <Badge tone="primary">Líderes</Badge> : null}
                   {g.mis_roles.map((r) => (
                     <Badge key={r} tone="success">

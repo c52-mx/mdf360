@@ -100,10 +100,16 @@ def _grupo(user, grupo, hoy: date, visibles_peticiones) -> dict:
 
 def construir(user) -> dict:
     hoy = timezone.localdate()
-    grupos = [
+    consultables = [
         g
         for g in access.grupos_visibles(user).filter(activo=True)
         if access.puede_ver_historial(user, g)
+    ]
+    grupos = [g for g in consultables if not g.suspendido]
+    suspendidos = [
+        {"id": g.pk, "nombre": g.nombre, "motivo": g.suspension_motivo}
+        for g in consultables
+        if g.suspendido
     ]
     visibles_peticiones = peticiones.peticiones_visibles(user)
     tarjetas = [_grupo(user, g, hoy, visibles_peticiones) for g in grupos]
@@ -148,9 +154,11 @@ def construir(user) -> dict:
             "integrantes": sum(t["integrantes"] for t in tarjetas),
             "asistencia_pct": _pct(presentes, registrados),
             "alertas": len(alertas),
+            "suspendidos": len(suspendidos),
             "asistencia_minima_pct": minimo,
         },
         "serie": serie,
         "grupos": tarjetas,
         "alertas": alertas,
+        "suspendidos": suspendidos,
     }

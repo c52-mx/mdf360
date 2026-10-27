@@ -18,13 +18,17 @@ class Grupo(models.Model):
 
     nombre = models.CharField(max_length=150)
     tipo = models.CharField(max_length=20, choices=Tipo.choices, default=Tipo.CONEXION)
-    sector = models.CharField(max_length=100, blank=True)
+    sector = models.CharField("sector (letra)", max_length=1, blank=True)
+    casa = models.PositiveSmallIntegerField("número de casa", null=True, blank=True)
     colonia = models.CharField("zona o colonia", max_length=100, blank=True)
     dia_semana = models.PositiveSmallIntegerField(
         "día de la semana", null=True, blank=True, help_text="0 = lunes … 6 = domingo"
     )
     hora = models.TimeField(null=True, blank=True)
     activo = models.BooleanField(default=True)
+    suspendido = models.BooleanField(default=False)
+    suspension_motivo = models.TextField("motivo de la suspensión", blank=True)
+    suspendido_en = models.DateField(null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -32,6 +36,16 @@ class Grupo(models.Model):
 
     def __str__(self):
         return self.nombre
+
+    @property
+    def ubicacion(self) -> str:
+        """«Sector K, Casa 6» (lo que tenga capturado)."""
+        partes = []
+        if self.sector:
+            partes.append(f"Sector {self.sector}")
+        if self.casa:
+            partes.append(f"Casa {self.casa}")
+        return ", ".join(partes)
 
 
 class GrupoMiembro(models.Model):
