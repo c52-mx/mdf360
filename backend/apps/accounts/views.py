@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.auth import login, logout
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
+from django.db.models import Q
 from django.middleware.csrf import get_token
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -290,18 +291,59 @@ class InvitationView(APIView):
         return Response(_invite_payload(user, raw, token), status=status.HTTP_201_CREATED)
 
 
+def _cuenta_gestionable(request, user_id: int):
+    return services.accesos_gestionables(request.user).filter(pk=user_id).first()
+
+
 class ResetAccessView(APIView):
     """Reinicia el acceso de una persona (perdió su PIN o su número)."""
 
     permission_classes = [requiere("usuarios.invitar")]
 
     def post(self, request, user_id: int):
-        user = User.objects.filter(pk=user_id, is_active=True).first()
+        user = _cuenta_gestionable(request, user_id)
         if user is None:
             return _error("not_found", "No existe la persona.", status.HTTP_404_NOT_FOUND)
         raw, token = services.issue_token(user, ActivationToken.Purpose.RESET, request.user)
         audit.log("auth.reset_issued", actor=request.user, target=user, request=request)
         return Response(_invite_payload(user, raw, token, reset=True))
+
+
+class UnlockAccessView(APIView):
+    """Quita el bloqueo por intentos fallidos («Demasiados intentos») sin cambiar el PIN."""
+
+    permission_classes = [requiere("usuarios.invitar")]
+
+    def post(self, request, user_id: int):
+        user = _cuenta_gestionable(request, user_id)
+        if user is None:
+            return _error("not_found", "No existe la persona.", status.HTTP_404_NOT_FOUND)
+        services.desbloquear(user, request.user, request)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AccesosView(APIView):
+    """Cuentas que quien invita puede gestionar y su estado de acceso (pantalla Invitar)."""
+
+    permission_classes = [requiere("usuarios.invitar")]
+
+    def get(self, request):
+        cuentas = services.accesos_gestionables(request.user)
+        texto = (request.query_params.get("q") or "").strip()
+        if texto:
+            cuentas = cuentas.filter(Q(nombre__icontains=texto) | Q(whatsapp__icontains=texto))
+        return Response(
+            [
+                {
+                    "id": u.pk,
+                    "nombre": u.nombre,
+                    "whatsapp": u.whatsapp,
+                    "bloqueado": u.is_locked(),
+                    "activada": u.has_usable_password(),
+                }
+                for u in cuentas.order_by("nombre")[:50]
+            ]
+        )
 
 
 class RolesView(APIView):

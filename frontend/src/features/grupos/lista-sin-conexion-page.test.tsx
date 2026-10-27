@@ -68,7 +68,7 @@ describe('ListaSinConexionPage', () => {
     expect(await screen.findByText('Sofía Cruz')).toBeInTheDocument()
     expect(screen.getAllByText('Ana Martínez')).toHaveLength(1) // Ana aparece con dos roles
     expect(screen.getByText('0 de 2 presentes')).toBeInTheDocument()
-    fireEvent.click(screen.getAllByRole('button', { name: 'Ausente' })[0])
+    fireEvent.click(screen.getAllByRole('checkbox')[0])
     fireEvent.click(screen.getByRole('button', { name: 'Guardar lista' }))
     expect(await screen.findByText(/quedó guardada en tu teléfono/)).toBeInTheDocument()
     await waitFor(() => expect(pendientes.listar(4)).toHaveLength(1))

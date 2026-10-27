@@ -7,3 +7,10 @@ export const moduleBg: Record<ModuleKey, string> = {
   kids: 'bg-module-kids',
   admin: 'bg-module-admin',
 }
+
+export const moduleText: Record<ModuleKey, string> = {
+  grupos: 'text-module-grupos',
+  cursos: 'text-module-cursos',
+  kids: 'text-module-kids',
+  admin: 'text-module-admin',
+}

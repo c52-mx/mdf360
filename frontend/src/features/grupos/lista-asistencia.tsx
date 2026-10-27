@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Alert, Badge, Button, Card, CardTitle, TextareaField } from '@/design-system'
+import { cn } from '@/lib/cn'
 
 export interface PersonaLista {
   persona_id: number
@@ -22,7 +23,7 @@ interface Props {
   ) => Promise<ResultadoGuardado>
 }
 
-/** Pase de lista: un botón grande por persona, contador, notas y guardado (con o sin conexión). */
+/** Pase de lista: una fila con palomita por persona, contador, notas y guardado (con o sin conexión). */
 export function ListaAsistencia({ personas, notasIniciales, puedeModificar, onGuardar }: Props) {
   const [presentes, setPresentes] = useState<Record<number, boolean>>(() =>
     Object.fromEntries(personas.map((p) => [p.persona_id, p.presente])),
@@ -48,24 +49,36 @@ export function ListaAsistencia({ personas, notasIniciales, puedeModificar, onGu
       </div>
       {!puedeModificar ? <Alert tone="warning">Solo puedes consultar esta lista.</Alert> : null}
       <ul className="flex flex-col gap-2">
-        {personas.map((p) => (
-          <li key={p.persona_id} className="flex items-center justify-between gap-3">
-            <span>
-              <span className="font-bold">{p.nombre}</span>{' '}
-              {p.invitado ? <Badge tone="warning">Invitado</Badge> : null}
-            </span>
-            <Button
-              type="button"
-              variant={presentes[p.persona_id] ? 'success' : 'outline'}
-              disabled={!puedeModificar}
-              aria-pressed={presentes[p.persona_id]}
-              onClick={() => setPresentes((m) => ({ ...m, [p.persona_id]: !m[p.persona_id] }))}
-              className="min-w-28"
-            >
-              {presentes[p.persona_id] ? 'Presente' : 'Ausente'}
-            </Button>
-          </li>
-        ))}
+        {personas.map((p) => {
+          const presente = !!presentes[p.persona_id]
+          return (
+            <li key={p.persona_id}>
+              {/* Toda la fila es el área de toque: la palomita refleja el estado */}
+              <label
+                className={cn(
+                  'presionable flex min-h-14 items-center gap-3 rounded-control border-2 px-3 py-2',
+                  presente ? 'border-success bg-success-soft' : 'border-border bg-card',
+                  puedeModificar ? 'cursor-pointer' : 'opacity-70',
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={presente}
+                  disabled={!puedeModificar}
+                  onChange={() => setPresentes((m) => ({ ...m, [p.persona_id]: !m[p.persona_id] }))}
+                  className="size-7 shrink-0 accent-success"
+                />
+                <span className="flex-1">
+                  <span className="font-bold">{p.nombre}</span>{' '}
+                  {p.invitado ? <Badge tone="warning">Invitado</Badge> : null}
+                </span>
+                <span className={cn('text-sm font-semibold', presente ? 'text-success' : 'text-muted-foreground')}>
+                  {presente ? 'Presente' : 'Ausente'}
+                </span>
+              </label>
+            </li>
+          )
+        })}
       </ul>
       <TextareaField
         label="Notas de la reunión"

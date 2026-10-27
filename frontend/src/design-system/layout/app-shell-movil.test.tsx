@@ -61,4 +61,12 @@ describe('AppShell en el celular', () => {
     fireEvent.click(within(hoja).getByRole('link', { name: 'Mi cuenta', hidden: true }))
     expect(mas).toHaveAttribute('aria-expanded', 'false')
   })
+
+  it('los ítems de módulo muestran su ícono real, no un cuadro vacío', () => {
+    montar(seis.map((n) => ({ ...n, module: 'grupos' as const })).slice(0, 3))
+    const lateral = screen.getAllByRole('navigation', { name: 'Principal' })[0]
+    for (const enlace of within(lateral).getAllByRole('link')) {
+      expect(enlace.querySelector('svg')).not.toBeNull()
+    }
+  })
 })

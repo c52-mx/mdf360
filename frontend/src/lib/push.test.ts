@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { claveABytes, quitarDispositivo, requiereInstalar, soportaPush } from './push'
+import { claveABytes, quitarDispositivo, requiereInstalar, soportaPush, TOPE_BAJA_MS } from './push'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -47,5 +47,29 @@ describe('requiereInstalar', () => {
 describe('quitarDispositivo', () => {
   it('no estorba al cerrar sesión cuando no hay soporte', async () => {
     await expect(quitarDispositivo()).resolves.toBeUndefined()
+  })
+
+  it('si el service worker nunca responde, cierra de todos modos pasado el tope', async () => {
+    vi.useFakeTimers()
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { ready: new Promise(() => {}) },
+    })
+    vi.stubGlobal('PushManager', class {})
+    vi.stubGlobal('Notification', class {})
+    try {
+      let terminado = false
+      const espera = quitarDispositivo().then(() => {
+        terminado = true
+      })
+      await vi.advanceTimersByTimeAsync(TOPE_BAJA_MS - 100)
+      expect(terminado).toBe(false)
+      await vi.advanceTimersByTimeAsync(200)
+      await espera
+      expect(terminado).toBe(true)
+    } finally {
+      vi.useRealTimers()
+      Reflect.deleteProperty(navigator, 'serviceWorker')
+    }
   })
 })
