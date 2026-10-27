@@ -2,6 +2,7 @@ import re
 from datetime import date
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import Count, Q, Sum
 from django.http import FileResponse, Http404, HttpResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -16,7 +17,7 @@ from apps.core import audit
 
 from . import access, services
 from . import ofrendas as ofr
-from .models import EstudioSemanal, Grupo, GrupoMiembro, Reunion
+from .models import Asistencia, EstudioSemanal, Grupo, GrupoMiembro, Ofrenda, Reunion
 
 DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
@@ -44,6 +45,11 @@ def grupo_resumen(grupo: Grupo, user) -> dict:
         "nombre": grupo.nombre,
         "tipo": grupo.tipo,
         "sector": grupo.sector,
+        "casa": grupo.casa,
+        "ubicacion": grupo.ubicacion,
+        "suspendido": grupo.suspendido,
+        "suspension_motivo": grupo.suspension_motivo,
+        "suspendido_en": grupo.suspendido_en.isoformat() if grupo.suspendido_en else None,
         "colonia": grupo.colonia,
         "dia_semana": grupo.dia_semana,
         "dia": DIAS[grupo.dia_semana] if grupo.dia_semana is not None else "",
@@ -84,11 +90,78 @@ def estudio_dict(e: EstudioSemanal | None) -> dict | None:
 class GrupoEscritura(serializers.Serializer):
     nombre = serializers.CharField(max_length=150)
     tipo = serializers.ChoiceField(choices=Grupo.Tipo.choices, default="conexion")
-    sector = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    sector = serializers.RegexField(
+        r"^[A-Za-z]?$",
+        required=False,
+        allow_blank=True,
+        error_messages={"invalid": "El sector es una sola letra, por ejemplo K."},
+    )
+    casa = serializers.IntegerField(min_value=1, max_value=9999, required=False, allow_null=True)
+
+    def validate_sector(self, valor: str) -> str:
+        return valor.upper()
+
     colonia = serializers.CharField(max_length=100, required=False, allow_blank=True)
     dia_semana = serializers.IntegerField(min_value=0, max_value=6, required=False, allow_null=True)
     hora = serializers.TimeField(required=False, allow_null=True)
     activo = serializers.BooleanField(required=False)
+
+
+def _reuniones_del_grupo(user, grupo: Grupo) -> list[dict]:
+    """Últimas reuniones con lo que ocurrió ese día: asistencia, observaciones, ofrendas (solo
+    si puede ver finanzas) y peticiones (solo las que puede leer)."""
+    from apps.peticiones import services as peticiones
+
+    from .ofrendas import puede_ver_finanzas_grupo
+
+    reuniones = list(grupo.reuniones.all()[:20])
+    ids = [r.pk for r in reuniones]
+    asistencia = {
+        f["reunion_id"]: f
+        for f in Asistencia.objects.filter(reunion_id__in=ids)
+        .values("reunion_id")
+        .annotate(registrados=Count("id"), presentes=Count("id", filter=Q(presente=True)))
+    }
+    peticiones_por_dia = {
+        f["referencia_id"]: f["n"]
+        for f in peticiones.peticiones_visibles(user)
+        .filter(origen_tipo="grupo", origen_id=grupo.pk, referencia_id__in=ids)
+        .values("referencia_id")
+        .annotate(n=Count("id"))
+    }
+    ve_finanzas = puede_ver_finanzas_grupo(user, grupo)
+    ofrendas_por_dia = {}
+    if ve_finanzas:
+        ofrendas_por_dia = {
+            f["reunion_id"]: f
+            for f in Ofrenda.objects.filter(reunion_id__in=ids)
+            .values("reunion_id")
+            .annotate(n=Count("id"), total=Sum("monto"))
+        }
+    filas = []
+    for r in reuniones:
+        a = asistencia.get(r.pk, {})
+        fila = {
+            "id": r.pk,
+            "fecha": r.fecha.isoformat(),
+            "presentes": a.get("presentes", 0),
+            "registrados": a.get("registrados", 0),
+            "notas": r.notas,
+            "peticiones": peticiones_por_dia.get(r.pk, 0),
+            "ofrendas": None,
+        }
+        if ve_finanzas:
+            o = ofrendas_por_dia.get(r.pk)
+            fila["ofrendas"] = (
+                {"cantidad": o["n"], "total": str(o["total"])}
+                if o
+                else {
+                    "cantidad": 0,
+                    "total": "0",
+                }
+            )
+        filas.append(fila)
+    return filas
 
 
 # ---------- grupos ----------
@@ -96,7 +169,28 @@ class GruposView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        p = request.query_params
         grupos = access.grupos_visibles(request.user).filter(activo=True)
+        if p.get("estado") == "activos":
+            grupos = grupos.filter(suspendido=False)
+        elif p.get("estado") == "suspendidos":
+            grupos = grupos.filter(suspendido=True)
+        if p.get("dia", "").isdigit():
+            grupos = grupos.filter(dia_semana=int(p["dia"]))
+        if p.get("sector"):
+            grupos = grupos.filter(sector__iexact=p["sector"].strip())
+        lider = (p.get("lider") or "").strip()
+        if lider:
+            grupos = grupos.filter(
+                miembros__activo=True,
+                miembros__rol="lider",
+                miembros__persona__nombre__unaccent__icontains=lider,
+            ).distinct()
+        q = (p.get("q") or "").strip()
+        if q:
+            grupos = grupos.filter(
+                Q(nombre__unaccent__icontains=q) | Q(colonia__unaccent__icontains=q)
+            )
         return Response([grupo_resumen(g, request.user) for g in grupos])
 
     def post(self, request):
@@ -134,15 +228,7 @@ class GrupoView(APIView):
         miembros = grupo.miembros.filter(activo=True).select_related("persona")
         reuniones = []
         if access.puede_ver_historial(request.user, grupo):
-            for r in grupo.reuniones.all()[:20]:
-                reuniones.append(
-                    {
-                        "id": r.pk,
-                        "fecha": r.fecha.isoformat(),
-                        "presentes": r.asistencias.filter(presente=True).count(),
-                        "registrados": r.asistencias.count(),
-                    }
-                )
+            reuniones = _reuniones_del_grupo(request.user, grupo)
         else:  # el Secretario solo llega a la reunión de hoy
             hoy = grupo.reuniones.filter(fecha=timezone.localdate()).first()
             if hoy:
@@ -171,6 +257,51 @@ class GrupoView(APIView):
             "grupo.actualizado", actor=request.user, target=grupo, request=request,
             campos=sorted(data.validated_data),
         )  # fmt: skip
+        return Response(grupo_resumen(grupo, request.user))
+
+
+class SuspensionSerializer(serializers.Serializer):
+    motivo = serializers.CharField(max_length=1000)
+
+
+class GrupoSuspenderView(APIView):
+    """Suspende un grupo (deja de contar en el dashboard y no abre reuniones) con su motivo."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        grupo = get_object_or_404(Grupo, pk=pk, activo=True)
+        if not access.puede_ver_grupo(request.user, grupo):
+            raise Http404
+        if not access.puede_administrar(request.user):
+            return _denegado()
+        data = SuspensionSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        motivo = data.validated_data["motivo"].strip()
+        if not motivo:
+            return _error("invalid", "Escribe el motivo de la suspensión.")
+        grupo.suspendido = True
+        grupo.suspension_motivo = motivo
+        grupo.suspendido_en = timezone.localdate()
+        grupo.save(update_fields=["suspendido", "suspension_motivo", "suspendido_en"])
+        audit.log(
+            "grupo.suspendido", actor=request.user, target=grupo, request=request, motivo=motivo
+        )
+        return Response(grupo_resumen(grupo, request.user))
+
+
+class GrupoReactivarView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        grupo = get_object_or_404(Grupo, pk=pk, activo=True)
+        if not access.puede_ver_grupo(request.user, grupo):
+            raise Http404
+        if not access.puede_administrar(request.user):
+            return _denegado()
+        grupo.suspendido = False
+        grupo.save(update_fields=["suspendido"])  # el motivo y la fecha quedan como historial
+        audit.log("grupo.reactivado", actor=request.user, target=grupo, request=request)
         return Response(grupo_resumen(grupo, request.user))
 
 
@@ -224,8 +355,46 @@ class IntegrantesView(APIView):
         return Response(miembro_dict(miembro), status=status.HTTP_201_CREATED)
 
 
+class CambioRolSerializer(serializers.Serializer):
+    rol = serializers.ChoiceField(choices=GrupoMiembro.Rol.choices)
+
+
 class IntegranteView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk, miembro_id):
+        """Cambia el rol de un integrante dentro del grupo."""
+        grupo = get_object_or_404(Grupo, pk=pk)
+        if not access.puede_ver_grupo(request.user, grupo):
+            raise Http404
+        miembro = get_object_or_404(GrupoMiembro, pk=miembro_id, grupo=grupo, activo=True)
+        if not access.puede_gestionar_integrantes(request.user, grupo):
+            return _denegado()
+        data = CambioRolSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        nuevo = data.validated_data["rol"]
+        if (
+            miembro.rol in ROLES_RESERVADOS or nuevo in ROLES_RESERVADOS
+        ) and not access.puede_administrar(request.user):
+            return _error(
+                "role_not_allowed",
+                "Solo la administración asigna o cambia Supervisor o Líder.",
+                status.HTTP_403_FORBIDDEN,
+            )
+        if (
+            GrupoMiembro.objects.filter(grupo=grupo, persona=miembro.persona, rol=nuevo)
+            .exclude(pk=miembro.pk)
+            .exists()
+        ):
+            return _error("invalid", "Esa persona ya tiene ese rol en el grupo.")
+        anterior = miembro.rol
+        miembro.rol = nuevo
+        miembro.save(update_fields=["rol"])
+        audit.log(
+            "grupo.integrante_rol", actor=request.user, target=grupo, request=request,
+            persona=miembro.persona_id, de=anterior, a=nuevo,
+        )  # fmt: skip
+        return Response(miembro_dict(miembro))
 
     def delete(self, request, pk, miembro_id):
         grupo = get_object_or_404(Grupo, pk=pk)
@@ -291,6 +460,8 @@ class ReunionesView(APIView):
             raise Http404
         if not access.puede_capturar(request.user, grupo):
             return _denegado()
+        if grupo.suspendido:
+            return _error("suspended", "El grupo está suspendido: no se abren reuniones.")
         data = AbrirReunionSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         fecha = data.validated_data.get("fecha")

@@ -45,6 +45,7 @@ interface Dashboard {
   serie: { semana: string; presentes: number; registrados: number; pct: number | null }[]
   grupos: Tarjeta[]
   alertas: Alerta[]
+  suspendidos: { id: number; nombre: string; motivo: string }[]
 }
 
 const textoAlerta = (a: Alerta, minimo: number) =>
@@ -70,7 +71,7 @@ export function ResumenGrupos() {
   })
   if (datos.isPending) return <p className="text-muted-foreground">Cargando…</p>
   if (datos.isError) return <Alert tone="destructive">{datos.error.message}</Alert>
-  const { resumen, serie, grupos, alertas } = datos.data
+  const { resumen, serie, grupos, alertas, suspendidos = [] } = datos.data
   const minimo = resumen.asistencia_minima_pct
 
   return (
@@ -83,6 +84,20 @@ export function ResumenGrupos() {
       </div>
 
       {grupos.length === 0 ? <Alert>Todavía no tienes grupos que supervisar.</Alert> : null}
+      {suspendidos.length > 0 ? (
+        <Alert tone="warning">
+          {suspendidos.length === 1 ? '1 grupo suspendido' : `${suspendidos.length} grupos suspendidos`}:{' '}
+          {suspendidos.map((s, i) => (
+            <span key={s.id}>
+              {i > 0 ? ', ' : ''}
+              <Link className="underline" to={`/grupos/${s.id}`}>
+                {s.nombre}
+              </Link>
+            </span>
+          ))}
+          .
+        </Alert>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Card>

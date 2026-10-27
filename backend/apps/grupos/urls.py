@@ -6,6 +6,8 @@ urlpatterns = [
     path("", views.GruposView.as_view(), name="grupos"),
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
     path("<int:pk>/", views.GrupoView.as_view(), name="grupo"),
+    path("<int:pk>/suspender/", views.GrupoSuspenderView.as_view(), name="grupo-suspender"),
+    path("<int:pk>/reactivar/", views.GrupoReactivarView.as_view(), name="grupo-reactivar"),
     path("<int:pk>/integrantes/", views.IntegrantesView.as_view(), name="grupo-integrantes"),
     path(
         "<int:pk>/integrantes/<int:miembro_id>/",

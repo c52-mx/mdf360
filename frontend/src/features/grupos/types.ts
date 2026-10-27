@@ -5,6 +5,11 @@ export interface GrupoResumen {
   nombre: string
   tipo: 'conexion' | 'lideres'
   sector: string
+  casa: number | null
+  ubicacion: string
+  suspendido: boolean
+  suspension_motivo: string
+  suspendido_en: string | null
   colonia: string
   dia_semana: number | null
   dia: string
@@ -24,9 +29,22 @@ export interface Miembro {
   invitado: boolean
 }
 
+export interface ReunionDelGrupo {
+  id: number
+  fecha: string
+  presentes?: number
+  registrados?: number
+  notas?: string
+  peticiones?: number
+  /** null si la persona no puede ver las finanzas del grupo. */
+  ofrendas?: { cantidad: number; total: string } | null
+}
+
+export const SECTORES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+
 export interface GrupoDetalle extends GrupoResumen {
   miembros: Miembro[]
-  reuniones: { id: number; fecha: string; presentes?: number; registrados?: number }[]
+  reuniones: ReunionDelGrupo[]
   puede_capturar: boolean
   puede_gestionar: boolean
   puede_administrar: boolean
