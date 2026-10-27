@@ -8,10 +8,15 @@ import {
   Badge,
   Button,
   Card,
-  CardLink,
   Field,
   PageHeader,
   SelectField,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
 } from '@/design-system'
 import { api } from '@/lib/api'
 import { fotoUrl, nivelLabel, type Nivel, type Pagina, type PersonaResumen } from './types'
@@ -102,25 +107,48 @@ export function PersonasPage() {
           {lista.data.results.length === 0 ? (
             <Alert>No hay personas con esos filtros.</Alert>
           ) : (
-            <ul className="flex flex-col gap-3">
-              {lista.data.results.map((p) => (
-                <li key={p.id}>
-                  <CardLink to={`/personas/${p.id}`} className="flex items-center gap-4">
-                      <Avatar name={p.nombre_completo} src={fotoUrl(p)} />
-                      <div className="flex-1">
-                        <p className="font-bold">{p.nombre_completo}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {[p.whatsapp, p.grupo_conexion].filter(Boolean).join(' · ') || 'Sin datos de contacto'}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
+            <Table aria-label="Personas">
+              <TableHead>
+                <TableRow className="hover:bg-muted">
+                  <TableHeaderCell>Persona</TableHeaderCell>
+                  <TableHeaderCell>Contacto</TableHeaderCell>
+                  <TableHeaderCell>Grupo</TableHeaderCell>
+                  <TableHeaderCell>Roles</TableHeaderCell>
+                  <TableHeaderCell>Nivel</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {lista.data.results.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell>
+                      <Link to={`/personas/${p.id}`} className="flex items-center gap-3 font-bold underline">
+                        <Avatar name={p.nombre_completo} src={fotoUrl(p)} />
+                        {p.nombre_completo}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{p.whatsapp || 'Sin datos'}</TableCell>
+                    <TableCell>{p.grupo_conexion || '–'}</TableCell>
+                    <TableCell>
+                      {p.roles.length > 0 ? (
+                        <span className="flex flex-wrap gap-1">
+                          {p.roles.map((rol) => (
+                            <Badge key={rol}>{rol}</Badge>
+                          ))}
+                        </span>
+                      ) : (
+                        '–'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="flex flex-wrap gap-1">
                         <Badge tone={nivelTone[p.nivel]}>{nivelLabel[p.nivel]}</Badge>
                         {!p.activo ? <Badge tone="warning">Baja</Badge> : null}
-                      </div>
-                  </CardLink>
-                </li>
-              ))}
-            </ul>
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
           <div className="flex items-center justify-between">
             <Button variant="outline" disabled={!lista.data.previous} onClick={() => setPage((n) => n - 1)}>

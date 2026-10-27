@@ -47,6 +47,32 @@
   --radius-control: 0.75rem;
 }
 
+/*
+ * Paletas elegibles (Mi cuenta > Color). Solo cambian la marca; los estados (éxito, aviso, error)
+ * y los colores de módulo se conservan para que su significado no varíe. Todas cumplen contraste
+ * AA con texto blanco sobre el color principal.
+ */
+[data-tema='azul'] {
+  --color-primary: #1f5fa8;
+  --color-primary-soft: #e3edf8;
+  --color-ring: #1f5fa8;
+}
+[data-tema='verde'] {
+  --color-primary: #1b6e4a;
+  --color-primary-soft: #e2f2ea;
+  --color-ring: #1b6e4a;
+}
+[data-tema='vino'] {
+  --color-primary: #8c1d40;
+  --color-primary-soft: #f6e3e9;
+  --color-ring: #8c1d40;
+}
+[data-tema='grafito'] {
+  --color-primary: #3d4451;
+  --color-primary-soft: #e8eaee;
+  --color-ring: #3d4451;
+}
+
 @layer base {
   html {
     font-size: 112.5%; /* 18 px base: pensado para personas mayores */

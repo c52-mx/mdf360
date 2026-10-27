@@ -6,9 +6,21 @@ from .models import Persona, PersonaMovimiento, Procedencia, ProcesoDiscipular
 FOTO_MAX_BYTES = 5 * 1024 * 1024
 
 
+def _nombres_de_roles(persona) -> list[str]:
+    """Roles (nombres) de la cuenta de la persona; vacío si todavía no tiene acceso."""
+    if persona.usuario_id is None:
+        return []
+    asignaciones = persona.usuario.asignaciones.all()
+    return sorted(a.rol.nombre for a in asignaciones if a.rol.activo)
+
+
 class PersonaListSerializer(serializers.ModelSerializer):
     nombre_completo = serializers.CharField(read_only=True)
     tiene_foto = serializers.SerializerMethodField()
+    roles = serializers.SerializerMethodField()
+
+    def get_roles(self, obj) -> list[str]:
+        return _nombres_de_roles(obj)
 
     class Meta:
         model = Persona
@@ -21,6 +33,7 @@ class PersonaListSerializer(serializers.ModelSerializer):
             "grupo_conexion",
             "activo",
             "tiene_foto",
+            "roles",
         ]
 
     def get_tiene_foto(self, obj) -> bool:
@@ -52,11 +65,16 @@ class PersonaDetailSerializer(serializers.ModelSerializer):
     tiene_foto = serializers.SerializerMethodField()
     faltantes_edu = serializers.SerializerMethodField()
     procesos = serializers.SerializerMethodField()
+    roles = serializers.SerializerMethodField()
+
+    def get_roles(self, obj) -> list[str]:
+        return _nombres_de_roles(obj)
 
     class Meta:
         model = Persona
         fields = [
             "id",
+            "roles",
             "nivel",
             "procedencia",
             "activo",

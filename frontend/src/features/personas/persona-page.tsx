@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type ChangeEvent, type FormEvent } from 'react'
-import { useParams } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
+import { Link, useParams } from 'react-router-dom'
 import {
   Alert,
   Avatar,
@@ -150,6 +151,10 @@ function Ficha({ persona }: { persona: Persona }) {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
+      <Link to="/personas" className="presionable flex w-fit items-center gap-2 font-semibold text-primary">
+        <ArrowLeft aria-hidden className="size-5" />
+        Volver al listado
+      </Link>
       <PageHeader
         title={persona.nombre_completo}
         description={persona.edad !== null ? `${persona.edad} años` : undefined}
@@ -172,6 +177,11 @@ function Ficha({ persona }: { persona: Persona }) {
           <div className="flex flex-wrap gap-2">
             <Badge tone="primary">{nivelLabel[persona.nivel]}</Badge>
             {persona.activo ? <Badge tone="success">Activo</Badge> : <Badge tone="warning">Baja</Badge>}
+            {persona.roles.map((rol) => (
+              <Badge key={rol} tone="neutral">
+                {rol}
+              </Badge>
+            ))}
           </div>
           <div className="flex flex-wrap gap-2">
             <FileButton onFile={(file) => subirFoto.mutate(file)} disabled={subirFoto.isPending}>

@@ -1,12 +1,12 @@
 import { useMutation } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { Alert, Button, Card, CardDescription, CardTitle, Field, PageHeader } from '@/design-system'
+import { Alert, Button, Card, CardDescription, CardTitle, Field, PageHeader, ThemePicker } from '@/design-system'
 import { NotificacionesCard } from '@/features/notificaciones/notificaciones-card'
 import { api } from '@/lib/api'
 import { useAuth, type User } from './use-auth'
 
 export function AccountPage() {
-  const { user, setUser, logout } = useAuth()
+  const { user, setUser } = useAuth()
   const [whatsapp, setWhatsapp] = useState('')
   const [credential, setCredential] = useState('')
 
@@ -37,6 +37,12 @@ export function AccountPage() {
         <CardDescription>Correo: {user.email || 'Sin correo registrado'}</CardDescription>
       </Card>
 
+      <Card className="flex flex-col gap-3">
+        <CardTitle>Color de la aplicación</CardTitle>
+        <CardDescription>Elige el color que prefieras. Se recuerda en este dispositivo.</CardDescription>
+        <ThemePicker />
+      </Card>
+
       <NotificacionesCard />
 
       <Card>
@@ -64,12 +70,6 @@ export function AccountPage() {
           </Button>
         </form>
       </Card>
-
-      <div>
-        <Button variant="outline" onClick={() => void logout()}>
-          Cerrar sesión
-        </Button>
-      </div>
     </div>
   )
 }

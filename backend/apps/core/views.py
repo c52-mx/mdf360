@@ -3,6 +3,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .audit import ACCIONES_AVISO, ACCIONES_ERROR, nivel_de
+
 
 class HealthView(APIView):
     """Comprobación de vida para el balanceador y el monitoreo."""
@@ -12,6 +14,9 @@ class HealthView(APIView):
 
     def get(self, request):
         return Response({"status": "ok"})
+
+
+_ACCIONES_POR_NIVEL = {"error": ACCIONES_ERROR, "aviso": ACCIONES_AVISO}
 
 
 class AuditPagination(PageNumberPagination):
@@ -40,6 +45,10 @@ class AuditListView(APIView):
             qs = qs.filter(action__startswith=p["action"])
         if p.get("q"):
             qs = qs.filter(Q(actor_repr__icontains=p["q"]) | Q(target_id=p["q"]))
+        if p.get("nivel") in ("error", "aviso"):
+            qs = qs.filter(action__in=_ACCIONES_POR_NIVEL[p["nivel"]])
+        elif p.get("nivel") == "info":
+            qs = qs.exclude(action__in=ACCIONES_ERROR | ACCIONES_AVISO)
         if p.get("desde"):
             qs = qs.filter(created_at__date__gte=p["desde"])
         if p.get("hasta"):
@@ -52,6 +61,7 @@ class AuditListView(APIView):
                 "id": e.id,
                 "fecha": e.created_at,
                 "accion": e.action,
+                "nivel": nivel_de(e.action),
                 "actor": e.actor_repr,
                 "objeto": f"{e.target_type} {e.target_id}".strip(),
                 "detalle": e.detail,
@@ -60,6 +70,53 @@ class AuditListView(APIView):
             for e in page
         ]
         return paginator.get_paginated_response(filas)
+
+
+class AuditResumenView(APIView):
+    """Errores y avisos por día, y los módulos que hay en la bitácora (para filtrar)."""
+
+    def get_permissions(self):
+        from apps.accounts.permissions import requiere
+
+        return [requiere("bitacora.ver")()]
+
+    def get(self, request):
+        from datetime import timedelta
+
+        from django.db.models import Count
+        from django.db.models.functions import TruncDate
+        from django.utils import timezone
+
+        from .models import AuditEvent
+
+        try:
+            dias = min(max(int(request.query_params.get("dias", 14)), 1), 90)
+        except ValueError:
+            dias = 14
+        hoy = timezone.localdate()
+        desde = hoy - timedelta(days=dias - 1)
+        filas = (
+            AuditEvent.objects.filter(
+                created_at__date__gte=desde,
+                action__in=ACCIONES_ERROR | ACCIONES_AVISO,
+            )
+            .annotate(dia=TruncDate("created_at", tzinfo=timezone.get_current_timezone()))
+            .values("dia", "action")
+            .annotate(n=Count("id"))
+        )
+        por_dia = {desde + timedelta(days=i): {"errores": 0, "avisos": 0} for i in range(dias)}
+        for f in filas:
+            clave = "errores" if f["action"] in ACCIONES_ERROR else "avisos"
+            if f["dia"] in por_dia:
+                por_dia[f["dia"]][clave] += f["n"]
+        acciones = AuditEvent.objects.values_list("action", flat=True).distinct()
+        modulos = sorted({a.split(".")[0] for a in acciones})
+        return Response(
+            {
+                "dias": [{"fecha": d.isoformat(), **v} for d, v in por_dia.items()],
+                "modulos": modulos,
+            }
+        )
 
 
 class ConfigView(APIView):

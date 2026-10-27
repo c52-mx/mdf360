@@ -10,7 +10,6 @@ import {
   CardTitle,
   ColumnsChart,
   Meter,
-  PageHeader,
 } from '@/design-system'
 import { api } from '@/lib/api'
 import { dinero } from './ofrendas'
@@ -63,8 +62,8 @@ const corta = (iso: string) =>
 const tonoAsistencia = (pct: number | null, minimo: number) =>
   pct === null ? 'primary' : pct < minimo ? 'destructive' : 'success'
 
-/** Reporte de supervisión: salud de los grupos que la persona puede consultar. */
-export function DashboardPage() {
+/** Salud de los grupos que la persona puede consultar. Se muestra en Inicio. */
+export function ResumenGrupos() {
   const datos = useQuery({
     queryKey: ['grupos-dashboard'],
     queryFn: () => api<Dashboard>('/api/grupos/dashboard/'),
@@ -76,16 +75,12 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Resumen de grupos"
-        description="Asistencia y avance de los grupos que puedes consultar."
-        module="grupos"
-        actions={
-          <Button asChild variant="outline">
-            <Link to="/grupos">Ver grupos</Link>
-          </Button>
-        }
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xl">Resumen de grupos</h2>
+        <Button asChild variant="outline">
+          <Link to="/grupos">Ver grupos</Link>
+        </Button>
+      </div>
 
       {grupos.length === 0 ? <Alert>Todavía no tienes grupos que supervisar.</Alert> : null}
 
