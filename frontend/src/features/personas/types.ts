@@ -7,6 +7,13 @@ export const nivelLabel: Record<Nivel, string> = {
   edu: 'Expediente completo',
 }
 
+/** Qué significa cada nivel de registro, para quien captura. */
+export const nivelAyuda: Record<Nivel, string> = {
+  contacto: 'Alguien que dejó su número o vino invitado. Solo tenemos lo básico para localizarlo.',
+  participante: 'Ya asiste y está en seguimiento. Se le registran sus procesos de discipulado.',
+  edu: 'Expediente digital completo (EDU): tiene todos los datos de la Radiografía de miembros.',
+}
+
 export const procedenciaOptions: { value: Procedencia; label: string }[] = [
   { value: 'miembro', label: 'Miembro de la iglesia' },
   { value: 'invitado_grupo', label: 'Invitado de grupo' },
@@ -24,6 +31,7 @@ export interface PersonaResumen {
   activo: boolean
   tiene_foto: boolean
   roles: string[]
+  grupos: string[]
 }
 
 export interface Pagina<T> {
@@ -84,6 +92,7 @@ export interface Movimiento {
   tipo_display: string
   fecha: string
   motivo: string
+  iglesia_destino: string
 }
 
 export const fotoUrl = (p: { id: number; tiene_foto: boolean }, version = '') =>

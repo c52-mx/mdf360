@@ -31,17 +31,33 @@ export function PersonasPage() {
   const [q, setQ] = useState('')
   const [nivel, setNivel] = useState('')
   const [activo, setActivo] = useState('true')
+  const [grupo, setGrupo] = useState('')
+  const [rol, setRol] = useState('')
   const [page, setPage] = useState(1)
 
   const lista = useQuery({
-    queryKey: ['personas', { q, nivel, activo, page }],
+    queryKey: ['personas', { q, nivel, activo, grupo, rol, page }],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), activo })
       if (q.trim()) params.set('q', q.trim())
       if (nivel) params.set('nivel', nivel)
+      if (grupo) params.set('grupo', grupo)
+      if (rol) params.set('rol', rol)
       return api<Pagina<PersonaResumen>>(`/api/personas/?${params.toString()}`)
     },
     placeholderData: (previous) => previous,
+  })
+
+  const grupos = useQuery({
+    queryKey: ['grupos', 'para-filtro'],
+    queryFn: () => api<{ id: number; nombre: string }[]>('/api/grupos/'),
+    staleTime: 60_000,
+  })
+  const roles = useQuery({
+    queryKey: ['roles-filtro'],
+    queryFn: () => api<{ clave: string; nombre: string }[]>('/api/auth/roles/'),
+    staleTime: 60_000,
+    retry: false,
   })
 
   const cambiar = (fn: () => void) => {
@@ -85,6 +101,26 @@ export function PersonasPage() {
           ]}
         />
         <SelectField
+          label="Grupo"
+          value={grupo}
+          onChange={(e) => cambiar(() => setGrupo(e.target.value))}
+          options={[
+            { value: '', label: 'Todos' },
+            ...(grupos.data ?? []).map((g) => ({ value: String(g.id), label: g.nombre })),
+          ]}
+        />
+        {roles.data ? (
+          <SelectField
+            label="Rol"
+            value={rol}
+            onChange={(e) => cambiar(() => setRol(e.target.value))}
+            options={[
+              { value: '', label: 'Todos' },
+              ...roles.data.map((r) => ({ value: r.clave, label: r.nombre })),
+            ]}
+          />
+        ) : null}
+        <SelectField
           label="Estado"
           value={activo}
           onChange={(e) => cambiar(() => setActivo(e.target.value))}
@@ -127,7 +163,7 @@ export function PersonasPage() {
                       </Link>
                     </TableCell>
                     <TableCell>{p.whatsapp || 'Sin datos'}</TableCell>
-                    <TableCell>{p.grupo_conexion || '–'}</TableCell>
+                    <TableCell>{p.grupos.length > 0 ? p.grupos.join(', ') : p.grupo_conexion || '–'}</TableCell>
                     <TableCell>
                       {p.roles.length > 0 ? (
                         <span className="flex flex-wrap gap-1">

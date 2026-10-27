@@ -42,11 +42,14 @@ def faltantes_para_edu(persona: Persona) -> list[str]:
     return [etiqueta for campo, etiqueta in REQUISITOS_EDU.items() if not getattr(persona, campo)]
 
 
-def _movimiento(persona, tipo, motivo="", fecha=None, actor=None) -> PersonaMovimiento:
+def _movimiento(
+    persona, tipo, motivo="", fecha=None, actor=None, iglesia_destino=""
+) -> PersonaMovimiento:
     return PersonaMovimiento.objects.create(
         persona=persona,
         tipo=tipo,
         motivo=motivo,
+        iglesia_destino=iglesia_destino,
         fecha=fecha or timezone.localdate(),
         registrado_por=actor if getattr(actor, "pk", None) else None,
     )
@@ -114,13 +117,50 @@ def cambiar_nivel(persona: Persona, nivel: str, *, actor=None, request=None) -> 
     return persona
 
 
+def _retirar_de_grupos(persona: Persona) -> list[int]:
+    """Quien sale de la iglesia deja de aparecer en las listas de sus grupos.
+
+    Se desactiva la membresía (no se borra): el historial de asistencia se conserva. Devuelve los
+    grupos de los que salió.
+    """
+    from apps.grupos.models import GrupoMiembro
+
+    membresias = GrupoMiembro.objects.filter(persona=persona, activo=True)
+    grupos = sorted(set(membresias.values_list("grupo_id", flat=True)))
+    membresias.update(activo=False)
+    return grupos
+
+
 def registrar_baja(persona: Persona, *, fecha, motivo, actor=None, request=None) -> Persona:
     if not persona.activo:
         raise ValidationError("La persona ya está dada de baja.")
     persona.activo = False
     persona.save(update_fields=["activo", "actualizado_en"])
     _movimiento(persona, PersonaMovimiento.Tipo.BAJA, motivo, fecha, actor)
-    audit.log("persona.baja", actor=actor, target=persona, request=request)
+    grupos = _retirar_de_grupos(persona)
+    audit.log("persona.baja", actor=actor, target=persona, request=request, grupos_quitados=grupos)
+    return persona
+
+
+def trasladar(
+    persona: Persona, *, fecha, iglesia_destino, motivo="", actor=None, request=None
+) -> Persona:
+    """Pasa a la persona a otra iglesia: queda inactiva, con el destino en su historial."""
+    if not persona.activo:
+        raise ValidationError("La persona ya está dada de baja.")
+    destino = iglesia_destino.strip()
+    if not destino:
+        raise ValidationError("Escribe a qué iglesia se traslada.")
+    persona.activo = False
+    persona.save(update_fields=["activo", "actualizado_en"])
+    _movimiento(
+        persona, PersonaMovimiento.Tipo.TRASLADO, motivo, fecha, actor, iglesia_destino=destino
+    )
+    grupos = _retirar_de_grupos(persona)
+    audit.log(
+        "persona.traslado", actor=actor, target=persona, request=request,
+        destino=destino, grupos_quitados=grupos,
+    )  # fmt: skip
     return persona
 
 

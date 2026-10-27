@@ -346,3 +346,85 @@ def test_el_listado_y_el_detalle_muestran_los_roles_de_la_persona(api, staff):
     assert filas[persona.pk]["roles"] == ["Líder / Maestro"]
     assert filas[sin_cuenta.pk]["roles"] == []
     assert api.get(f"/api/personas/{persona.pk}/").json()["roles"] == ["Líder / Maestro"]
+
+
+# ---------- traslado a otra iglesia, baja y grupos ----------
+def _persona_en_grupo(nombre="Gloria", whatsapp="55 8888 0001"):
+    from apps.grupos.models import Grupo, GrupoMiembro
+
+    persona = Persona.objects.create(nombre=nombre, whatsapp=whatsapp)
+    grupo = Grupo.objects.create(nombre="Conexión Norte")
+    GrupoMiembro.objects.create(grupo=grupo, persona=persona, rol="asistente")
+    return persona, grupo
+
+
+def test_traslado_deja_inactiva_a_la_persona_con_su_destino_y_la_saca_de_sus_grupos(api):
+    from apps.grupos.models import GrupoMiembro
+
+    persona, grupo = _persona_en_grupo()
+    r = api.post(
+        f"/api/personas/{persona.pk}/traslado/",
+        {"fecha": "2026-10-20", "iglesia_destino": "Iglesia Vida Nueva", "motivo": "Se mudó"},
+        format="json",
+    )
+    assert r.status_code == 200 and r.json()["activo"] is False
+    mov = api.get(f"/api/personas/{persona.pk}/movimientos/").json()[0]
+    assert mov["tipo"] == "traslado" and mov["iglesia_destino"] == "Iglesia Vida Nueva"
+    assert not GrupoMiembro.objects.get(grupo=grupo, persona=persona).activo
+    evento = AuditEvent.objects.get(action="persona.traslado")
+    assert evento.detail["destino"] == "Iglesia Vida Nueva"
+    assert evento.detail["grupos_quitados"] == [grupo.pk]
+    # no se traslada dos veces ni sin destino
+    otra = api.post(
+        f"/api/personas/{persona.pk}/traslado/",
+        {"fecha": "2026-10-20", "iglesia_destino": "X"},
+        format="json",
+    )
+    assert otra.status_code == 400
+
+
+def test_traslado_exige_destino_y_permiso(api, db):
+    persona, _ = _persona_en_grupo("Hugo", "55 8888 0002")
+    sin_destino = api.post(
+        f"/api/personas/{persona.pk}/traslado/",
+        {"fecha": "2026-10-20", "iglesia_destino": "   "},
+        format="json",
+    )
+    assert sin_destino.status_code == 400
+    lider = APIClient()
+    lider.force_authenticate(
+        _con_rol(User.objects.create_user("55 8888 0099", pin="482915", nombre="L"), "lider")
+    )
+    assert lider.post(f"/api/personas/{persona.pk}/traslado/", {}, format="json").status_code == 403
+
+
+def test_la_baja_tambien_retira_de_los_grupos(api):
+    from apps.grupos.models import GrupoMiembro
+
+    persona, grupo = _persona_en_grupo("Iris", "55 8888 0003")
+    assert (
+        api.post(
+            f"/api/personas/{persona.pk}/baja/",
+            {"fecha": "2026-10-20", "motivo": "Ya no asiste"},
+            format="json",
+        ).status_code
+        == 200
+    )
+    assert not GrupoMiembro.objects.get(grupo=grupo, persona=persona).activo
+
+
+def test_filtros_por_grupo_y_por_rol_y_grupos_en_el_listado(api):
+    persona, grupo = _persona_en_grupo("Julia", "55 8888 0004")
+    Persona.objects.create(nombre="Kiko", whatsapp="55 8888 0005")
+    cuenta = _con_rol(
+        User.objects.create_user("55 8888 0006", pin="482915", nombre="Lalo"), "lider"
+    )
+    lalo = Persona.objects.create(nombre="Lalo", whatsapp="55 8888 0006", usuario=cuenta)
+    nombres = lambda qs: sorted(  # noqa: E731
+        f["nombre_completo"] for f in api.get(f"/api/personas/?{qs}").json()["results"]
+    )
+    assert nombres(f"grupo={grupo.pk}") == ["Julia"]
+    assert nombres("rol=lider") == ["Lalo"]
+    fila = next(f for f in api.get("/api/personas/").json()["results"] if f["id"] == persona.pk)
+    assert fila["grupos"] == ["Conexión Norte"]
+    assert lalo.pk

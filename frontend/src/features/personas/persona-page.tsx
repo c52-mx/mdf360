@@ -21,6 +21,7 @@ import {
 import { api, apiUpload } from '@/lib/api'
 import {
   fotoUrl,
+  nivelAyuda,
   nivelLabel,
   procedenciaOptions,
   type Movimiento,
@@ -52,6 +53,10 @@ function Ficha({ persona }: { persona: Persona }) {
   const [bajaAbierta, setBajaAbierta] = useState(false)
   const [bajaFecha, setBajaFecha] = useState(hoy())
   const [bajaMotivo, setBajaMotivo] = useState('')
+  const [trasladoAbierto, setTrasladoAbierto] = useState(false)
+  const [trasladoFecha, setTrasladoFecha] = useState(hoy())
+  const [trasladoIglesia, setTrasladoIglesia] = useState('')
+  const [trasladoMotivo, setTrasladoMotivo] = useState('')
 
   const refrescar = (actualizada: Persona) => {
     queryClient.setQueryData(['persona', String(actualizada.id)], actualizada)
@@ -137,6 +142,17 @@ function Ficha({ persona }: { persona: Persona }) {
       refrescar(actualizada)
     },
   })
+  const trasladar = useMutation({
+    mutationFn: () =>
+      api<Persona>(`/api/personas/${persona.id}/traslado/`, {
+        method: 'POST',
+        body: { fecha: trasladoFecha, iglesia_destino: trasladoIglesia, motivo: trasladoMotivo },
+      }),
+    onSuccess: (actualizada) => {
+      setTrasladoAbierto(false)
+      refrescar(actualizada)
+    },
+  })
   const reactivar = useMutation({
     mutationFn: () => api<Persona>(`/api/personas/${persona.id}/reactivar/`, { method: 'POST', body: {} }),
     onSuccess: refrescar,
@@ -147,7 +163,8 @@ function Ficha({ persona }: { persona: Persona }) {
     guardar.mutate()
   }
   const siguienteNivel = persona.nivel === 'contacto' ? 'participante' : persona.nivel === 'participante' ? 'edu' : null
-  const errorNivel = subirNivel.error ?? reactivar.error ?? darBaja.error ?? subirFoto.error
+  const errorNivel =
+    subirNivel.error ?? reactivar.error ?? darBaja.error ?? trasladar.error ?? subirFoto.error
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
@@ -187,16 +204,99 @@ function Ficha({ persona }: { persona: Persona }) {
             <FileButton onFile={(file) => subirFoto.mutate(file)} disabled={subirFoto.isPending}>
               {persona.tiene_foto ? 'Cambiar foto' : 'Subir foto'}
             </FileButton>
-            {siguienteNivel ? (
-              <Button type="button" variant="outline" onClick={() => subirNivel.mutate(siguienteNivel)}>
-                Pasar a {nivelLabel[siguienteNivel].toLowerCase()}
-              </Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="flex flex-col gap-3">
+        <CardTitle>Nivel de registro</CardTitle>
+        <ul className="flex flex-col gap-2">
+          {(['contacto', 'participante', 'edu'] as const).map((n) => (
+            <li key={n} className="flex flex-wrap items-baseline gap-x-3">
+              <Badge tone={n === persona.nivel ? 'primary' : 'neutral'}>{nivelLabel[n]}</Badge>
+              <span className="text-muted-foreground">{nivelAyuda[n]}</span>
+            </li>
+          ))}
+        </ul>
+        {siguienteNivel ? (
+          <div className="flex flex-col items-start gap-2">
+            <Button type="button" variant="outline" onClick={() => subirNivel.mutate(siguienteNivel)}>
+              {siguienteNivel === 'participante' ? 'Subir a participante' : 'Completar expediente (EDU)'}
+            </Button>
+            {siguienteNivel === 'edu' && persona.faltantes_edu.length > 0 ? (
+              <CardDescription>Para el expediente completo falta: {persona.faltantes_edu.join(', ')}.</CardDescription>
             ) : null}
           </div>
-          {persona.nivel !== 'edu' && persona.faltantes_edu.length > 0 ? (
-            <CardDescription>Para el expediente completo falta: {persona.faltantes_edu.join(', ')}.</CardDescription>
-          ) : null}
-        </div>
+        ) : null}
+      </Card>
+
+      <Card className="flex flex-col gap-4">
+        <CardTitle>Situación en la iglesia</CardTitle>
+        {persona.activo ? (
+          bajaAbierta ? (
+            <div className="grid max-w-xl grid-cols-1 gap-4">
+              <CardDescription>
+                Dar de baja saca a la persona de sus grupos; su historial de asistencia se conserva.
+              </CardDescription>
+              <Field label="Fecha" type="date" value={bajaFecha} onChange={(e) => setBajaFecha(e.target.value)} />
+              <Field label="Motivo" value={bajaMotivo} onChange={(e) => setBajaMotivo(e.target.value)} />
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={!bajaMotivo.trim() || darBaja.isPending}
+                  onClick={() => darBaja.mutate()}
+                >
+                  Confirmar baja
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setBajaAbierta(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          ) : trasladoAbierto ? (
+            <div className="grid max-w-xl grid-cols-1 gap-4">
+              <CardDescription>
+                La persona queda inactiva con la iglesia de destino en su historial y sale de sus grupos.
+              </CardDescription>
+              <Field label="Fecha" type="date" value={trasladoFecha} onChange={(e) => setTrasladoFecha(e.target.value)} />
+              <Field
+                label="Iglesia a la que se traslada"
+                value={trasladoIglesia}
+                onChange={(e) => setTrasladoIglesia(e.target.value)}
+              />
+              <Field label="Motivo (opcional)" value={trasladoMotivo} onChange={(e) => setTrasladoMotivo(e.target.value)} />
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={!trasladoIglesia.trim() || trasladar.isPending}
+                  onClick={() => trasladar.mutate()}
+                >
+                  Confirmar traslado
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setTrasladoAbierto(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              <Button type="button" variant="outline" onClick={() => setTrasladoAbierto(true)}>
+                Pasar a otra iglesia
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setBajaAbierta(true)}>
+                Dar de baja
+              </Button>
+            </div>
+          )
+        ) : (
+          <div>
+            <Button type="button" variant="success" onClick={() => reactivar.mutate()}>
+              Reactivar
+            </Button>
+          </div>
+        )}
       </Card>
 
       <Section title="Datos personales">
@@ -301,49 +401,13 @@ function Ficha({ persona }: { persona: Persona }) {
               <li key={m.id} className="flex flex-wrap gap-x-3">
                 <span className="font-bold">{m.tipo_display}</span>
                 <span className="text-muted-foreground">{m.fecha}</span>
+                {m.iglesia_destino ? <span>→ {m.iglesia_destino}</span> : null}
                 {m.motivo ? <span>{m.motivo}</span> : null}
               </li>
             ))}
           </ul>
         ) : (
           <CardDescription>Sin movimientos.</CardDescription>
-        )}
-      </Card>
-
-      <Card className="flex flex-col gap-4">
-        {persona.activo ? (
-          bajaAbierta ? (
-            <div className="grid max-w-xl grid-cols-1 gap-4">
-              <CardTitle>Dar de baja</CardTitle>
-              <Field label="Fecha" type="date" value={bajaFecha} onChange={(e) => setBajaFecha(e.target.value)} />
-              <Field label="Motivo" value={bajaMotivo} onChange={(e) => setBajaMotivo(e.target.value)} />
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  disabled={!bajaMotivo.trim() || darBaja.isPending}
-                  onClick={() => darBaja.mutate()}
-                >
-                  Confirmar baja
-                </Button>
-                <Button type="button" variant="ghost" onClick={() => setBajaAbierta(false)}>
-                  Cancelar
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <Button type="button" variant="outline" onClick={() => setBajaAbierta(true)}>
-                Dar de baja
-              </Button>
-            </div>
-          )
-        ) : (
-          <div>
-            <Button type="button" variant="success" onClick={() => reactivar.mutate()}>
-              Reactivar
-            </Button>
-          </div>
         )}
       </Card>
     </form>

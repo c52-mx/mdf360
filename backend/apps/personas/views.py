@@ -27,6 +27,7 @@ from .serializers import (
     PersonaListSerializer,
     ProcesoCatalogoSerializer,
     ProcesoPersonaSerializer,
+    TrasladoSerializer,
 )
 
 
@@ -76,6 +77,7 @@ class PersonaViewSet(viewsets.ModelViewSet):
         "nivel": "personas.editar",
         "procesos": "personas.editar",
         "baja": "personas.baja",
+        "traslado": "personas.baja",
         "reactivar": "personas.baja",
     }
 
@@ -93,7 +95,7 @@ class PersonaViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Persona.objects.select_related("usuario").prefetch_related(
-            "usuario__asignaciones__rol"
+            "usuario__asignaciones__rol", "membresias__grupo"
         )
         if self.action != "list":
             return qs
@@ -105,6 +107,11 @@ class PersonaViewSet(viewsets.ModelViewSet):
             qs = qs.filter(nivel=p["nivel"])
         if p.get("procedencia"):
             qs = qs.filter(procedencia=p["procedencia"])
+        if p.get("grupo", "").isdigit():
+            qs = qs.filter(membresias__grupo_id=int(p["grupo"]), membresias__activo=True)
+        if p.get("rol"):
+            qs = qs.filter(usuario__asignaciones__rol__clave=p["rol"])
+        qs = qs.distinct()
         q = (p.get("q") or "").strip()
         if q:
             cond = Q()
@@ -197,6 +204,17 @@ class PersonaViewSet(viewsets.ModelViewSet):
             )
         except DjangoValidationError as exc:
             return _error("invalid_baja", _validation_detail(exc))
+        return Response(PersonaDetailSerializer(persona).data)
+
+    @action(detail=True, methods=["post"])
+    def traslado(self, request, pk=None):
+        persona = self.get_object()
+        data = TrasladoSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        try:
+            services.trasladar(persona, actor=request.user, request=request, **data.validated_data)
+        except DjangoValidationError as exc:
+            return _error("invalid_traslado", _validation_detail(exc))
         return Response(PersonaDetailSerializer(persona).data)
 
     @action(detail=True, methods=["post"])

@@ -180,12 +180,14 @@ class PersonaMovimiento(models.Model):
         CAMBIO_NIVEL = "cambio_nivel", "Cambio de nivel de registro"
         BAJA = "baja", "Baja"
         REACTIVACION = "reactivacion", "Reactivación"
+        TRASLADO = "traslado", "Traslado a otra iglesia"
         OTRO = "otro", "Otro"
 
     persona = models.ForeignKey(Persona, on_delete=models.CASCADE, related_name="movimientos")
     tipo = models.CharField(max_length=20, choices=Tipo.choices)
     fecha = models.DateField(default=timezone.localdate)
     motivo = models.CharField(max_length=300, blank=True)
+    iglesia_destino = models.CharField(max_length=150, blank=True)
     registrado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
