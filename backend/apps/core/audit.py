@@ -1,5 +1,27 @@
 from .models import AuditEvent
 
+# Semáforo de la bitácora: lo que no aparece aquí es informativo (verde).
+ACCIONES_ERROR = frozenset({"auth.locked", "ofrenda.aval_pin_incorrecto"})
+ACCIONES_AVISO = frozenset(
+    {
+        "auth.login_failed",
+        "auth.reset_issued",
+        "auth.unlocked",
+        "rbac.roles_changed",
+        "persona.baja",
+        "peticion.purgadas",
+        "tablero.eliminado",
+        "tablero.purgados",
+    }
+)
+
+
+def nivel_de(action: str) -> str:
+    """Clasifica un evento: «error» (rojo), «aviso» (amarillo) o «info» (verde)."""
+    if action in ACCIONES_ERROR:
+        return "error"
+    return "aviso" if action in ACCIONES_AVISO else "info"
+
 
 def client_ip(request) -> str | None:
     if request is None:

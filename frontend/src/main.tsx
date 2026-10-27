@@ -5,7 +5,10 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { ToastProvider } from './design-system'
 import { AuthProvider } from './features/auth/use-auth'
+import { aplicarTema, temaGuardado } from './lib/tema'
 import './styles/theme.css'
+
+aplicarTema(temaGuardado(), false)
 
 // networkMode «always»: con el navegador sin red, la petición se intenta igual para que el
 // service worker responda desde su caché y las escrituras puedan quedar en la cola local.

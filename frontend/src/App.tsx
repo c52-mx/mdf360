@@ -1,6 +1,5 @@
 import {
   Bell,
-  ChartColumn,
   Coins,
   HandHeart,
   Home,
@@ -13,7 +12,7 @@ import {
   Users,
   UsersRound,
 } from 'lucide-react'
-import { Outlet, Route, Routes } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { AppShell, type NavItem } from '@/design-system'
 import { AuditoriaPage } from '@/features/auditoria/auditoria-page'
 import { ConfigPage } from '@/features/config/config-page'
@@ -29,7 +28,6 @@ import { DesignPage } from '@/features/design/design-page'
 import { EstudiosPage } from '@/features/grupos/estudios-page'
 import { ListaSinConexionPage } from '@/features/grupos/lista-sin-conexion-page'
 import { GrupoPage } from '@/features/grupos/grupo-page'
-import { DashboardPage } from '@/features/grupos/dashboard-page'
 import { GruposPage } from '@/features/grupos/grupos-page'
 import { AvisosPage } from '@/features/tablero/avisos-page'
 import { OfrendasPage } from '@/features/grupos/ofrendas-page'
@@ -43,38 +41,40 @@ import { PersonaPage } from '@/features/personas/persona-page'
 import { PersonasPage } from '@/features/personas/personas-page'
 
 function PrivateLayout() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const can = (permiso: string) => !!user?.permisos.includes(permiso)
+  const operacion = 'Operación'
+  const catalogos = 'Catálogos'
+  const administracion = 'Administración'
   const nav: NavItem[] = [
     { to: '/', label: 'Inicio', icon: Home },
-    { to: '/grupos', label: 'Grupos', icon: UsersRound, module: 'grupos' as const },
-    { to: '/avisos', label: 'Avisos', icon: Bell, module: 'grupos' as const },
-    { to: '/ofrendas', label: 'Ofrendas', icon: Coins, module: 'grupos' as const },
-    ...(user?.roles.some((r) => ['lider', 'supervisor', 'pastor', 'anciano'].includes(r))
-      ? [{ to: '/grupos/resumen', label: 'Resumen', icon: ChartColumn, module: 'grupos' as const }]
-      : []),
-    { to: '/peticiones', label: 'Peticiones', icon: HandHeart, module: 'grupos' as const },
+    { to: '/grupos', label: 'Grupos', icon: UsersRound, module: 'grupos', group: operacion },
+    { to: '/peticiones', label: 'Peticiones', icon: HandHeart, module: 'grupos', group: operacion },
+    { to: '/avisos', label: 'Avisos', icon: Bell, module: 'grupos', group: operacion },
+    { to: '/ofrendas', label: 'Ofrendas', icon: Coins, module: 'grupos', group: operacion },
     ...(can('personas.ver')
-      ? [{ to: '/personas', label: 'Personas', icon: Users, module: 'admin' as const }]
+      ? [{ to: '/personas', label: 'Personas', icon: Users, module: 'admin' as const, group: catalogos }]
       : []),
     ...(can('usuarios.invitar')
-      ? [{ to: '/invitar', label: 'Invitar', icon: UserPlus, module: 'admin' as const }]
+      ? [{ to: '/invitar', label: 'Invitar', icon: UserPlus, module: 'admin' as const, group: administracion }]
       : []),
     ...(can('roles.gestionar')
-      ? [{ to: '/roles', label: 'Roles', icon: ShieldCheck, module: 'admin' as const }]
+      ? [{ to: '/roles', label: 'Roles', icon: ShieldCheck, module: 'admin' as const, group: administracion }]
       : []),
     ...(can('bitacora.ver')
-      ? [{ to: '/bitacora', label: 'Bitácora', icon: ScrollText, module: 'admin' as const }]
+      ? [{ to: '/bitacora', label: 'Bitácora', icon: ScrollText, module: 'admin' as const, group: administracion }]
       : []),
     ...(can('config.gestionar')
-      ? [{ to: '/configuracion', label: 'Configuración', icon: Settings, module: 'admin' as const }]
+      ? [{ to: '/configuracion', label: 'Configuración', icon: Settings, module: 'admin' as const, group: administracion }]
+      : []),
+    // Catálogo interno del sistema de diseño: solo para quien administra el sistema
+    ...(can('config.gestionar')
+      ? [{ to: '/diseno', label: 'Diseño', icon: Palette, group: administracion }]
       : []),
     { to: '/cuenta', label: 'Mi cuenta', icon: UserCog },
-    // Catálogo interno del sistema de diseño: solo para quien administra el sistema
-    ...(can('config.gestionar') ? [{ to: '/diseno', label: 'Diseño', icon: Palette }] : []),
   ]
   return (
-    <AppShell nav={nav}>
+    <AppShell nav={nav} userName={user?.nombre} onLogout={() => void logout()}>
       <SyncBanner />
       <Outlet />
     </AppShell>
@@ -91,7 +91,7 @@ export default function App() {
         <Route element={<PrivateLayout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/grupos" element={<GruposPage />} />
-          <Route path="/grupos/resumen" element={<DashboardPage />} />
+          <Route path="/grupos/resumen" element={<Navigate to="/" replace />} />
           <Route path="/avisos" element={<AvisosPage />} />
           <Route path="/grupos/reuniones/:rid" element={<ReunionPage />} />
           <Route path="/grupos/:id/hoy" element={<ListaSinConexionPage />} />

@@ -92,7 +92,9 @@ class PersonaViewSet(viewsets.ModelViewSet):
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def get_queryset(self):
-        qs = Persona.objects.all()
+        qs = Persona.objects.select_related("usuario").prefetch_related(
+            "usuario__asignaciones__rol"
+        )
         if self.action != "list":
             return qs
         p = self.request.query_params

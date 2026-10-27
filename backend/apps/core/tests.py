@@ -48,3 +48,25 @@ def test_consulta_de_bitacora_por_permiso_y_filtros():
     assert admin.get("/api/auditoria/?action=auth").json()["count"] == 1
     assert admin.get("/api/auditoria/?q=Ana").json()["results"][0]["actor"] == "Ana"
     assert AuditEvent.objects.filter(action="bitacora.viewed").exists()
+
+
+@pytest.mark.django_db
+def test_bitacora_clasifica_por_nivel_y_resume_errores_por_dia():
+    admin = APIClient()
+    admin.force_authenticate(_usuario("55 1000 0003", "admin_tecnico"))
+    AuditEvent.objects.create(action="auth.locked", actor_repr="Ana")
+    AuditEvent.objects.create(action="auth.login_failed", actor_repr="Ana")
+    AuditEvent.objects.create(action="auth.login", actor_repr="Ana")
+    niveles = {e["accion"]: e["nivel"] for e in admin.get("/api/auditoria/").json()["results"]}
+    assert niveles == {"auth.locked": "error", "auth.login_failed": "aviso", "auth.login": "info"}
+    assert admin.get("/api/auditoria/?nivel=error").json()["count"] == 1
+    assert admin.get("/api/auditoria/?nivel=aviso").json()["count"] == 1
+    info = admin.get("/api/auditoria/?nivel=info").json()["results"]
+    assert {e["nivel"] for e in info} == {"info"} and "auth.login" in {e["accion"] for e in info}
+    resumen = admin.get("/api/auditoria/resumen/?dias=7").json()
+    assert len(resumen["dias"]) == 7
+    assert resumen["dias"][-1]["errores"] == 1 and resumen["dias"][-1]["avisos"] == 1
+    assert "auth" in resumen["modulos"]
+    sin = APIClient()
+    sin.force_authenticate(_usuario("55 1000 0004", "lider"))
+    assert sin.get("/api/auditoria/resumen/").status_code == 403

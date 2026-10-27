@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DashboardPage } from './dashboard-page'
+import { ResumenGrupos } from './dashboard-page'
 
 const datos = {
   resumen: { grupos: 2, integrantes: 9, asistencia_pct: 72, alertas: 2, asistencia_minima_pct: 60 },
@@ -51,13 +51,13 @@ function montar() {
   render(
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
-        <DashboardPage />
+        <ResumenGrupos />
       </MemoryRouter>
     </QueryClientProvider>,
   )
 }
 
-describe('DashboardPage', () => {
+describe('ResumenGrupos', () => {
   it('muestra resumen, avisos y cada grupo con sus datos permitidos', async () => {
     vi.stubGlobal('fetch', vi.fn(() => json(200, datos)))
     montar()

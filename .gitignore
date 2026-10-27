@@ -30,3 +30,6 @@ backend/media/
 .agents/
 .claude/
 skills-lock.json
+
+# Caché de compilación incremental de TypeScript
+*.tsbuildinfo

@@ -334,3 +334,15 @@ def test_la_activacion_exige_aceptar_el_aviso_y_registra_el_consentimiento(api):
 
 def test_nivel_por_defecto_es_contacto():
     assert Persona(nombre="x").nivel == Nivel.CONTACTO
+
+
+# ---------- roles visibles en el listado y el detalle ----------
+def test_el_listado_y_el_detalle_muestran_los_roles_de_la_persona(api, staff):
+    con_cuenta = User.objects.create_user("55 7777 0001", pin="482915", nombre="Lupe")
+    _con_rol(con_cuenta, "lider")
+    persona = Persona.objects.create(nombre="Lupe", whatsapp="55 7777 0001", usuario=con_cuenta)
+    sin_cuenta = Persona.objects.create(nombre="Beto", whatsapp="55 7777 0002")
+    filas = {f["id"]: f for f in api.get("/api/personas/").json()["results"]}
+    assert filas[persona.pk]["roles"] == ["Líder / Maestro"]
+    assert filas[sin_cuenta.pk]["roles"] == []
+    assert api.get(f"/api/personas/{persona.pk}/").json()["roles"] == ["Líder / Maestro"]

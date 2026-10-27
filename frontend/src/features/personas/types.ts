@@ -23,6 +23,7 @@ export interface PersonaResumen {
   grupo_conexion: string
   activo: boolean
   tiene_foto: boolean
+  roles: string[]
 }
 
 export interface Pagina<T> {
@@ -43,6 +44,7 @@ export interface ProcesoFila {
 
 export interface Persona {
   id: number
+  roles: string[]
   nivel: Nivel
   procedencia: Procedencia
   activo: boolean

@@ -1,5 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Card, CardDescription, CardTitle, CheckboxField, PageHeader } from '@/design-system'
+import { ArrowLeft } from 'lucide-react'
+import { useState } from 'react'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardDescription,
+  CardTitle,
+  CheckboxField,
+  Field,
+  PageHeader,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from '@/design-system'
 import { api } from '@/lib/api'
 import { useCan, type User } from './use-auth'
 
@@ -12,6 +30,8 @@ interface Rol {
 export function RolesPage() {
   const puede = useCan('roles.gestionar')
   const queryClient = useQueryClient()
+  const [editando, setEditando] = useState<number | null>(null)
+  const [busqueda, setBusqueda] = useState('')
   const roles = useQuery({ queryKey: ['roles'], queryFn: () => api<Rol[]>('/api/auth/roles/'), enabled: puede })
   const usuarios = useQuery({ queryKey: ['usuarios'], queryFn: () => api<User[]>('/api/auth/users/'), enabled: puede })
 
@@ -23,33 +43,107 @@ export function RolesPage() {
 
   if (!puede) return <Alert tone="warning">No tienes permiso para asignar roles.</Alert>
 
+  const nombreDe = (clave: string) => roles.data?.find((r) => r.clave === clave)?.nombre ?? clave
   const alternar = (u: User, clave: string, activo: boolean) =>
     guardar.mutate({
       id: u.id,
       claves: activo ? [...u.roles, clave] : u.roles.filter((r) => r !== clave),
     })
 
-  return (
-    <div className="flex flex-col gap-6">
-      <PageHeader title="Roles" description="Asigna a cada persona los roles que le corresponden." module="admin" />
-      {guardar.error ? <Alert tone="destructive">{guardar.error.message}</Alert> : null}
-      {usuarios.data?.map((u) => (
-        <Card key={u.id} className="flex flex-col gap-2">
-          <CardTitle>{u.nombre}</CardTitle>
-          <CardDescription>{u.whatsapp}</CardDescription>
+  const elegido = usuarios.data?.find((u) => u.id === editando)
+  if (elegido) {
+    return (
+      <div className="flex flex-col gap-6">
+        <button
+          type="button"
+          onClick={() => {
+            guardar.reset()
+            setEditando(null)
+          }}
+          className="presionable flex w-fit items-center gap-2 font-semibold text-primary"
+        >
+          <ArrowLeft aria-hidden className="size-5" />
+          Volver al listado
+        </button>
+        <PageHeader title={elegido.nombre} description={elegido.whatsapp} module="admin" />
+        {guardar.error ? <Alert tone="destructive">{guardar.error.message}</Alert> : null}
+        <Card className="flex flex-col gap-2">
+          <CardTitle>Roles de {elegido.nombre}</CardTitle>
+          <CardDescription>Los cambios se guardan al marcar o desmarcar.</CardDescription>
           <div className="grid grid-cols-1 gap-x-4 md:grid-cols-3">
             {roles.data?.map((r) => (
               <CheckboxField
                 key={r.clave}
                 label={r.nombre}
-                checked={u.roles.includes(r.clave)}
+                checked={elegido.roles.includes(r.clave)}
                 disabled={guardar.isPending}
-                onChange={(e) => alternar(u, r.clave, e.target.checked)}
+                onChange={(e) => alternar(elegido, r.clave, e.target.checked)}
               />
             ))}
           </div>
         </Card>
-      ))}
+      </div>
+    )
+  }
+
+  const texto = busqueda.trim().toLowerCase()
+  const filas = (usuarios.data ?? []).filter(
+    (u) => !texto || u.nombre.toLowerCase().includes(texto) || u.whatsapp.includes(texto),
+  )
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Roles" description="Asigna a cada persona los roles que le corresponden." module="admin" />
+      <Card>
+        <Field
+          label="Buscar por nombre o WhatsApp"
+          type="search"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+      </Card>
+      {usuarios.isError ? <Alert tone="destructive">{usuarios.error.message}</Alert> : null}
+      {usuarios.data && filas.length === 0 ? <Alert>No hay personas con ese dato.</Alert> : null}
+      {filas.length > 0 ? (
+        <Table aria-label="Personas con acceso y sus roles">
+          <TableHead>
+            <TableRow className="hover:bg-muted">
+              <TableHeaderCell>Persona</TableHeaderCell>
+              <TableHeaderCell>WhatsApp</TableHeaderCell>
+              <TableHeaderCell>Roles</TableHeaderCell>
+              <TableHeaderCell>
+                <span className="sr-only">Acciones</span>
+              </TableHeaderCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filas.map((u) => (
+              <TableRow key={u.id}>
+                <TableCell className="font-bold">{u.nombre}</TableCell>
+                <TableCell>{u.whatsapp}</TableCell>
+                <TableCell>
+                  {u.roles.length > 0 ? (
+                    <span className="flex flex-wrap gap-1">
+                      {u.roles.map((r) => (
+                        <Badge key={r} tone="primary">
+                          {nombreDe(r)}
+                        </Badge>
+                      ))}
+                    </span>
+                  ) : (
+                    <Badge tone="warning">Sin rol</Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Button size="sm" variant="outline" onClick={() => setEditando(u.id)}>
+                    Asignar roles
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      ) : null}
     </div>
   )
 }
