@@ -76,7 +76,7 @@ describe('ReunionPage', () => {
     expect(await screen.findByText('Lección 4')).toBeInTheDocument()
     expect(screen.getByText('Invitado')).toBeInTheDocument()
     expect(screen.getByText('0 de 2 presentes')).toBeInTheDocument()
-    const botones = screen.getAllByRole('button', { name: 'Ausente' })
+    const botones = screen.getAllByRole('checkbox')
     fireEvent.click(botones[0])
     fireEvent.click(botones[1])
     expect(screen.getByText('2 de 2 presentes')).toBeInTheDocument()
@@ -98,7 +98,7 @@ describe('ReunionPage', () => {
       }),
     )
     montar()
-    fireEvent.click((await screen.findAllByRole('button', { name: 'Ausente' }))[0])
+    fireEvent.click((await screen.findAllByRole('checkbox'))[0])
     fireEvent.click(screen.getByRole('button', { name: 'Guardar lista' }))
     expect(await screen.findByText(/quedó guardada en tu teléfono/)).toBeInTheDocument()
     await waitFor(() => expect(pendientes.listar(4)).toHaveLength(1))

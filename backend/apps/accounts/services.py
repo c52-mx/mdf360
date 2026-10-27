@@ -12,6 +12,7 @@ from django.utils import timezone
 from apps.core import audit
 
 from .models import ActivationToken, User
+from .permissions import tiene_permiso
 from .phone import normalize_whatsapp
 
 
@@ -168,3 +169,30 @@ def asignar_roles(user: User, claves: list[str], actor, request=None) -> User:
             user.save(update_fields=["requires_strong_credential"])
     audit.log("rbac.roles_changed", actor=actor, target=user, request=request, roles=claves)
     return user
+
+
+# ---------- acceso de otras personas (desbloquear / reiniciar) ----------
+def accesos_gestionables(actor):
+    """Cuentas cuyo acceso puede desbloquear o reiniciar `actor`.
+
+    Quien administra roles o ve todos los grupos alcanza a todas; un Líder, Supervisor o Secretario,
+    solo a las personas de sus grupos.
+    """
+    from apps.grupos import access
+    from apps.grupos.models import GrupoMiembro
+
+    cuentas = User.objects.filter(is_active=True).exclude(pk=actor.pk)
+    if tiene_permiso(actor, "roles.gestionar") or tiene_permiso(actor, "grupos.ver_todos"):
+        return cuentas
+    personas = GrupoMiembro.objects.filter(
+        grupo__in=access.grupos_visibles(actor), activo=True
+    ).values_list("persona_id", flat=True)
+    return cuentas.filter(persona__in=personas)
+
+
+def desbloquear(user: User, actor, request=None) -> None:
+    """Quita el bloqueo por intentos fallidos sin tocar el PIN."""
+    user.failed_attempts = 0
+    user.locked_until = None
+    user.save(update_fields=["failed_attempts", "locked_until"])
+    audit.log("auth.unlocked", actor=actor, target=user, request=request)

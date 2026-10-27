@@ -62,11 +62,23 @@ export async function desactivarPush(): Promise<void> {
   await suscripcion.unsubscribe()
 }
 
-/** Al cerrar sesión: que este teléfono deje de recibir los avisos de la persona que se va. */
+/** Tiempo máximo que se espera la baja del dispositivo antes de cerrar sesión. */
+export const TOPE_BAJA_MS = 2000
+
+/**
+ * Al cerrar sesión: que este teléfono deje de recibir los avisos de la persona que se va.
+ * Nunca impide ni retrasa más de `TOPE_BAJA_MS` el cierre: el service worker puede no responder.
+ */
 export async function quitarDispositivo(): Promise<void> {
+  let temporizador: ReturnType<typeof setTimeout> | undefined
+  const tope = new Promise<void>((resolver) => {
+    temporizador = setTimeout(resolver, TOPE_BAJA_MS)
+  })
   try {
-    await desactivarPush()
+    await Promise.race([desactivarPush(), tope])
   } catch {
     // sin conexión o sin suscripción: no debe impedir cerrar sesión
+  } finally {
+    clearTimeout(temporizador)
   }
 }

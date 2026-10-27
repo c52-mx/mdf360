@@ -1,8 +1,21 @@
 import { Ellipsis, PanelLeftClose, PanelLeftOpen, X, type LucideIcon } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { moduleBg, type ModuleKey } from './module'
+import { moduleText, type ModuleKey } from './module'
 import { cn } from '@/lib/cn'
+
+/** Ícono del menú: siempre el glifo real; los módulos lo llevan en una pastilla con su color. */
+function NavIcon({ icon: Icon, module }: { icon: LucideIcon; module?: ModuleKey }) {
+  if (!module) return <Icon aria-hidden className="size-6 shrink-0" />
+  return (
+    <span
+      aria-hidden
+      className="flex size-8 shrink-0 items-center justify-center rounded-control bg-card ring-1 ring-border"
+    >
+      <Icon className={cn('size-5', moduleText[module])} />
+    </span>
+  )
+}
 
 export interface NavItem {
   to: string
@@ -100,11 +113,7 @@ export function AppShell({ nav, children }: AppShellProps) {
                   )
                 }
               >
-                {module ? (
-                  <span aria-hidden className={cn('size-5 rounded', moduleBg[module])} />
-                ) : (
-                  <Icon aria-hidden className="size-5" />
-                )}
+                <NavIcon icon={Icon} module={module} />
                 {label}
               </NavLink>
             ))}
@@ -189,11 +198,7 @@ export function AppShell({ nav, children }: AppShellProps) {
                   )
                 }
               >
-                {module ? (
-                  <span aria-hidden className={cn('size-5 rounded', moduleBg[module])} />
-                ) : (
-                  <Icon aria-hidden className="size-6" />
-                )}
+                <NavIcon icon={Icon} module={module} />
                 {label}
               </NavLink>
             ))}
