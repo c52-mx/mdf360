@@ -8,8 +8,9 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import requiere
@@ -17,7 +18,15 @@ from apps.core import audit
 
 from . import access, services
 from . import ofrendas as ofr
-from .models import Asistencia, EstudioSemanal, Grupo, GrupoMiembro, Ofrenda, Reunion
+from .models import (
+    Asistencia,
+    EstudioSemanal,
+    Grupo,
+    GrupoMiembro,
+    Ofrenda,
+    Reunion,
+    SolicitudIngreso,
+)
 
 DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
@@ -241,6 +250,12 @@ class GrupoView(APIView):
                 "puede_capturar": access.puede_capturar(request.user, grupo),
                 "puede_gestionar": access.puede_gestionar_integrantes(request.user, grupo),
                 "puede_administrar": access.puede_administrar(request.user),
+                "enlace": (
+                    f"/unirse/{grupo.enlace_token}"
+                    if grupo.enlace_token
+                    and access.puede_gestionar_integrantes(request.user, grupo)
+                    else None
+                ),
             }
         )
 
@@ -258,6 +273,162 @@ class GrupoView(APIView):
             campos=sorted(data.validated_data),
         )  # fmt: skip
         return Response(grupo_resumen(grupo, request.user))
+
+
+# ---------- ingreso por enlace o QR ----------
+class IngresoThrottle(AnonRateThrottle):
+    scope = "unirse"
+
+
+def _grupo_por_enlace(token: str):
+    return Grupo.objects.filter(enlace_token=token, activo=True, suspendido=False).first()
+
+
+class EnlaceGrupoView(APIView):
+    """Quien lidera el grupo genera, regenera o desactiva el enlace (y su QR)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def _grupo(self, request, pk):
+        grupo = get_object_or_404(Grupo, pk=pk, activo=True)
+        if not access.puede_ver_grupo(request.user, grupo):
+            raise Http404
+        return grupo
+
+    def post(self, request, pk):
+        grupo = self._grupo(request, pk)
+        if not access.puede_gestionar_integrantes(request.user, grupo):
+            return _denegado()
+        if grupo.suspendido:
+            return _error("suspended", "El grupo está suspendido.")
+        token = services.generar_enlace(grupo, actor=request.user, request=request)
+        return Response({"enlace": f"/unirse/{token}"}, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, pk):
+        grupo = self._grupo(request, pk)
+        if not access.puede_gestionar_integrantes(request.user, grupo):
+            return _denegado()
+        services.desactivar_enlace(grupo, actor=request.user, request=request)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class EnlacePublicoView(APIView):
+    """Lo que ve quien abre el enlace: solo el nombre y el horario del grupo."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+    throttle_classes = [IngresoThrottle]
+
+    def get(self, request, token):
+        grupo = _grupo_por_enlace(token)
+        if grupo is None:
+            return _error("invalid_link", "Este enlace ya no es válido.", status.HTTP_404_NOT_FOUND)
+        return Response(
+            {
+                "grupo": grupo.nombre,
+                "dia": DIAS[grupo.dia_semana] if grupo.dia_semana is not None else "",
+                "hora": grupo.hora.strftime("%H:%M") if grupo.hora else "",
+            }
+        )
+
+
+class SolicitudEscritura(serializers.Serializer):
+    nombre = serializers.CharField(max_length=100)
+    whatsapp = serializers.CharField(max_length=40)
+    acepta_datos = serializers.BooleanField()
+
+
+class SolicitarIngresoView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+    throttle_classes = [IngresoThrottle]
+
+    def post(self, request, token):
+        grupo = _grupo_por_enlace(token)
+        if grupo is None:
+            return _error("invalid_link", "Este enlace ya no es válido.", status.HTTP_404_NOT_FOUND)
+        data = SolicitudEscritura(data=request.data)
+        data.is_valid(raise_exception=True)
+        try:
+            solicitud = services.solicitar_ingreso(grupo, request=request, **data.validated_data)
+        except DjangoValidationError as exc:
+            return _error("invalid", _detalle(exc))
+        return Response(
+            {"codigo": solicitud.codigo, "estado": solicitud.estado, "grupo": grupo.nombre},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class SalaDeEsperaView(APIView):
+    """La persona consulta, con su código secreto, si ya la aprobaron."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+    throttle_classes = [IngresoThrottle]
+
+    def get(self, request, codigo):
+        solicitud = get_object_or_404(
+            SolicitudIngreso.objects.select_related("grupo"), codigo=codigo
+        )
+        return Response({"estado": solicitud.estado, "grupo": solicitud.grupo.nombre})
+
+
+def solicitud_dict(s: SolicitudIngreso) -> dict:
+    from urllib.parse import quote
+
+    texto = (
+        f"Hola {s.nombre.split()[0]}, ya eres parte de {s.grupo.nombre}. "
+        "¡Te esperamos en la próxima reunión!"
+    )
+    return {
+        "id": s.pk,
+        "nombre": s.nombre,
+        "whatsapp": s.whatsapp,
+        "creada_en": s.creada_en,
+        "estado": s.estado,
+        "whatsapp_url": f"https://wa.me/{s.whatsapp.lstrip('+')}?text={quote(texto)}",
+    }
+
+
+class SolicitudesGrupoView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        grupo = get_object_or_404(Grupo, pk=pk, activo=True)
+        if not access.puede_ver_grupo(request.user, grupo):
+            raise Http404
+        if not access.puede_gestionar_integrantes(request.user, grupo):
+            return _denegado()
+        pendientes = grupo.solicitudes.filter(estado="pendiente").select_related("grupo")
+        return Response([solicitud_dict(s) for s in pendientes])
+
+
+class ResolverSolicitudView(APIView):
+    permission_classes = [IsAuthenticated]
+    aprobar = True
+
+    def post(self, request, sid):
+        solicitud = get_object_or_404(SolicitudIngreso.objects.select_related("grupo"), pk=sid)
+        grupo = solicitud.grupo
+        if not access.puede_ver_grupo(request.user, grupo):
+            raise Http404
+        if not access.puede_gestionar_integrantes(request.user, grupo):
+            return _denegado()
+        try:
+            solicitud = services.resolver_solicitud(
+                solicitud, aprobar=self.aprobar, actor=request.user, request=request
+            )
+        except DjangoValidationError as exc:
+            return _error("invalid", _detalle(exc))
+        return Response(solicitud_dict(solicitud))
+
+
+class AprobarSolicitudView(ResolverSolicitudView):
+    aprobar = True
+
+
+class RechazarSolicitudView(ResolverSolicitudView):
+    aprobar = False
 
 
 class SuspensionSerializer(serializers.Serializer):

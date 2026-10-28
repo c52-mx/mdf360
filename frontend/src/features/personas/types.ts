@@ -53,6 +53,7 @@ export interface ProcesoFila {
 export interface Persona {
   id: number
   roles: string[]
+  grupos: string[]
   nivel: Nivel
   procedencia: Procedencia
   activo: boolean

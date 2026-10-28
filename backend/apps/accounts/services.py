@@ -65,6 +65,18 @@ def authenticate(identifier: str, credential: str, request=None) -> User:
     return user
 
 
+def rol_por_defecto(user: User, actor=None) -> None:
+    """Quien se invita sin un rol queda como «Miembro / Asistente»; después se le asigna otro."""
+    from .models import AsignacionRol, Rol
+
+    if user.asignaciones.exists():
+        return
+    rol = Rol.objects.filter(clave="miembro", activo=True).first()
+    if rol is not None:
+        AsignacionRol.objects.create(usuario=user, rol=rol, asignado_por=actor)
+        audit.log("rbac.rol_por_defecto", actor=actor, target=user, rol="miembro")
+
+
 # --- tokens de activación / reinicio ---
 def _hash(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()

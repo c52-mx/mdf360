@@ -20,6 +20,7 @@ import { PeticionesPanel } from '@/features/peticiones/peticiones-panel'
 import { TableroPanel } from '@/features/tablero/tablero-panel'
 import { api } from '@/lib/api'
 import { esErrorDeRed } from '@/lib/outbox'
+import { IngresoCard } from './ingreso-card'
 import { dinero } from './ofrendas'
 import { dias, fechaLarga, rolesGrupo, SECTORES, type GrupoDetalle } from './types'
 
@@ -372,6 +373,10 @@ export function GrupoPage() {
             </Button>
           </form>
         </Card>
+      ) : null}
+
+      {g.puede_gestionar ? (
+        <IngresoCard grupoId={g.id} enlace={g.enlace} suspendido={g.suspendido} />
       ) : null}
 
       <TableroPanel

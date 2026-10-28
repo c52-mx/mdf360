@@ -25,6 +25,7 @@ import { RequireAuth } from '@/features/auth/require-auth'
 import { RolesPage } from '@/features/auth/roles-page'
 import { useAuth } from '@/features/auth/use-auth'
 import { DesignPage } from '@/features/design/design-page'
+import { UnirsePage } from '@/features/grupos/unirse-page'
 import { EstudiosPage } from '@/features/grupos/estudios-page'
 import { ListaSinConexionPage } from '@/features/grupos/lista-sin-conexion-page'
 import { GrupoPage } from '@/features/grupos/grupo-page'
@@ -87,6 +88,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/activar/:token" element={<ActivatePage />} />
       <Route path="/recuperar" element={<RecoveryPage />} />
+      <Route path="/unirse/:token" element={<UnirsePage />} />
       <Route element={<RequireAuth />}>
         <Route element={<PrivateLayout />}>
           <Route path="/" element={<HomePage />} />

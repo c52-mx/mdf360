@@ -10,7 +10,14 @@ from apps.personas import services as personas
 from apps.personas.models import Persona
 
 from . import access
-from .models import Asistencia, EstudioSemanal, GrupoMiembro, Reunion, lunes_de
+from .models import (
+    Asistencia,
+    EstudioSemanal,
+    GrupoMiembro,
+    Reunion,
+    SolicitudIngreso,
+    lunes_de,
+)
 
 LIMITE_PDF = 15 * 1024 * 1024
 LIMITE_AUDIO = 40 * 1024 * 1024
@@ -41,14 +48,136 @@ def agregar_integrante(
     miembro, nuevo = GrupoMiembro.objects.get_or_create(
         grupo=grupo, persona=persona, rol=rol, defaults={"activo": True}
     )
+    entra = nuevo or not miembro.activo
     if not nuevo and not miembro.activo:
         miembro.activo = True
-        miembro.save(update_fields=["activo"])
+        miembro.retirado_por_baja = False
+        miembro.save(update_fields=["activo", "retirado_por_baja"])
     audit.log(
         "grupo.integrante_agregado", actor=actor, target=grupo, request=request,
         persona=persona.pk, rol=rol, persona_nueva=creada,
     )  # fmt: skip
+    if entra:
+        _avisar_ingreso(grupo, persona, actor)
     return miembro
+
+
+def _avisar_ingreso(grupo, persona, actor) -> None:
+    """Avisa por notificación a quien lidera el grupo y a la persona (si tiene cuenta)."""
+    lideres = [
+        m.persona.usuario
+        for m in GrupoMiembro.objects.filter(
+            grupo=grupo, activo=True, rol__in=["lider", "supervisor"]
+        ).select_related("persona__usuario")
+        if m.persona.usuario_id
+    ]
+    push.notificar(
+        titulo=f"Nueva persona en {grupo.nombre}",
+        cuerpo=f"{persona.nombre_completo} se agregó al grupo.",
+        url=f"/grupos/{grupo.pk}",
+        etiqueta=f"ingreso-{grupo.pk}",
+        usuarios=lideres,
+        excluir=actor,
+    )
+    if persona.usuario_id:
+        push.notificar(
+            titulo="Te agregaron a un grupo",
+            cuerpo=f"Ahora eres parte de {grupo.nombre}.",
+            url=f"/grupos/{grupo.pk}",
+            etiqueta=f"ingreso-{grupo.pk}-yo",
+            usuarios=[persona.usuario],
+            excluir=actor,
+        )
+
+
+# ---------- ingreso por enlace o QR (sala de espera) ----------
+def generar_enlace(grupo, *, actor=None, request=None) -> str:
+    """Crea (o regenera) el enlace de ingreso; el anterior deja de servir."""
+    import secrets
+
+    grupo.enlace_token = secrets.token_urlsafe(18)
+    grupo.save(update_fields=["enlace_token"])
+    audit.log("grupo.enlace_generado", actor=actor, target=grupo, request=request)
+    return grupo.enlace_token
+
+
+def desactivar_enlace(grupo, *, actor=None, request=None) -> None:
+    grupo.enlace_token = None
+    grupo.save(update_fields=["enlace_token"])
+    audit.log("grupo.enlace_desactivado", actor=actor, target=grupo, request=request)
+
+
+def solicitar_ingreso(grupo, *, nombre, whatsapp, acepta_datos, request=None) -> SolicitudIngreso:
+    """Registra la solicitud de quien abrió el enlace. Es idempotente: si ya hay una pendiente
+    con ese WhatsApp, se devuelve la misma. No pide cuenta: la persona espera la aprobación."""
+    import secrets
+
+    from apps.accounts.phone import normalize_whatsapp
+
+    if not acepta_datos:
+        raise ValidationError("Debes aceptar el aviso de privacidad para pedir tu ingreso.")
+    nombre = nombre.strip()
+    if not nombre:
+        raise ValidationError("Escribe tu nombre.")
+    numero = normalize_whatsapp(whatsapp)
+    persona = personas.buscar_duplicado(numero)
+    if persona and GrupoMiembro.objects.filter(grupo=grupo, persona=persona, activo=True).exists():
+        raise ValidationError("Ya eres parte de este grupo.")
+    existente = SolicitudIngreso.objects.filter(
+        grupo=grupo, whatsapp=numero, estado=SolicitudIngreso.Estado.PENDIENTE
+    ).first()
+    if existente:
+        return existente
+    solicitud = SolicitudIngreso.objects.create(
+        grupo=grupo,
+        nombre=nombre,
+        whatsapp=numero,
+        acepta_datos=True,
+        codigo=secrets.token_urlsafe(24),
+    )
+    audit.log("grupo.solicitud_creada", target=grupo, request=request, solicitud=solicitud.pk)
+    lideres = [
+        m.persona.usuario
+        for m in GrupoMiembro.objects.filter(
+            grupo=grupo, activo=True, rol__in=["lider", "supervisor"]
+        ).select_related("persona__usuario")
+        if m.persona.usuario_id
+    ]
+    push.notificar(
+        titulo=f"Quieren unirse a {grupo.nombre}",
+        cuerpo=f"{solicitud.nombre} espera tu aprobación.",
+        url=f"/grupos/{grupo.pk}",
+        etiqueta=f"solicitud-{grupo.pk}",
+        usuarios=lideres,
+    )
+    return solicitud
+
+
+def resolver_solicitud(solicitud, *, aprobar, actor, request=None) -> SolicitudIngreso:
+    if solicitud.estado != SolicitudIngreso.Estado.PENDIENTE:
+        raise ValidationError("Esta solicitud ya se resolvió.")
+    with transaction.atomic():
+        if aprobar:
+            agregar_integrante(
+                solicitud.grupo,
+                rol="asistente",
+                whatsapp=solicitud.whatsapp,
+                nombre=solicitud.nombre,
+                acepta_datos=solicitud.acepta_datos,
+                actor=actor,
+                request=request,
+            )
+        solicitud.estado = (
+            SolicitudIngreso.Estado.APROBADA if aprobar else SolicitudIngreso.Estado.RECHAZADA
+        )
+        solicitud.resuelta_en = timezone.now()
+        solicitud.resuelta_por = actor
+        solicitud.save(update_fields=["estado", "resuelta_en", "resuelta_por"])
+    audit.log(
+        "grupo.solicitud_aprobada" if aprobar else "grupo.solicitud_rechazada",
+        actor=actor, target=solicitud.grupo, request=request, solicitud=solicitud.pk,
+    )  # fmt: skip
+    return solicitud
 
 
 @transaction.atomic

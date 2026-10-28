@@ -18,6 +18,7 @@ import {
   SelectField,
   TextareaField,
 } from '@/design-system'
+import { useCan } from '@/features/auth/use-auth'
 import { api, apiUpload } from '@/lib/api'
 import {
   fotoUrl,
@@ -53,6 +54,8 @@ function Ficha({ persona }: { persona: Persona }) {
   const [bajaAbierta, setBajaAbierta] = useState(false)
   const [bajaFecha, setBajaFecha] = useState(hoy())
   const [bajaMotivo, setBajaMotivo] = useState('')
+  const puedeAsignar = useCan('grupos.gestionar')
+  const [grupoElegido, setGrupoElegido] = useState('')
   const [trasladoAbierto, setTrasladoAbierto] = useState(false)
   const [trasladoFecha, setTrasladoFecha] = useState(hoy())
   const [trasladoIglesia, setTrasladoIglesia] = useState('')
@@ -142,6 +145,24 @@ function Ficha({ persona }: { persona: Persona }) {
       refrescar(actualizada)
     },
   })
+  const grupos = useQuery({
+    queryKey: ['grupos', 'para-asignar'],
+    enabled: puedeAsignar && persona.activo,
+    queryFn: () => api<{ id: number; nombre: string; suspendido: boolean }[]>('/api/grupos/?estado=activos'),
+  })
+  const asignar = useMutation({
+    mutationFn: () =>
+      api(`/api/grupos/${grupoElegido}/integrantes/`, {
+        method: 'POST',
+        body: { whatsapp: persona.whatsapp, nombre: persona.nombre, rol: 'asistente', acepta_datos: false },
+      }),
+    onSuccess: async () => {
+      setGrupoElegido('')
+      const actualizada = await api<Persona>(`/api/personas/${persona.id}/`)
+      refrescar(actualizada)
+      void queryClient.invalidateQueries({ queryKey: ['grupos'] })
+    },
+  })
   const trasladar = useMutation({
     mutationFn: () =>
       api<Persona>(`/api/personas/${persona.id}/traslado/`, {
@@ -164,7 +185,7 @@ function Ficha({ persona }: { persona: Persona }) {
   }
   const siguienteNivel = persona.nivel === 'contacto' ? 'participante' : persona.nivel === 'participante' ? 'edu' : null
   const errorNivel =
-    subirNivel.error ?? reactivar.error ?? darBaja.error ?? trasladar.error ?? subirFoto.error
+    subirNivel.error ?? reactivar.error ?? darBaja.error ?? trasladar.error ?? asignar.error ?? subirFoto.error
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
@@ -227,6 +248,47 @@ function Ficha({ persona }: { persona: Persona }) {
               <CardDescription>Para el expediente completo falta: {persona.faltantes_edu.join(', ')}.</CardDescription>
             ) : null}
           </div>
+        ) : null}
+      </Card>
+
+      <Card className="flex flex-col gap-3">
+        <CardTitle>Grupos</CardTitle>
+        {persona.grupos.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {persona.grupos.map((g) => (
+              <Badge key={g} tone="success">
+                {g}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <CardDescription>No pertenece a ningún grupo.</CardDescription>
+        )}
+        {puedeAsignar && persona.activo && persona.whatsapp ? (
+          <div className="flex max-w-xl flex-wrap items-end gap-3">
+            <div className="min-w-48 flex-1">
+              <SelectField
+                label="Asignar a un grupo"
+                value={grupoElegido}
+                onChange={(e) => setGrupoElegido(e.target.value)}
+                options={[
+                  { value: '', label: 'Elige un grupo' },
+                  ...(grupos.data ?? [])
+                    .filter((g) => !persona.grupos.includes(g.nombre))
+                    .map((g) => ({ value: String(g.id), label: g.nombre })),
+                ]}
+              />
+            </div>
+            <Button type="button" disabled={!grupoElegido || asignar.isPending} onClick={() => asignar.mutate()}>
+              Asignar
+            </Button>
+          </div>
+        ) : null}
+        {puedeAsignar && persona.activo && !persona.whatsapp ? (
+          <CardDescription>Para asignarla a un grupo registra primero su WhatsApp.</CardDescription>
+        ) : null}
+        {puedeAsignar ? (
+          <CardDescription>El líder del grupo y la persona (si tiene cuenta) reciben un aviso.</CardDescription>
         ) : null}
       </Card>
 

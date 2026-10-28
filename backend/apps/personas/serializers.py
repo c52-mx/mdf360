@@ -71,15 +71,20 @@ class PersonaDetailSerializer(serializers.ModelSerializer):
     faltantes_edu = serializers.SerializerMethodField()
     procesos = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField()
+    grupos = serializers.SerializerMethodField()
 
     def get_roles(self, obj) -> list[str]:
         return _nombres_de_roles(obj)
+
+    def get_grupos(self, obj) -> list[str]:
+        return sorted(m.grupo.nombre for m in obj.membresias.all() if m.activo and m.grupo.activo)
 
     class Meta:
         model = Persona
         fields = [
             "id",
             "roles",
+            "grupos",
             "nivel",
             "procedencia",
             "activo",

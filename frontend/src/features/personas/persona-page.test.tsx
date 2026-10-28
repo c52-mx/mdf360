@@ -5,12 +5,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PersonaPage } from './persona-page'
 import type { Movimiento, Persona } from './types'
 
+vi.mock('@/features/auth/use-auth', () => ({ useCan: () => false }))
+
 const json = (status: number, body: unknown) =>
   Promise.resolve(new Response(JSON.stringify(body), { status }))
 
 const persona = {
   id: 5,
   roles: ['Líder / Maestro'],
+  grupos: [],
   nivel: 'contacto',
   procedencia: 'visitante',
   activo: true,

@@ -47,6 +47,7 @@ const grupo: GrupoDetalle = {
   puede_capturar: true,
   puede_gestionar: true,
   puede_administrar: true,
+  enlace: null,
 }
 
 function montar(datos = grupo, llamadas: { url: string; init?: RequestInit }[] = []) {
@@ -58,6 +59,7 @@ function montar(datos = grupo, llamadas: { url: string; init?: RequestInit }[] =
         llamadas.push({ url, init })
         return json(200, datos)
       }
+      if (url.includes('/solicitudes/')) return json(200, [])
       return json(200, datos)
     }),
   )
