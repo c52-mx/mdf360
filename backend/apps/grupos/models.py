@@ -63,6 +63,8 @@ class GrupoMiembro(models.Model):
     persona = models.ForeignKey(Persona, on_delete=models.PROTECT, related_name="membresias")
     rol = models.CharField(max_length=20, choices=Rol.choices, default=Rol.ASISTENTE)
     activo = models.BooleanField(default=True)
+    # True si salió porque la persona se dio de baja o se trasladó: al reactivarla, regresa.
+    retirado_por_baja = models.BooleanField(default=False)
     desde = models.DateField(default=timezone.localdate)
 
     class Meta:

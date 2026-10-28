@@ -127,8 +127,18 @@ def _retirar_de_grupos(persona: Persona) -> list[int]:
 
     membresias = GrupoMiembro.objects.filter(persona=persona, activo=True)
     grupos = sorted(set(membresias.values_list("grupo_id", flat=True)))
-    membresias.update(activo=False)
+    membresias.update(activo=False, retirado_por_baja=True)
     return grupos
+
+
+def _desactivar_acceso(persona: Persona) -> bool:
+    """Su cuenta (si la tiene) deja de poder entrar hasta que se reactive a la persona."""
+    cuenta = persona.usuario
+    if cuenta is None or not cuenta.is_active:
+        return False
+    cuenta.is_active = False
+    cuenta.save(update_fields=["is_active"])
+    return True
 
 
 def registrar_baja(persona: Persona, *, fecha, motivo, actor=None, request=None) -> Persona:
@@ -138,7 +148,11 @@ def registrar_baja(persona: Persona, *, fecha, motivo, actor=None, request=None)
     persona.save(update_fields=["activo", "actualizado_en"])
     _movimiento(persona, PersonaMovimiento.Tipo.BAJA, motivo, fecha, actor)
     grupos = _retirar_de_grupos(persona)
-    audit.log("persona.baja", actor=actor, target=persona, request=request, grupos_quitados=grupos)
+    acceso = _desactivar_acceso(persona)
+    audit.log(
+        "persona.baja", actor=actor, target=persona, request=request,
+        grupos_quitados=grupos, acceso_desactivado=acceso,
+    )  # fmt: skip
     return persona
 
 
@@ -157,9 +171,10 @@ def trasladar(
         persona, PersonaMovimiento.Tipo.TRASLADO, motivo, fecha, actor, iglesia_destino=destino
     )
     grupos = _retirar_de_grupos(persona)
+    acceso = _desactivar_acceso(persona)
     audit.log(
         "persona.traslado", actor=actor, target=persona, request=request,
-        destino=destino, grupos_quitados=grupos,
+        destino=destino, grupos_quitados=grupos, acceso_desactivado=acceso,
     )  # fmt: skip
     return persona
 
@@ -170,8 +185,32 @@ def reactivar(persona: Persona, *, motivo="", actor=None, request=None) -> Perso
     persona.activo = True
     persona.save(update_fields=["activo", "actualizado_en"])
     _movimiento(persona, PersonaMovimiento.Tipo.REACTIVACION, motivo, actor=actor)
-    audit.log("persona.reactivada", actor=actor, target=persona, request=request)
+    grupos = _regresar_a_grupos(persona)
+    acceso = _reactivar_acceso(persona)
+    audit.log(
+        "persona.reactivada", actor=actor, target=persona, request=request,
+        grupos_regresados=grupos, acceso_reactivado=acceso,
+    )  # fmt: skip
     return persona
+
+
+def _regresar_a_grupos(persona: Persona) -> list[int]:
+    """Regresa solo a los grupos de los que salió por la baja (no a los que dejó antes)."""
+    from apps.grupos.models import GrupoMiembro
+
+    membresias = GrupoMiembro.objects.filter(persona=persona, retirado_por_baja=True)
+    grupos = sorted(set(membresias.values_list("grupo_id", flat=True)))
+    membresias.update(activo=True, retirado_por_baja=False)
+    return grupos
+
+
+def _reactivar_acceso(persona: Persona) -> bool:
+    cuenta = persona.usuario
+    if cuenta is None or cuenta.is_active:
+        return False
+    cuenta.is_active = True
+    cuenta.save(update_fields=["is_active"])
+    return True
 
 
 def actualizar_procesos(persona: Persona, items, *, actor=None, request=None) -> None:

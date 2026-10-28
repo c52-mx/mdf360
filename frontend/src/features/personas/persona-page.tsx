@@ -236,7 +236,7 @@ function Ficha({ persona }: { persona: Persona }) {
           bajaAbierta ? (
             <div className="grid max-w-xl grid-cols-1 gap-4">
               <CardDescription>
-                Dar de baja saca a la persona de sus grupos; su historial de asistencia se conserva.
+                La persona sale de sus grupos y su acceso a la aplicación queda inactivo. Su historial se conserva y, al reactivarla, todo regresa.
               </CardDescription>
               <Field label="Fecha" type="date" value={bajaFecha} onChange={(e) => setBajaFecha(e.target.value)} />
               <Field label="Motivo" value={bajaMotivo} onChange={(e) => setBajaMotivo(e.target.value)} />
@@ -257,7 +257,7 @@ function Ficha({ persona }: { persona: Persona }) {
           ) : trasladoAbierto ? (
             <div className="grid max-w-xl grid-cols-1 gap-4">
               <CardDescription>
-                La persona queda inactiva con la iglesia de destino en su historial y sale de sus grupos.
+                La persona queda inactiva con la iglesia de destino en su historial, sale de sus grupos y su acceso queda inactivo.
               </CardDescription>
               <Field label="Fecha" type="date" value={trasladoFecha} onChange={(e) => setTrasladoFecha(e.target.value)} />
               <Field
