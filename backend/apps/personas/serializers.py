@@ -18,15 +18,20 @@ class PersonaListSerializer(serializers.ModelSerializer):
     nombre_completo = serializers.CharField(read_only=True)
     tiene_foto = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField()
+    grupos = serializers.SerializerMethodField()
 
     def get_roles(self, obj) -> list[str]:
         return _nombres_de_roles(obj)
+
+    def get_grupos(self, obj) -> list[str]:
+        return sorted(m.grupo.nombre for m in obj.membresias.all() if m.activo and m.grupo.activo)
 
     class Meta:
         model = Persona
         fields = [
             "id",
             "nombre_completo",
+            "grupos",
             "nivel",
             "procedencia",
             "whatsapp",
@@ -145,7 +150,15 @@ class MovimientoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PersonaMovimiento
-        fields = ["id", "tipo", "tipo_display", "fecha", "motivo", "creado_en"]
+        fields = [
+            "id",
+            "tipo",
+            "tipo_display",
+            "fecha",
+            "motivo",
+            "iglesia_destino",
+            "creado_en",
+        ]
 
 
 class NivelSerializer(serializers.Serializer):
@@ -155,6 +168,12 @@ class NivelSerializer(serializers.Serializer):
 class BajaSerializer(serializers.Serializer):
     fecha = serializers.DateField()
     motivo = serializers.CharField(max_length=300)
+
+
+class TrasladoSerializer(serializers.Serializer):
+    fecha = serializers.DateField()
+    iglesia_destino = serializers.CharField(max_length=150)
+    motivo = serializers.CharField(max_length=300, required=False, allow_blank=True, default="")
 
 
 class FotoSerializer(serializers.Serializer):
