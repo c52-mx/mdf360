@@ -29,6 +29,8 @@ class Grupo(models.Model):
     suspendido = models.BooleanField(default=False)
     suspension_motivo = models.TextField("motivo de la suspensión", blank=True)
     suspendido_en = models.DateField(null=True, blank=True)
+    # Enlace (y QR) para pedir ingreso; vacío = desactivado. Regenerarlo invalida el anterior.
+    enlace_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -63,6 +65,8 @@ class GrupoMiembro(models.Model):
     persona = models.ForeignKey(Persona, on_delete=models.PROTECT, related_name="membresias")
     rol = models.CharField(max_length=20, choices=Rol.choices, default=Rol.ASISTENTE)
     activo = models.BooleanField(default=True)
+    # True si salió porque la persona se dio de baja o se trasladó: al reactivarla, regresa.
+    retirado_por_baja = models.BooleanField(default=False)
     desde = models.DateField(default=timezone.localdate)
 
     class Meta:
@@ -73,6 +77,42 @@ class GrupoMiembro(models.Model):
 
     def __str__(self):
         return f"{self.persona} · {self.get_rol_display()} · {self.grupo}"
+
+
+class SolicitudIngreso(models.Model):
+    """Persona que pidió entrar a un grupo por su enlace o QR y espera la aprobación del líder."""
+
+    class Estado(models.TextChoices):
+        PENDIENTE = "pendiente", "Pendiente"
+        APROBADA = "aprobada", "Aprobada"
+        RECHAZADA = "rechazada", "Rechazada"
+
+    grupo = models.ForeignKey(Grupo, on_delete=models.CASCADE, related_name="solicitudes")
+    nombre = models.CharField(max_length=100)
+    whatsapp = models.CharField(max_length=20)
+    acepta_datos = models.BooleanField(default=False)
+    estado = models.CharField(max_length=12, choices=Estado.choices, default=Estado.PENDIENTE)
+    # Secreto que la persona usa para consultar su propia solicitud (sala de espera).
+    codigo = models.CharField(max_length=64, unique=True)
+    creada_en = models.DateTimeField(auto_now_add=True)
+    resuelta_en = models.DateTimeField(null=True, blank=True)
+    resuelta_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["creada_en"]
+        verbose_name_plural = "solicitudes de ingreso"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["grupo", "whatsapp"],
+                condition=models.Q(estado="pendiente"),
+                name="solicitud_pendiente_unica",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.nombre} → {self.grupo} ({self.estado})"
 
 
 def _archivo_estudio(instance, filename):

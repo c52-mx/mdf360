@@ -5,12 +5,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PersonaPage } from './persona-page'
 import type { Movimiento, Persona } from './types'
 
+vi.mock('@/features/auth/use-auth', () => ({ useCan: () => false }))
+
 const json = (status: number, body: unknown) =>
   Promise.resolve(new Response(JSON.stringify(body), { status }))
 
 const persona = {
   id: 5,
   roles: ['Líder / Maestro'],
+  grupos: [],
   nivel: 'contacto',
   procedencia: 'visitante',
   activo: true,
@@ -90,9 +93,9 @@ describe('PersonaPage', () => {
     expect(JSON.parse(String(llamadas[0].init?.body)).iglesia_destino).toBe('Iglesia Vida Nueva')
   })
 
-  it('la baja avisa que también saca a la persona de sus grupos', async () => {
+  it('la baja avisa que saca a la persona de sus grupos y desactiva su acceso', async () => {
     montar()
     fireEvent.click(await screen.findByRole('button', { name: 'Dar de baja' }))
-    expect(screen.getByText(/saca a la persona de sus grupos/)).toBeInTheDocument()
+    expect(screen.getByText(/su acceso a la aplicación queda inactivo/)).toBeInTheDocument()
   })
 })

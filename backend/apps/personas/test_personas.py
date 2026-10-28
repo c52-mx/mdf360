@@ -428,3 +428,85 @@ def test_filtros_por_grupo_y_por_rol_y_grupos_en_el_listado(api):
     fila = next(f for f in api.get("/api/personas/").json()["results"] if f["id"] == persona.pk)
     assert fila["grupos"] == ["Conexión Norte"]
     assert lalo.pk
+
+
+# ---------- la baja desactiva el acceso y la reactivación lo devuelve todo ----------
+def _persona_con_cuenta(rol, whatsapp, nombre):
+    cuenta = _con_rol(User.objects.create_user(whatsapp, pin="482915", nombre=nombre), rol)
+    return Persona.objects.create(nombre=nombre, whatsapp=whatsapp, usuario=cuenta), cuenta
+
+
+def test_la_baja_desactiva_el_acceso_y_reactivar_regresa_acceso_y_grupos(api):
+    from apps.grupos.models import Grupo, GrupoMiembro
+
+    persona, cuenta = _persona_con_cuenta("lider", "55 8888 1001", "Lupe")
+    norte = Grupo.objects.create(nombre="Norte")
+    sur = Grupo.objects.create(nombre="Sur")
+    GrupoMiembro.objects.create(grupo=norte, persona=persona, rol="lider")
+    ya_fuera = GrupoMiembro.objects.create(
+        grupo=sur, persona=persona, rol="asistente", activo=False
+    )
+
+    assert (
+        api.post(
+            f"/api/personas/{persona.pk}/baja/",
+            {"fecha": "2026-10-20", "motivo": "Ya no asiste"},
+            format="json",
+        ).status_code
+        == 200
+    )
+    cuenta.refresh_from_db()
+    assert cuenta.is_active is False
+    login = APIClient().post(
+        "/api/auth/login/", {"identifier": "55 8888 1001", "credential": "482915"}, format="json"
+    )
+    assert login.status_code == 400  # no puede entrar mientras esté de baja
+    assert AuditEvent.objects.get(action="persona.baja").detail["acceso_desactivado"] is True
+
+    assert api.post(f"/api/personas/{persona.pk}/reactivar/", {}, format="json").status_code == 200
+    cuenta.refresh_from_db()
+    assert cuenta.is_active is True
+    assert GrupoMiembro.objects.get(grupo=norte, persona=persona).activo
+    ya_fuera.refresh_from_db()
+    assert not ya_fuera.activo  # el que dejó antes de la baja no regresa solo
+    entra = APIClient().post(
+        "/api/auth/login/", {"identifier": "55 8888 1001", "credential": "482915"}, format="json"
+    )
+    assert entra.status_code == 200
+
+
+def test_el_traslado_tambien_desactiva_el_acceso(api):
+    persona, cuenta = _persona_con_cuenta("lider", "55 8888 1002", "Mario")
+    api.post(
+        f"/api/personas/{persona.pk}/traslado/",
+        {"fecha": "2026-10-20", "iglesia_destino": "Vida Nueva"},
+        format="json",
+    )
+    cuenta.refresh_from_db()
+    assert cuenta.is_active is False
+
+
+def test_solo_un_superior_da_de_baja_y_nunca_a_si_mismo_ni_a_su_nivel(api, staff):
+    # `staff` es Pastor y tiene su propia persona
+    yo = Persona.objects.create(nombre="Admin", whatsapp="55 9999 0000", usuario=staff)
+    asegurar = api.post(
+        f"/api/personas/{yo.pk}/baja/", {"fecha": "2026-10-20", "motivo": "x"}, format="json"
+    )
+    assert asegurar.status_code == 403
+    otro_pastor, _ = _persona_con_cuenta("pastor", "55 8888 1003", "Otro Pastor")
+    igual = api.post(
+        f"/api/personas/{otro_pastor.pk}/baja/",
+        {"fecha": "2026-10-20", "motivo": "x"},
+        format="json",
+    )
+    assert igual.status_code == 403
+    assert "superior" in igual.json()["detail"]
+    anciano, _ = _persona_con_cuenta("anciano", "55 8888 1004", "Anciano")
+    assert (
+        api.post(
+            f"/api/personas/{anciano.pk}/baja/",
+            {"fecha": "2026-10-20", "motivo": "x"},
+            format="json",
+        ).status_code
+        == 200
+    )

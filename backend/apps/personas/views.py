@@ -14,7 +14,7 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import requiere
 from apps.core import audit
 
-from . import services
+from . import jerarquia, services
 from .aviso import AVISO_TEXTO, AVISO_VERSION
 from .models import Persona, ProcesoDiscipular
 from .serializers import (
@@ -33,6 +33,14 @@ from .serializers import (
 
 def _error(code: str, detail, http_status=status.HTTP_400_BAD_REQUEST, **extra):
     return Response({"code": code, "detail": detail, **extra}, status=http_status)
+
+
+def _sin_jerarquia():
+    return _error(
+        "forbidden",
+        "Solo un superior puede dar de baja, trasladar o reactivar a esta persona.",
+        status.HTTP_403_FORBIDDEN,
+    )
 
 
 def _validation_detail(exc: DjangoValidationError) -> str:
@@ -196,6 +204,8 @@ class PersonaViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def baja(self, request, pk=None):
         persona = self.get_object()
+        if not jerarquia.puede_dar_baja(request.user, persona):
+            return _sin_jerarquia()
         data = BajaSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         try:
@@ -209,6 +219,8 @@ class PersonaViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def traslado(self, request, pk=None):
         persona = self.get_object()
+        if not jerarquia.puede_dar_baja(request.user, persona):
+            return _sin_jerarquia()
         data = TrasladoSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         try:
@@ -220,6 +232,8 @@ class PersonaViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def reactivar(self, request, pk=None):
         persona = self.get_object()
+        if not jerarquia.puede_dar_baja(request.user, persona):
+            return _sin_jerarquia()
         try:
             services.reactivar(
                 persona,

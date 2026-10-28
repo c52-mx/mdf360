@@ -287,6 +287,7 @@ class InvitationView(APIView):
             )
             audit.log("auth.invited", actor=request.user, target=user, request=request)
         personas.ensure_persona_for_user(user)
+        services.rol_por_defecto(user, request.user)
         raw, token = services.issue_token(user, ActivationToken.Purpose.ACTIVATION, request.user)
         return Response(_invite_payload(user, raw, token), status=status.HTTP_201_CREATED)
 

@@ -142,7 +142,7 @@ EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "MDF360 <no-reply@mdf360.local>")
 
 REST_FRAMEWORK = {
-    "DEFAULT_THROTTLE_RATES": {"auth": "30/min"},
+    "DEFAULT_THROTTLE_RATES": {"auth": "30/min", "unirse": "20/min"},
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
