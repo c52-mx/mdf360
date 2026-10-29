@@ -3,6 +3,7 @@ import {
   Coins,
   HandHeart,
   Home,
+  KeyRound,
   Palette,
   ScrollText,
   Settings,
@@ -22,6 +23,7 @@ import { InvitePage } from '@/features/auth/invite-page'
 import { LoginPage } from '@/features/auth/login-page'
 import { RecoveryPage } from '@/features/auth/recovery-page'
 import { RequireAuth } from '@/features/auth/require-auth'
+import { PermisosPage } from '@/features/auth/permisos-page'
 import { RolesPage } from '@/features/auth/roles-page'
 import { useAuth } from '@/features/auth/use-auth'
 import { DesignPage } from '@/features/design/design-page'
@@ -61,6 +63,9 @@ function PrivateLayout() {
       : []),
     ...(can('roles.gestionar')
       ? [{ to: '/roles', label: 'Roles', icon: ShieldCheck, module: 'admin' as const, group: administracion }]
+      : []),
+    ...(can('roles.administrar')
+      ? [{ to: '/permisos', label: 'Permisos', icon: KeyRound, module: 'admin' as const, group: administracion }]
       : []),
     ...(can('bitacora.ver')
       ? [{ to: '/bitacora', label: 'Bitácora', icon: ScrollText, module: 'admin' as const, group: administracion }]
@@ -108,6 +113,7 @@ export default function App() {
           <Route path="/bitacora" element={<AuditoriaPage />} />
           <Route path="/configuracion" element={<ConfigPage />} />
           <Route path="/roles" element={<RolesPage />} />
+          <Route path="/permisos" element={<PermisosPage />} />
           <Route path="/invitar" element={<InvitePage />} />
           <Route path="/cuenta" element={<AccountPage />} />
           <Route path="/diseno" element={<DesignPage />} />

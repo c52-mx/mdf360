@@ -158,9 +158,12 @@ class Rol(models.Model):
     clave = models.SlugField(max_length=40, unique=True)
     nombre = models.CharField(max_length=80)
     nivel = models.PositiveSmallIntegerField(help_text="0 es el nivel más alto de la jerarquía")
+    descripcion = models.CharField(max_length=300, blank=True)
     exige_credencial_fuerte = models.BooleanField(default=False)
     permisos = models.JSONField(default=list)
     activo = models.BooleanField(default=True)
+    #: Los roles base vienen con el sistema: se ajustan, pero no se desactivan.
+    es_base = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["nivel", "nombre"]

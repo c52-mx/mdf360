@@ -26,7 +26,10 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('RolesPage', () => {
   it('lista en una tabla con el rol de cada quien y permite volver al listado', async () => {
-    vi.stubGlobal('fetch', vi.fn((url: string) => json(url.includes('/roles/') ? roles : usuarios)))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => json(url.includes('/permisos/') ? [] : url.includes('/roles/') ? roles : usuarios)),
+    )
     render(
       <QueryClientProvider client={new QueryClient()}>
         <RolesPage />
