@@ -27,6 +27,11 @@ const unidad: UnidadDetalle = {
   puede_administrar: false,
 }
 
+const rol = (clave: string, nombre: string, de_gestion: boolean) => ({
+  ambito: 'ministerio', clave, nombre, descripcion: '', permisos: [], activo: true, es_base: true, en_uso: 0, de_gestion,
+})
+const roles = [rol('servidor', 'Servidor', false), rol('respaldo', 'Respaldo', true), rol('encargado', 'Encargado', true)]
+
 function montar(datos = unidad, llamadas: { url: string; init?: RequestInit }[] = []) {
   vi.stubGlobal(
     'fetch',
@@ -36,15 +41,16 @@ function montar(datos = unidad, llamadas: { url: string; init?: RequestInit }[] 
         llamadas.push({ url, init })
         return json(200, {})
       }
+      if (url.includes('/roles-equipo/')) return json(200, roles)
       return json(200, datos)
     }),
   )
   render(
     <QueryClientProvider client={new QueryClient()}>
       <ToastProvider>
-        <MemoryRouter initialEntries={['/unidades/2']}>
+        <MemoryRouter initialEntries={['/ministerios/2']}>
           <Routes>
-            <Route path="/unidades/:id" element={<UnidadPage />} />
+            <Route path="/ministerios/:id" element={<UnidadPage />} />
           </Routes>
         </MemoryRouter>
       </ToastProvider>
@@ -53,6 +59,11 @@ function montar(datos = unidad, llamadas: { url: string; init?: RequestInit }[] 
   return llamadas
 }
 
+const opciones = () =>
+  Array.from((screen.getByLabelText('Rol en el ministerio') as HTMLSelectElement).options).map(
+    (o) => o.value,
+  )
+
 afterEach(() => vi.unstubAllGlobals())
 
 describe('UnidadPage', () => {
@@ -60,23 +71,17 @@ describe('UnidadPage', () => {
     montar()
     expect(await screen.findByText('Sergio Servidor')).toBeInTheDocument()
     expect(screen.getByLabelText('Rol de Sergio Servidor')).toBeInTheDocument()
-    // el otro encargado no se puede tocar sin la administración de unidades
+    // el otro encargado no se puede tocar sin la administración de ministerios
     expect(screen.queryByLabelText('Rol de Eva Encargada')).toBeNull()
-    const opciones = Array.from(
-      (screen.getByLabelText('Rol en la unidad') as HTMLSelectElement).options,
-    ).map((o) => o.value)
-    expect(opciones).toEqual(['servidor'])
-    expect(screen.queryByText('Datos de la unidad')).toBeNull()
+    await waitFor(() => expect(opciones()).toEqual(['servidor']))
+    expect(screen.queryByText('Datos del ministerio')).toBeNull()
   })
 
   it('la administración ve todos los roles y edita los datos', async () => {
     montar({ ...unidad, puede_administrar: true })
     await screen.findByText('Sergio Servidor')
-    const opciones = Array.from(
-      (screen.getByLabelText('Rol en la unidad') as HTMLSelectElement).options,
-    ).map((o) => o.value)
-    expect(opciones).toEqual(['servidor', 'respaldo', 'encargado'])
-    expect(screen.getByText('Datos de la unidad')).toBeInTheDocument()
+    await waitFor(() => expect(opciones()).toEqual(['servidor', 'respaldo', 'encargado']))
+    expect(screen.getByText('Datos del ministerio')).toBeInTheDocument()
   })
 
   it('agrega a una persona con su rol y permite deshacer al quitarla', async () => {

@@ -1,14 +1,14 @@
-"""Las Unidades como origen del tablero de mensajes.
+"""Los ministerios como origen del tablero de mensajes.
 
-Publican el encargado, el respaldo y la administración de unidades. Leen todos los integrantes
-activos de la unidad y quienes ven todas las unidades.
+Publican los roles con ese permiso (encargado, respaldo…) y la administración de ministerios.
+Leen quienes tienen un rol que ve el ministerio y quienes ven todos los ministerios.
 """
 
 from apps.accounts.permissions import tiene_permiso
 from apps.tablero import registry
 
 from . import access
-from .models import Unidad, UnidadMiembro
+from .models import Unidad
 
 
 def _unidad(unidad_id: int):
@@ -17,7 +17,7 @@ def _unidad(unidad_id: int):
 
 def _etiqueta(unidad_id: int) -> str | None:
     unidad = _unidad(unidad_id)
-    return f"Unidad · {unidad.nombre}" if unidad else None
+    return f"Ministerio · {unidad.nombre}" if unidad else None
 
 
 def _puede_publicar(user, unidad_id: int) -> bool:
@@ -29,20 +29,13 @@ def _puede_leer(user, unidad_id: int) -> bool:
     unidad = _unidad(unidad_id)
     if unidad is None:
         return False
-    return tiene_permiso(user, "unidades.ver_todas") or bool(access.roles_en(user, unidad))
+    return access.puede_ver(user, unidad)
 
 
 def _ids_legibles(user) -> list[int] | None:
     if tiene_permiso(user, "unidades.ver_todas"):
         return None
-    persona = getattr(user, "persona", None)
-    if persona is None:
-        return []
-    return list(
-        UnidadMiembro.objects.filter(persona=persona, activo=True)
-        .values_list("unidad_id", flat=True)
-        .distinct()
-    )
+    return access.ids_con_rol_que_ve(user)
 
 
 def _listar(user) -> list[tuple[int, str]]:
@@ -50,19 +43,19 @@ def _listar(user) -> list[tuple[int, str]]:
     unidades = Unidad.objects.filter(activa=True)
     if ids is not None:
         unidades = unidades.filter(pk__in=ids)
-    return [(u.pk, f"Unidad · {u.nombre}") for u in unidades.order_by("nombre")]
+    return [(u.pk, f"Ministerio · {u.nombre}") for u in unidades.order_by("nombre")]
 
 
 def registrar_origen():
     registry.registrar(
         registry.Origen(
             tipo="unidad",
-            nombre="Unidad",
+            nombre="Ministerio",
             etiqueta=_etiqueta,
             puede_publicar=_puede_publicar,
             puede_leer=_puede_leer,
             ids_legibles=_ids_legibles,
             listar=_listar,
-            ruta=lambda unidad_id: f"/unidades/{unidad_id}",
+            ruta=lambda unidad_id: f"/ministerios/{unidad_id}",
         )
     )

@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { Alert, Button, Card, CardDescription, CardTitle, Field, PageHeader, ThemePicker } from '@/design-system'
 import { NotificacionesCard } from '@/features/notificaciones/notificaciones-card'
 import { api } from '@/lib/api'
+import { MisDatosCard } from './mis-datos-card'
 import { useAuth, type User } from './use-auth'
 
 export function AccountPage() {
@@ -36,6 +37,8 @@ export function AccountPage() {
         <CardDescription>WhatsApp: {user.whatsapp}</CardDescription>
         <CardDescription>Correo: {user.email || 'Sin correo registrado'}</CardDescription>
       </Card>
+
+      <MisDatosCard />
 
       <Card className="flex flex-col gap-3">
         <CardTitle>Color de la aplicación</CardTitle>

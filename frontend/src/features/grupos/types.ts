@@ -80,15 +80,6 @@ export interface ReunionDetalle {
   puede_modificar: boolean
 }
 
-export const rolesGrupo = [
-  { value: 'asistente', label: 'Asistente' },
-  { value: 'anfitrion', label: 'Anfitrión' },
-  { value: 'secretario', label: 'Secretario' },
-  { value: 'tesorero', label: 'Tesorero' },
-  { value: 'lider', label: 'Líder' },
-  { value: 'supervisor', label: 'Supervisor' },
-]
-
 export const fechaLarga = (iso: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString('es-MX', {
     weekday: 'long',

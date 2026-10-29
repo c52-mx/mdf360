@@ -10,7 +10,7 @@ const SECCIONES = [
   { tipo: 'persona', titulo: 'Para ti' },
   { tipo: 'iglesia', titulo: 'Toda la iglesia' },
   { tipo: 'grupo', titulo: 'Mis grupos' },
-  { tipo: 'unidad', titulo: 'Mis unidades' },
+  { tipo: 'unidad', titulo: 'Mis ministerios' },
 ]
 
 interface Tablero {
@@ -34,7 +34,7 @@ export function AvisosPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Avisos"
-        description="Mensajes de la iglesia, de tus grupos y de tus unidades."
+        description="Mensajes de la iglesia, de tus grupos y de tus ministerios."
         module="grupos"
       />
       <EnviarAvisoCard />

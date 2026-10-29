@@ -5,7 +5,7 @@ from apps.personas.models import Persona
 
 
 class Unidad(models.Model):
-    """Área de servicio de la iglesia: cafetería, librería, niños, danza, etc."""
+    """Ministerio: área de servicio de la iglesia (cafetería, librería, niños, danza, etc.)."""
 
     nombre = models.CharField(max_length=120, unique=True)
     descripcion = models.CharField(max_length=300, blank=True)
@@ -14,23 +14,26 @@ class Unidad(models.Model):
 
     class Meta:
         ordering = ["nombre"]
-        verbose_name_plural = "unidades"
+        verbose_name = "ministerio"
+        verbose_name_plural = "ministerios"
 
     def __str__(self):
         return self.nombre
 
 
 class UnidadMiembro(models.Model):
-    """Persona dentro de una unidad con su rol. Cada rol vale solo dentro de esa unidad."""
+    """Persona dentro de un ministerio con su rol. Cada rol vale solo dentro de ese ministerio."""
 
-    class Rol(models.TextChoices):
-        ENCARGADO = "encargado", "Encargado"
-        RESPALDO = "respaldo", "Respaldo"
-        SERVIDOR = "servidor", "Servidor"
+    class Rol:
+        """Claves de los roles base; los roles y sus permisos se configuran en RolEquipo."""
+
+        ENCARGADO = "encargado"
+        RESPALDO = "respaldo"
+        SERVIDOR = "servidor"
 
     unidad = models.ForeignKey(Unidad, on_delete=models.CASCADE, related_name="miembros")
     persona = models.ForeignKey(Persona, on_delete=models.PROTECT, related_name="unidades")
-    rol = models.CharField(max_length=12, choices=Rol.choices, default=Rol.SERVIDOR)
+    rol = models.CharField(max_length=40, default=Rol.SERVIDOR)
     activo = models.BooleanField(default=True)
     desde = models.DateField(default=timezone.localdate)
 
@@ -43,4 +46,4 @@ class UnidadMiembro(models.Model):
         ordering = ["unidad", "rol", "persona__nombre"]
 
     def __str__(self):
-        return f"{self.persona} · {self.get_rol_display()} · {self.unidad}"
+        return f"{self.persona} · {self.rol} · {self.unidad}"

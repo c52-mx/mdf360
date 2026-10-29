@@ -83,12 +83,12 @@ CATALOGO: tuple[Permiso, ...] = (
         "Crear y editar roles y sus permisos",
         sensible=True,
     ),
-    Permiso("unidades.ver_todas", "Unidades", "Unidades", "Ver todas las unidades"),
+    Permiso("unidades.ver_todas", "Ministerios", "Ministerios", "Ver todos los ministerios"),
     Permiso(
         "unidades.gestionar",
-        "Unidades",
-        "Unidades",
-        "Crear unidades y asignar encargados y respaldos",
+        "Ministerios",
+        "Ministerios",
+        "Crear ministerios y asignar encargados y respaldos",
     ),
     Permiso(
         "avisos.iglesia",
@@ -129,3 +129,100 @@ def agrupado() -> list[dict]:
         }
         for modulo, pantallas in modulos.items()
     ]
+
+
+# ---------- Permisos dentro de un equipo (grupo de conexión o ministerio) ----------
+# Cada persona tiene un rol por grupo o ministerio (encargado, respaldo, servidor…). Lo que ese
+# rol permite se configura en la pantalla de roles; estas son las acciones que existen.
+AMBITO_GRUPO = "grupo"
+AMBITO_MINISTERIO = "ministerio"
+AMBITOS = {AMBITO_GRUPO: "Grupo de Conexión", AMBITO_MINISTERIO: "Ministerio"}
+
+CATALOGO_EQUIPO: dict[str, tuple[Permiso, ...]] = {
+    AMBITO_GRUPO: (
+        Permiso("ver", "Grupo", "Su grupo", "Consultar el grupo y su gente"),
+        Permiso("integrantes", "Grupo", "Su grupo", "Agregar, cambiar y quitar integrantes"),
+        Permiso("historial", "Grupo", "Asistencia", "Ver el historial de asistencia"),
+        Permiso("capturar", "Grupo", "Asistencia", "Capturar la asistencia (el mismo día)"),
+        Permiso("corregir", "Grupo", "Asistencia", "Corregir la asistencia de cualquier día"),
+        Permiso("estudio", "Grupo", "Estudio semanal", "Ver el estudio de la semana"),
+        Permiso("avisos", "Grupo", "Tablero", "Publicar avisos en el tablero del grupo"),
+    ),
+    AMBITO_MINISTERIO: (
+        Permiso("ver", "Ministerio", "Su ministerio", "Consultar el ministerio y su gente"),
+        Permiso(
+            "integrantes", "Ministerio", "Su ministerio", "Agregar, cambiar y quitar servidores"
+        ),
+        Permiso("avisos", "Ministerio", "Tablero", "Publicar avisos en el tablero del ministerio"),
+        Permiso(
+            "peticiones_registrar",
+            "Ministerio",
+            "Peticiones de oración",
+            "Registrar peticiones del ministerio",
+        ),
+        Permiso(
+            "peticiones_ver",
+            "Ministerio",
+            "Peticiones de oración",
+            "Ver todas las peticiones del ministerio",
+            sensible=True,
+        ),
+    ),
+}
+
+
+def codigos_equipo(ambito: str) -> set[str]:
+    return {p.codigo for p in CATALOGO_EQUIPO.get(ambito, ())}
+
+
+def agrupado_equipo(ambito: str) -> list[dict]:
+    return [
+        {"codigo": p.codigo, "accion": p.accion, "pantalla": p.pantalla, "sensible": p.sensible}
+        for p in CATALOGO_EQUIPO.get(ambito, ())
+    ]
+
+
+# Roles que vienen con el sistema y lo que permiten al inicio.
+_G = codigos_equipo(AMBITO_GRUPO)
+BASE_EQUIPO: dict[str, tuple[tuple[str, str, str, tuple[str, ...]], ...]] = {
+    AMBITO_GRUPO: (
+        ("lider", "Líder", "Encargado del grupo.", tuple(sorted(_G))),
+        (
+            "respaldo",
+            "Respaldo",
+            "Persona de respaldo del líder.",
+            tuple(sorted(_G)),
+        ),
+        (
+            "supervisor",
+            "Supervisor",
+            "Consulta sus grupos.",
+            ("ver", "historial", "estudio", "avisos"),
+        ),
+        (
+            "secretario",
+            "Secretario",
+            "Captura la asistencia.",
+            ("ver", "capturar", "estudio", "avisos"),
+        ),
+        ("anfitrion", "Anfitrión", "Abre su casa para la reunión.", ()),
+        ("tesorero", "Tesorero", "Cuida las ofrendas del grupo.", ()),
+        ("servidor", "Servidor", "Sirve en el grupo.", ()),
+        ("asistente", "Asistente", "Participa en el grupo.", ()),
+    ),
+    AMBITO_MINISTERIO: (
+        (
+            "encargado",
+            "Encargado",
+            "Responsable del ministerio.",
+            ("ver", "integrantes", "avisos", "peticiones_registrar", "peticiones_ver"),
+        ),
+        (
+            "respaldo",
+            "Respaldo",
+            "Persona de respaldo del encargado.",
+            ("ver", "integrantes", "avisos", "peticiones_registrar", "peticiones_ver"),
+        ),
+        ("servidor", "Servidor", "Sirve en el ministerio.", ("ver",)),
+    ),
+}

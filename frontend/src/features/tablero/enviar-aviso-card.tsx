@@ -31,7 +31,7 @@ interface Resultado {
 
 const clave = (tipo: string, id: number) => `${tipo}:${id}`
 
-/** Un mismo aviso para varios lugares: toda la iglesia, grupos, unidades y personas. */
+/** Un mismo aviso para varios lugares: toda la iglesia, grupos, ministerios y personas. */
 export function EnviarAvisoCard() {
   const queryClient = useQueryClient()
   const puedePersonas = useCan('avisos.personas')

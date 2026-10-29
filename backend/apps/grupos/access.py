@@ -11,11 +11,12 @@ from datetime import date, datetime, timedelta
 
 from django.utils import timezone
 
+from apps.accounts import equipos
 from apps.accounts.permissions import tiene_permiso
 
 from .models import Grupo, GrupoMiembro, Reunion
 
-R = GrupoMiembro.Rol
+AMBITO = "grupo"
 
 
 def roles_en(user, grupo: Grupo) -> set[str]:
@@ -29,6 +30,11 @@ def roles_en(user, grupo: Grupo) -> set[str]:
     )
 
 
+def permisos_en(user, grupo: Grupo) -> set[str]:
+    """Lo que sus roles en ese grupo le permiten (se configura en la pantalla de roles)."""
+    return equipos.permisos_de_roles(AMBITO, roles_en(user, grupo))
+
+
 def grupos_visibles(user):
     if tiene_permiso(user, "grupos.ver_todos"):
         return Grupo.objects.all()
@@ -36,7 +42,7 @@ def grupos_visibles(user):
     if persona is None:
         return Grupo.objects.none()
     ids = GrupoMiembro.objects.filter(
-        persona=persona, activo=True, rol__in=[R.SUPERVISOR, R.LIDER, R.SECRETARIO]
+        persona=persona, activo=True, rol__in=equipos.con_permiso(AMBITO, "ver")
     ).values_list("grupo_id", flat=True)
     return Grupo.objects.filter(pk__in=ids)
 
@@ -50,17 +56,18 @@ def puede_ver_grupo(user, grupo: Grupo) -> bool:
 
 
 def puede_gestionar_integrantes(user, grupo: Grupo) -> bool:
-    return puede_administrar(user) or R.LIDER in roles_en(user, grupo)
+    return puede_administrar(user) or "integrantes" in permisos_en(user, grupo)
 
 
 def puede_ver_historial(user, grupo: Grupo) -> bool:
     if tiene_permiso(user, "grupos.ver_todos"):
         return True
-    return bool(roles_en(user, grupo) & {R.SUPERVISOR, R.LIDER})
+    return "historial" in permisos_en(user, grupo)
 
 
 def puede_capturar(user, grupo: Grupo) -> bool:
-    return puede_administrar(user) or bool(roles_en(user, grupo) & {R.LIDER, R.SECRETARIO})
+    permisos = permisos_en(user, grupo)
+    return puede_administrar(user) or bool(permisos & {"capturar", "corregir"})
 
 
 VENTANA_SINCRONIZACION = timedelta(days=7)
@@ -93,17 +100,18 @@ def dia_efectivo(momento: datetime | None) -> date:
 def puede_modificar_asistencia(user, reunion: Reunion, dia: date | None = None) -> bool:
     """Líder y Pastor siempre; Secretario solo el mismo día de la reunión (el día en que
     capturó, si la captura se hizo sin conexión y se sincroniza después)."""
-    if puede_administrar(user) or R.LIDER in roles_en(user, reunion.grupo):
+    permisos = permisos_en(user, reunion.grupo)
+    if puede_administrar(user) or "corregir" in permisos:
         return True
     dia = dia or timezone.localdate()
-    return R.SECRETARIO in roles_en(user, reunion.grupo) and reunion.fecha == dia
+    return "capturar" in permisos and reunion.fecha == dia
 
 
 def puede_ver_reunion(user, reunion: Reunion, dia: date | None = None) -> bool:
     if puede_ver_historial(user, reunion.grupo):
         return True
     dia = dia or timezone.localdate()
-    return R.SECRETARIO in roles_en(user, reunion.grupo) and reunion.fecha == dia
+    return "capturar" in permisos_en(user, reunion.grupo) and reunion.fecha == dia
 
 
 def puede_ver_estudios(user) -> bool:
@@ -113,6 +121,6 @@ def puede_ver_estudios(user) -> bool:
     return bool(
         persona
         and GrupoMiembro.objects.filter(
-            persona=persona, activo=True, rol__in=[R.SUPERVISOR, R.LIDER, R.SECRETARIO]
+            persona=persona, activo=True, rol__in=equipos.con_permiso(AMBITO, "estudio")
         ).exists()
     )

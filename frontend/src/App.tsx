@@ -27,6 +27,7 @@ import { RequireAuth } from '@/features/auth/require-auth'
 import { UnidadPage } from '@/features/unidades/unidad-page'
 import { UnidadesPage } from '@/features/unidades/unidades-page'
 import { PermisosPage } from '@/features/auth/permisos-page'
+import { RolesEquipoPage } from '@/features/equipos/roles-equipo-page'
 import { RolesPage } from '@/features/auth/roles-page'
 import { useAuth } from '@/features/auth/use-auth'
 import { DesignPage } from '@/features/design/design-page'
@@ -55,7 +56,7 @@ function PrivateLayout() {
   const nav: NavItem[] = [
     { to: '/', label: 'Inicio', icon: Home },
     { to: '/grupos', label: 'Grupos', icon: UsersRound, module: 'grupos', group: operacion },
-    { to: '/unidades', label: 'Unidades', icon: Building2, module: 'grupos', group: operacion },
+    { to: '/ministerios', label: 'Ministerios', icon: Building2, module: 'grupos', group: operacion },
     { to: '/peticiones', label: 'Peticiones', icon: HandHeart, module: 'grupos', group: operacion },
     { to: '/avisos', label: 'Avisos', icon: Bell, module: 'grupos', group: operacion },
     { to: '/ofrendas', label: 'Ofrendas', icon: Coins, module: 'grupos', group: operacion },
@@ -108,8 +109,8 @@ export default function App() {
           <Route path="/grupos/:id/hoy" element={<ListaSinConexionPage />} />
           <Route path="/grupos/:id" element={<GrupoPage />} />
           <Route path="/ofrendas" element={<OfrendasPage />} />
-          <Route path="/unidades" element={<UnidadesPage />} />
-          <Route path="/unidades/:id" element={<UnidadPage />} />
+          <Route path="/ministerios" element={<UnidadesPage />} />
+          <Route path="/ministerios/:id" element={<UnidadPage />} />
           <Route path="/peticiones" element={<PeticionesPage />} />
           <Route path="/peticiones/formulario" element={<FormularioPage />} />
           <Route path="/estudios" element={<EstudiosPage />} />
@@ -120,6 +121,7 @@ export default function App() {
           <Route path="/configuracion" element={<ConfigPage />} />
           <Route path="/roles" element={<RolesPage />} />
           <Route path="/permisos" element={<PermisosPage />} />
+          <Route path="/permisos/equipos" element={<RolesEquipoPage />} />
           <Route path="/invitar" element={<InvitePage />} />
           <Route path="/cuenta" element={<AccountPage />} />
           <Route path="/diseno" element={<DesignPage />} />

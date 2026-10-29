@@ -149,7 +149,7 @@ class DestinosView(APIView):
 
 
 class MasivoView(APIView):
-    """Un mismo aviso para varios tableros (iglesia, grupos, unidades, personas)."""
+    """Un mismo aviso para varios tableros (iglesia, grupos, ministerios, personas)."""
 
     permission_classes = [IsAuthenticated]
 

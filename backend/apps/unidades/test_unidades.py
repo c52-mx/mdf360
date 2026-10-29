@@ -126,7 +126,7 @@ def test_el_encargado_agrega_servidores_pero_no_encargados(mundo, monkeypatch):
     api = api_de(mundo["encargada"])
     ok = api.post(url, {"whatsapp": nueva.whatsapp, "rol": "servidor"}, format="json")
     assert ok.status_code == 201
-    assert any(a["titulo"] == "Te agregaron a una unidad" for a in avisos)
+    assert any(a["titulo"] == "Te agregaron a un ministerio" for a in avisos)
     for rol in ("encargado", "respaldo"):
         r = api.post(url, {"whatsapp": nueva.whatsapp, "rol": rol}, format="json")
         assert r.status_code == 403
