@@ -25,6 +25,7 @@ const persona = {
   tiene_foto: false,
   faltantes_edu: ['fecha de nacimiento'],
   procesos: [],
+  vehiculos: [],
   actualizado_en: '2026-10-27T10:00:00Z',
 } as unknown as Persona
 

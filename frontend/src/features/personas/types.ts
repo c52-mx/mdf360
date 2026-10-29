@@ -84,6 +84,7 @@ export interface Persona {
   observaciones: string
   faltantes_edu: string[]
   procesos: ProcesoFila[]
+  vehiculos: { id: number; descripcion: string; color: string; placas: string }[]
   actualizado_en: string
 }
 

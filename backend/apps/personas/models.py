@@ -120,6 +120,38 @@ class Persona(models.Model):
         return hoy.year - self.fecha_nacimiento.year - (0 if cumplio else 1)
 
 
+class Vehiculo(models.Model):
+    """Bien ligado a la persona: un vehículo que usa para llegar a la iglesia (estacionamiento,
+    seguridad). Lo registra y lo mantiene la propia persona."""
+
+    class Tipo(models.TextChoices):
+        AUTO = "auto", "Auto"
+        CAMIONETA = "camioneta", "Camioneta"
+        MOTO = "moto", "Motocicleta"
+        BICICLETA = "bicicleta", "Bicicleta"
+        OTRO = "otro", "Otro"
+
+    persona = models.ForeignKey(Persona, on_delete=models.CASCADE, related_name="vehiculos")
+    tipo = models.CharField(max_length=12, choices=Tipo.choices, default=Tipo.AUTO)
+    marca = models.CharField(max_length=60, blank=True)
+    modelo = models.CharField(max_length=60, blank=True)
+    anio = models.PositiveSmallIntegerField("año", null=True, blank=True)
+    color = models.CharField(max_length=40, blank=True)
+    placas = models.CharField(max_length=15, blank=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name_plural = "vehículos"
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} {self.marca} {self.modelo}".strip()
+
+    def save(self, *args, **kwargs):
+        self.placas = "".join(self.placas.upper().split())
+        super().save(*args, **kwargs)
+
+
 class ProcesoDiscipular(models.Model):
     """Catálogo configurable de los procesos de desarrollo discipular."""
 

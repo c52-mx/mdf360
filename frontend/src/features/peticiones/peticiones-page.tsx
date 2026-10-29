@@ -2,15 +2,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Alert, Button, Card, PageHeader, SelectField } from '@/design-system'
-import { useCan } from '@/features/auth/use-auth'
+import { useAuth, useCan } from '@/features/auth/use-auth'
 import { api } from '@/lib/api'
-import { etiquetasDe, PeticionItem, useFormularioPeticiones } from './peticiones-panel'
+import { etiquetasDe, PeticionesPanel, PeticionItem, useFormularioPeticiones } from './peticiones-panel'
 import type { Pagina, Peticion } from './types'
 
 /** Todas las peticiones que la persona puede ver, de cualquier origen, siempre con su origen. */
 export function PeticionesPage() {
   const queryClient = useQueryClient()
   const puedeConfigurar = useCan('peticiones.configurar')
+  const { user } = useAuth()
   const [origen, setOrigen] = useState('')
   const [estado, setEstado] = useState('activa')
   const [page, setPage] = useState(1)
@@ -51,6 +52,15 @@ export function PeticionesPage() {
           ) : null
         }
       />
+      {user ? (
+        <PeticionesPanel
+          origenTipo="persona"
+          origenId={user.id}
+          puedeRegistrar
+          titulo="Pedir oración"
+          alcances={['lideres', 'equipo']}
+        />
+      ) : null}
       <Card className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SelectField
           label="Origen"

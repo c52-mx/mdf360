@@ -72,6 +72,13 @@ class PersonaDetailSerializer(serializers.ModelSerializer):
     procesos = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField()
     grupos = serializers.SerializerMethodField()
+    vehiculos = serializers.SerializerMethodField()
+
+    def get_vehiculos(self, obj) -> list[dict]:
+        return [
+            {"id": v.pk, "descripcion": str(v), "color": v.color, "placas": v.placas}
+            for v in obj.vehiculos.all()
+        ]
 
     def get_roles(self, obj) -> list[str]:
         return _nombres_de_roles(obj)
@@ -116,6 +123,7 @@ class PersonaDetailSerializer(serializers.ModelSerializer):
             "datos_extra",
             "faltantes_edu",
             "procesos",
+            "vehiculos",
             "creado_en",
             "actualizado_en",
         ]
