@@ -130,6 +130,41 @@ class MisTablerosView(APIView):
         return Response(services.mis_tableros(request.user))
 
 
+class DestinoSerializer(serializers.Serializer):
+    tipo = serializers.CharField(max_length=40)
+    id = serializers.IntegerField(min_value=1)
+
+
+class MasivoSerializer(serializers.Serializer):
+    texto = serializers.CharField(max_length=1000)
+    destinos = DestinoSerializer(many=True)
+    fijado = serializers.BooleanField(required=False, default=False)
+
+
+class DestinosView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(services.destinos_para_publicar(request.user))
+
+
+class MasivoView(APIView):
+    """Un mismo aviso para varios tableros (iglesia, grupos, unidades, personas)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = MasivoSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        try:
+            resultado = services.publicar_masivo(
+                actor=request.user, request=request, **data.validated_data
+            )
+        except DjangoValidationError as exc:
+            return Response({"code": "invalid", "detail": " ".join(exc.messages)}, status=400)
+        return Response(resultado, status=status.HTTP_201_CREATED)
+
+
 class NoLeidosView(APIView):
     permission_classes = [IsAuthenticated]
 

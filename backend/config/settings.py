@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.personas",
     "apps.grupos",
+    "apps.unidades",
     "apps.peticiones",
     "apps.tablero",
     "apps.notificaciones",
