@@ -15,6 +15,12 @@ urlpatterns = [
         "mi-perfil/vehiculos/<int:pk>/", views_perfil.MiVehiculoView.as_view(), name="mi-vehiculo"
     ),
     path("aviso-privacidad/", views.AvisoPrivacidadView.as_view(), name="aviso-privacidad"),
+    path(
+        "aviso-privacidad/publicar/",
+        views.AvisoPrivacidadPublicarView.as_view(),
+        name="aviso-privacidad-publicar",
+    ),
+    path("mi-perfil/aceptar-aviso/", views_perfil.AceptarAvisoView.as_view(), name="aceptar-aviso"),
     path("catalogo/procesos/", views.CatalogoProcesosView.as_view(), name="catalogo-procesos"),
     path("", include(router.urls)),
 ]

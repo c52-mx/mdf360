@@ -19,6 +19,7 @@ import {
   TextareaField,
 } from '@/design-system'
 import { useCan } from '@/features/auth/use-auth'
+import { DatosAdicionalesCard } from '@/features/formularios/datos-adicionales-card'
 import { api, apiUpload } from '@/lib/api'
 import {
   fotoUrl,
@@ -55,6 +56,7 @@ function Ficha({ persona }: { persona: Persona }) {
   const [bajaFecha, setBajaFecha] = useState(hoy())
   const [bajaMotivo, setBajaMotivo] = useState('')
   const puedeAsignar = useCan('grupos.gestionar')
+  const puedeEditar = useCan('personas.editar')
   const [grupoElegido, setGrupoElegido] = useState('')
   const [trasladoAbierto, setTrasladoAbierto] = useState(false)
   const [trasladoFecha, setTrasladoFecha] = useState(hoy())
@@ -291,6 +293,15 @@ function Ficha({ persona }: { persona: Persona }) {
           <CardDescription>El líder del grupo y la persona (si tiene cuenta) reciben un aviso.</CardDescription>
         ) : null}
       </Card>
+
+      <DatosAdicionalesCard
+        entidad="persona"
+        id={persona.id}
+        datos={persona.datos_extra}
+        etiquetas={persona.datos_extra_etiquetas}
+        puedeEditar={puedeEditar}
+        refrescar={['persona', String(persona.id)]}
+      />
 
       {persona.vehiculos.length > 0 ? (
         <Card className="flex flex-col gap-2">

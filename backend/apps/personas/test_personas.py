@@ -78,7 +78,7 @@ def test_alta_rapida_crea_contacto_con_consentimiento_y_movimiento(api):
     assert body["nivel"] == "contacto" and body["whatsapp"] == "+525544443333"
     persona = Persona.objects.get(pk=body["id"])
     consentimiento = Consentimiento.objects.get(persona=persona)
-    assert consentimiento.acepta_datos and consentimiento.version == "0.1-generico"
+    assert consentimiento.acepta_datos and consentimiento.version == "0.2-provisional"
     assert persona.movimientos.filter(tipo="alta").exists()
     assert AuditEvent.objects.filter(action="persona.created", target_id=str(persona.pk)).exists()
 
@@ -288,10 +288,12 @@ def test_sin_foto_responde_404(api):
 
 
 # ---------- aviso de privacidad ----------
-def test_aviso_de_privacidad_es_publico_y_versionado():
+def test_aviso_de_privacidad_es_publico_y_versionado(
+    db,
+):
     r = APIClient().get("/api/personas/aviso-privacidad/")
     assert r.status_code == 200
-    assert r.json()["version"] == "0.1-generico" and "GENÉRICO" in r.json()["texto"]
+    assert r.json()["version"] == "0.2-provisional" and "PROVISIONAL" in r.json()["texto"]
 
 
 # ---------- integración con cuentas ----------

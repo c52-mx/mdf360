@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 from apps.accounts import equipos
 from apps.accounts.permissions import requiere
 from apps.core import audit
+from apps.formularios import services as formularios
 
 from . import access, services
 from . import ofrendas as ofr
@@ -112,6 +113,7 @@ class GrupoEscritura(serializers.Serializer):
     def validate_sector(self, valor: str) -> str:
         return valor.upper()
 
+    datos_extra = serializers.DictField(required=False)
     colonia = serializers.CharField(max_length=100, required=False, allow_blank=True)
     dia_semana = serializers.IntegerField(min_value=0, max_value=6, required=False, allow_null=True)
     hora = serializers.TimeField(required=False, allow_null=True)
@@ -209,7 +211,12 @@ class GruposView(APIView):
             return _denegado()
         data = GrupoEscritura(data=request.data)
         data.is_valid(raise_exception=True)
-        grupo = Grupo.objects.create(**data.validated_data)
+        datos = dict(data.validated_data)
+        try:
+            datos["datos_extra"] = formularios.aplicar("grupo", {}, datos.pop("datos_extra", {}))
+        except DjangoValidationError as exc:
+            return _error("invalid", _detalle(exc))
+        grupo = Grupo.objects.create(**datos)
         audit.log("grupo.creado", actor=request.user, target=grupo, request=request)
         return Response(grupo_resumen(grupo, request.user), status=status.HTTP_201_CREATED)
 
@@ -247,6 +254,8 @@ class GrupoView(APIView):
         return Response(
             {
                 **grupo_resumen(grupo, request.user),
+                "datos_extra": grupo.datos_extra,
+                "datos_extra_etiquetas": formularios.etiquetas("grupo", grupo.datos_extra),
                 "miembros": [miembro_dict(m, equipos.nombres("grupo")) for m in miembros],
                 "reuniones": reuniones,
                 "puede_capturar": access.puede_capturar(request.user, grupo),
@@ -267,7 +276,15 @@ class GrupoView(APIView):
             return _denegado()
         data = GrupoEscritura(data=request.data, partial=True)
         data.is_valid(raise_exception=True)
-        for campo, valor in data.validated_data.items():
+        cambios = dict(data.validated_data)
+        if "datos_extra" in cambios:
+            try:
+                cambios["datos_extra"] = formularios.aplicar(
+                    "grupo", grupo.datos_extra, cambios["datos_extra"]
+                )
+            except DjangoValidationError as exc:
+                return _error("invalid", _detalle(exc))
+        for campo, valor in cambios.items():
             setattr(grupo, campo, valor)
         grupo.save()
         audit.log(

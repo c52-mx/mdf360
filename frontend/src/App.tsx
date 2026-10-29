@@ -1,9 +1,11 @@
 import {
   Bell,
   Building2,
+  ClipboardList,
   Coins,
   HandHeart,
   Home,
+  FileText,
   KeyRound,
   Palette,
   ScrollText,
@@ -26,7 +28,11 @@ import { RecoveryPage } from '@/features/auth/recovery-page'
 import { RequireAuth } from '@/features/auth/require-auth'
 import { UnidadPage } from '@/features/unidades/unidad-page'
 import { UnidadesPage } from '@/features/unidades/unidades-page'
+import { AvisoPendiente } from '@/features/auth/aviso-pendiente'
+import { AvisoPrivacidadPage } from '@/features/auth/aviso-privacidad-page'
 import { PermisosPage } from '@/features/auth/permisos-page'
+import { DisenadorPage } from '@/features/formularios/disenador-page'
+import { FormulariosPage } from '@/features/formularios/formularios-page'
 import { RolesEquipoPage } from '@/features/equipos/roles-equipo-page'
 import { RolesPage } from '@/features/auth/roles-page'
 import { useAuth } from '@/features/auth/use-auth'
@@ -73,6 +79,12 @@ function PrivateLayout() {
     ...(can('roles.administrar')
       ? [{ to: '/permisos', label: 'Permisos', icon: KeyRound, module: 'admin' as const, group: administracion }]
       : []),
+    ...(can('formularios.gestionar')
+      ? [{ to: '/formularios', label: 'Formularios', icon: ClipboardList, module: 'admin' as const, group: administracion }]
+      : []),
+    ...(can('config.gestionar')
+      ? [{ to: '/aviso-privacidad', label: 'Aviso de privacidad', icon: FileText, module: 'admin' as const, group: administracion }]
+      : []),
     ...(can('bitacora.ver')
       ? [{ to: '/bitacora', label: 'Bitácora', icon: ScrollText, module: 'admin' as const, group: administracion }]
       : []),
@@ -88,6 +100,7 @@ function PrivateLayout() {
   return (
     <AppShell nav={nav} userName={user?.nombre} onLogout={() => void logout().then(() => navigate('/login', { replace: true }))}>
       <SyncBanner />
+      <AvisoPendiente />
       <Outlet />
     </AppShell>
   )
@@ -122,6 +135,9 @@ export default function App() {
           <Route path="/configuracion" element={<ConfigPage />} />
           <Route path="/roles" element={<RolesPage />} />
           <Route path="/permisos" element={<PermisosPage />} />
+          <Route path="/formularios" element={<FormulariosPage />} />
+          <Route path="/formularios/:entidad" element={<DisenadorPage />} />
+          <Route path="/aviso-privacidad" element={<AvisoPrivacidadPage />} />
           <Route path="/permisos/equipos" element={<RolesEquipoPage />} />
           <Route path="/invitar" element={<InvitePage />} />
           <Route path="/cuenta" element={<AccountPage />} />

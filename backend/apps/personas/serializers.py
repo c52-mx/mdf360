@@ -55,6 +55,7 @@ class PersonaCreateSerializer(serializers.Serializer):
     )
     acepta_datos = serializers.BooleanField()
     acepta_foto = serializers.BooleanField(default=False)
+    datos_extra = serializers.DictField(required=False)
 
 
 class ProcesoPersonaSerializer(serializers.Serializer):
@@ -73,6 +74,12 @@ class PersonaDetailSerializer(serializers.ModelSerializer):
     roles = serializers.SerializerMethodField()
     grupos = serializers.SerializerMethodField()
     vehiculos = serializers.SerializerMethodField()
+    datos_extra_etiquetas = serializers.SerializerMethodField()
+
+    def get_datos_extra_etiquetas(self, obj) -> dict:
+        from apps.formularios import services as formularios
+
+        return formularios.etiquetas("persona", obj.datos_extra)
 
     def get_vehiculos(self, obj) -> list[dict]:
         return [
@@ -124,6 +131,7 @@ class PersonaDetailSerializer(serializers.ModelSerializer):
             "faltantes_edu",
             "procesos",
             "vehiculos",
+            "datos_extra_etiquetas",
             "creado_en",
             "actualizado_en",
         ]
