@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 from apps.core import audit
 from apps.personas import services as personas
 
-from . import services
+from . import catalogo, roles_admin, services
 from .models import ActivationToken, Rol, User
 from .permissions import requiere
 from .phone import normalize_whatsapp
@@ -347,16 +347,134 @@ class AccesosView(APIView):
         )
 
 
+def rol_dict(rol: Rol, actor, usuarios: int | None = None) -> dict:
+    return {
+        "clave": rol.clave,
+        "nombre": rol.nombre,
+        "descripcion": rol.descripcion,
+        "nivel": rol.nivel,
+        "permisos": rol.permisos,
+        "exige_credencial_fuerte": rol.exige_credencial_fuerte,
+        "activo": rol.activo,
+        "es_base": rol.es_base,
+        "editable": roles_admin.puede_editar(actor, rol),
+        "usuarios": rol.asignaciones.count() if usuarios is None else usuarios,
+    }
+
+
+class RolEscritura(serializers.Serializer):
+    nombre = serializers.CharField(max_length=80)
+    descripcion = serializers.CharField(max_length=300, required=False, allow_blank=True)
+    nivel = serializers.IntegerField(min_value=0, max_value=98)
+    exige_credencial_fuerte = serializers.BooleanField(required=False)
+    permisos = serializers.ListField(child=serializers.CharField(max_length=60), allow_empty=True)
+
+
 class RolesView(APIView):
+    """Lista de roles (con `?todos=1` incluye los desactivados) y alta de roles nuevos."""
+
+    def get_permissions(self):
+        codigo = "roles.administrar" if self.request.method == "POST" else "roles.gestionar"
+        return [requiere(codigo)()]
+
+    def get(self, request):
+        roles = (
+            Rol.objects.all()
+            if request.query_params.get("todos")
+            else Rol.objects.filter(activo=True)
+        )
+        return Response([rol_dict(r, request.user) for r in roles])
+
+    def post(self, request):
+        data = RolEscritura(data=request.data)
+        data.is_valid(raise_exception=True)
+        try:
+            rol = roles_admin.crear_rol(request.user, request=request, **data.validated_data)
+        except DjangoValidationError as exc:
+            return _error("invalid_role", " ".join(exc.messages), 400)
+        return Response(rol_dict(rol, request.user), status=status.HTTP_201_CREATED)
+
+
+class RolView(APIView):
+    permission_classes = [requiere("roles.administrar")]
+
+    def _rol(self, clave):
+        return Rol.objects.filter(clave=clave).first()
+
+    def patch(self, request, clave):
+        rol = self._rol(clave)
+        if rol is None:
+            return _error("not_found", "No existe el rol.", status.HTTP_404_NOT_FOUND)
+        data = RolEscritura(data=request.data, partial=True)
+        data.is_valid(raise_exception=True)
+        try:
+            roles_admin.editar_rol(request.user, rol, request=request, **data.validated_data)
+        except roles_admin.RolNoEditable:
+            return _error("role_locked", "No puedes modificar un rol de tu nivel o más alto.", 403)
+        except DjangoValidationError as exc:
+            return _error("invalid_role", " ".join(exc.messages), 400)
+        return Response(rol_dict(rol, request.user))
+
+
+class RolAccionView(APIView):
+    """Duplicar, desactivar o activar un rol."""
+
+    permission_classes = [requiere("roles.administrar")]
+    accion = ""
+
+    def post(self, request, clave):
+        rol = Rol.objects.filter(clave=clave).first()
+        if rol is None:
+            return _error("not_found", "No existe el rol.", status.HTTP_404_NOT_FOUND)
+        try:
+            if self.accion == "duplicar":
+                if rol.nivel < roles_admin.nivel_de(request.user):
+                    return _error(
+                        "role_locked", "No puedes copiar un rol más alto que el tuyo.", 403
+                    )
+                copia = roles_admin.duplicar_rol(request.user, rol, request=request)
+                return Response(rol_dict(copia, request.user), status=status.HTTP_201_CREATED)
+            roles_admin.cambiar_estado(
+                request.user, rol, activo=self.accion == "activar", request=request
+            )
+        except roles_admin.RolNoEditable:
+            return _error("role_locked", "No puedes modificar un rol de tu nivel o más alto.", 403)
+        except DjangoValidationError as exc:
+            return _error("invalid_role", " ".join(exc.messages), 400)
+        return Response(rol_dict(rol, request.user))
+
+
+class DuplicarRolView(RolAccionView):
+    accion = "duplicar"
+
+
+class ActivarRolView(RolAccionView):
+    accion = "activar"
+
+
+class DesactivarRolView(RolAccionView):
+    accion = "desactivar"
+
+
+class CatalogoPermisosView(APIView):
+    """Las acciones que existen en el sistema, por módulo y pantalla."""
+
     permission_classes = [requiere("roles.gestionar")]
 
     def get(self, request):
-        return Response(
-            [
-                {"clave": r.clave, "nombre": r.nombre, "nivel": r.nivel, "permisos": r.permisos}
-                for r in Rol.objects.filter(activo=True)
-            ]
-        )
+        return Response(catalogo.agrupado())
+
+
+class PermisosDePersonaView(APIView):
+    """Qué puede hacer realmente una persona y de qué rol le viene cada cosa."""
+
+    permission_classes = [requiere("roles.gestionar")]
+
+    def get(self, request, user_id: int):
+        user = User.objects.filter(pk=user_id, is_active=True).first()
+        if user is None:
+            return _error("not_found", "No existe la persona.", status.HTTP_404_NOT_FOUND)
+        return Response(roles_admin.permisos_de(user))
 
 
 class UsuariosView(APIView):

@@ -21,6 +21,12 @@ import {
 import { api } from '@/lib/api'
 import { useCan, type User } from './use-auth'
 
+interface PermisosPersona {
+  modulo: string
+  pantalla: string
+  acciones: { codigo: string; accion: string; sensible: boolean; roles: string[] }[]
+}
+
 interface Rol {
   clave: string
   nombre: string
@@ -34,6 +40,12 @@ export function RolesPage() {
   const [busqueda, setBusqueda] = useState('')
   const roles = useQuery({ queryKey: ['roles'], queryFn: () => api<Rol[]>('/api/auth/roles/'), enabled: puede })
   const usuarios = useQuery({ queryKey: ['usuarios'], queryFn: () => api<User[]>('/api/auth/users/'), enabled: puede })
+
+  const permisosDe = useQuery({
+    queryKey: ['permisos-de', editando, usuarios.dataUpdatedAt],
+    enabled: puede && editando !== null,
+    queryFn: () => api<PermisosPersona[]>(`/api/auth/users/${editando}/permisos/`),
+  })
 
   const guardar = useMutation({
     mutationFn: ({ id, claves }: { id: number; claves: string[] }) =>
@@ -81,6 +93,28 @@ export function RolesPage() {
               />
             ))}
           </div>
+        </Card>
+        <Card className="flex flex-col gap-3">
+          <CardTitle>Lo que puede hacer</CardTitle>
+          {permisosDe.data?.length === 0 ? (
+            <CardDescription>Sus roles no le dan acciones administrativas.</CardDescription>
+          ) : null}
+          {permisosDe.data?.map((f) => (
+            <div key={`${f.modulo}-${f.pantalla}`} className="flex flex-col gap-1">
+              <p className="font-bold">
+                {f.modulo} › {f.pantalla}
+              </p>
+              <ul className="flex flex-col gap-1">
+                {f.acciones.map((a) => (
+                  <li key={a.codigo} className="flex flex-wrap items-center gap-2">
+                    <span>{a.accion}</span>
+                    {a.sensible ? <Badge tone="warning">Sensible</Badge> : null}
+                    <span className="text-sm text-muted-foreground">por {a.roles.join(', ')}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </Card>
       </div>
     )

@@ -16,6 +16,20 @@ urlpatterns = [
     path("users/<int:user_id>/unlock/", views.UnlockAccessView.as_view(), name="auth-unlock"),
     path("accesos/", views.AccesosView.as_view(), name="auth-accesos"),
     path("roles/", views.RolesView.as_view(), name="rbac-roles"),
+    path("roles/<slug:clave>/", views.RolView.as_view(), name="rbac-rol"),
+    path("roles/<slug:clave>/duplicar/", views.DuplicarRolView.as_view(), name="rbac-rol-copia"),
+    path("roles/<slug:clave>/activar/", views.ActivarRolView.as_view(), name="rbac-rol-activar"),
+    path(
+        "roles/<slug:clave>/desactivar/",
+        views.DesactivarRolView.as_view(),
+        name="rbac-rol-desactivar",
+    ),
+    path("permisos/", views.CatalogoPermisosView.as_view(), name="rbac-permisos"),
+    path(
+        "users/<int:user_id>/permisos/",
+        views.PermisosDePersonaView.as_view(),
+        name="rbac-permisos-persona",
+    ),
     path("users/", views.UsuariosView.as_view(), name="rbac-users"),
     path("users/<int:user_id>/roles/", views.AsignarRolesView.as_view(), name="rbac-assign"),
 ]

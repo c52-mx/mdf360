@@ -12,6 +12,7 @@ PERMISOS = {
     "personas.baja": "Dar de baja o reactivar",
     "usuarios.invitar": "Invitar personas y reiniciar accesos",
     "roles.gestionar": "Asignar roles",
+    "roles.administrar": "Crear y editar roles y sus permisos",
     "bitacora.ver": "Consultar la bitácora",
     "grupos.ver_todos": "Ver todos los Grupos de Conexión",
     "grupos.gestionar": "Crear y administrar Grupos de Conexión",
@@ -32,12 +33,15 @@ ROLES = {
         [
             "usuarios.invitar",
             "roles.gestionar",
+            "roles.administrar",
             "bitacora.ver",
             "config.gestionar",
             "peticiones.configurar",
         ],
     ),
     "pastor": ("Pastor General", 1, True, list(PERMISOS)),
+    # Igual al Pastor en lo administrativo; por debajo del Super Usuario, como todos.
+    "secretaria": ("Secretaria", 1, True, list(PERMISOS)),
     "anciano": (
         "Anciano",
         2,
