@@ -5,8 +5,10 @@ from apps.grupos.models import GrupoMiembro
 from .test_tablero import _limpiar, api_de, cuenta, m, publicar  # noqa: F401
 
 
-def tableros(m, quien):
-    return api_de(m[quien]).get("/api/tablero/mis-tableros/").json()
+def tableros(m, quien, tipo="grupo"):
+    """Los tableros de un tipo. Todos tienen además «Toda la iglesia»."""
+    todos = api_de(m[quien]).get("/api/tablero/mis-tableros/").json()
+    return [t for t in todos if t["tipo"] == tipo]
 
 
 def test_cada_quien_lista_solo_sus_tableros(m):
@@ -16,7 +18,8 @@ def test_cada_quien_lista_solo_sus_tableros(m):
     assert [t["etiqueta"] for t in tableros(m, "otro")] == ["Grupo de Conexión · Conexión Sur"]
     assert len(tableros(m, "pastor")) == len(tableros(m, "anciano")) == 2  # ven todos los grupos
     sin_grupo = cuenta("55 0000 0090", "Sin grupo", "miembro")
-    assert api_de(sin_grupo).get("/api/tablero/mis-tableros/").json() == []
+    generales = api_de(sin_grupo).get("/api/tablero/mis-tableros/").json()
+    assert [t["tipo"] for t in generales] == ["iglesia"]  # sin grupos ni unidades
 
 
 def test_indica_no_leidos_y_si_puede_publicar(m):

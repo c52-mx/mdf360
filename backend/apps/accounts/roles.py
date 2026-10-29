@@ -13,6 +13,10 @@ PERMISOS = {
     "usuarios.invitar": "Invitar personas y reiniciar accesos",
     "roles.gestionar": "Asignar roles",
     "roles.administrar": "Crear y editar roles y sus permisos",
+    "unidades.ver_todas": "Ver todas las unidades",
+    "unidades.gestionar": "Crear y administrar unidades y sus encargados",
+    "avisos.iglesia": "Enviar avisos a toda la iglesia",
+    "avisos.personas": "Enviar avisos a personas",
     "bitacora.ver": "Consultar la bitácora",
     "grupos.ver_todos": "Ver todos los Grupos de Conexión",
     "grupos.gestionar": "Crear y administrar Grupos de Conexión",
@@ -53,6 +57,7 @@ ROLES = {
             "grupos.ver_todos",
             "grupos.material",
             "peticiones.ver_todas",
+            "unidades.ver_todas",
         ],
     ),
     "supervisor": (

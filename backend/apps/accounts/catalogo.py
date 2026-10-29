@@ -83,6 +83,23 @@ CATALOGO: tuple[Permiso, ...] = (
         "Crear y editar roles y sus permisos",
         sensible=True,
     ),
+    Permiso("unidades.ver_todas", "Unidades", "Unidades", "Ver todas las unidades"),
+    Permiso(
+        "unidades.gestionar",
+        "Unidades",
+        "Unidades",
+        "Crear unidades y asignar encargados y respaldos",
+    ),
+    Permiso(
+        "avisos.iglesia",
+        "Avisos",
+        "Avisos masivos",
+        "Enviar avisos a toda la iglesia",
+        sensible=True,
+    ),
+    Permiso(
+        "avisos.personas", "Avisos", "Avisos masivos", "Enviar avisos a personas", sensible=True
+    ),
     Permiso("bitacora.ver", "Administración", "Bitácora", "Consultar la bitácora"),
     Permiso(
         "config.gestionar", "Administración", "Configuración", "Cambiar los parámetros del sistema"

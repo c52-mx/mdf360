@@ -129,6 +129,65 @@ def no_leidos(user) -> dict[str, dict[int, int]]:
     return resultado
 
 
+MAX_DESTINOS = 60
+
+
+def destinos_para_publicar(user) -> list[dict]:
+    """Los tableros donde la persona puede publicar, para elegir a quién enviar un aviso."""
+    filas = []
+    for origen in registry.todos():
+        if origen.listar is None or origen.tipo == "persona":
+            continue  # a personas se elige una por una
+        for origen_id, etiqueta in origen.listar(user):
+            if origen.puede_publicar(user, origen_id):
+                filas.append(
+                    {
+                        "tipo": origen.tipo,
+                        "tipo_display": origen.nombre,
+                        "id": origen_id,
+                        "etiqueta": etiqueta,
+                    }
+                )
+    return filas
+
+
+def publicar_masivo(*, destinos, texto, actor, fijado=False, request=None) -> dict:
+    """Publica el mismo aviso en varios tableros. Cada destino respeta sus propios permisos: los
+    que la persona no puede publicar se omiten y se informan, sin detener el resto."""
+    vistos, unicos = set(), []
+    for d in destinos:
+        clave = (d["tipo"], d["id"])
+        if clave not in vistos:
+            vistos.add(clave)
+            unicos.append(d)
+    if not unicos:
+        raise ValidationError("Elige a quién enviar el aviso.")
+    if len(unicos) > MAX_DESTINOS:
+        raise ValidationError(f"Puedes enviar a {MAX_DESTINOS} destinos como máximo a la vez.")
+    texto = (texto or "").strip()
+    if not texto:
+        raise ValidationError("Escribe el mensaje.")
+    enviados, omitidos = [], []
+    for d in unicos:
+        try:
+            m = publicar(
+                origen_tipo=d["tipo"],
+                origen_id=d["id"],
+                texto=texto,
+                actor=actor,
+                fijado=fijado,
+                request=request,
+            )
+            enviados.append({"tipo": d["tipo"], "id": d["id"], "etiqueta": m.origen_etiqueta})
+        except (OrigenDesconocido, SinPermiso, ValidationError):
+            omitidos.append({"tipo": d["tipo"], "id": d["id"]})
+    audit.log(
+        "tablero.masivo", actor=actor, request=request,
+        enviados=len(enviados), omitidos=len(omitidos),
+    )  # fmt: skip
+    return {"enviados": enviados, "omitidos": omitidos}
+
+
 def mis_tableros(user) -> list[dict]:
     """Tableros que la persona puede leer, con mensajes sin leer y si puede publicar."""
     pendientes = no_leidos(user)
