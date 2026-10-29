@@ -292,6 +292,21 @@ function Ficha({ persona }: { persona: Persona }) {
         ) : null}
       </Card>
 
+      {persona.vehiculos.length > 0 ? (
+        <Card className="flex flex-col gap-2">
+          <CardTitle>Vehículos</CardTitle>
+          <ul className="flex flex-col gap-1">
+            {persona.vehiculos.map((v) => (
+              <li key={v.id}>
+                {v.descripcion}
+                {v.color ? `, ${v.color}` : ''}
+                {v.placas ? ` · placas ${v.placas}` : ''}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       <Card className="flex flex-col gap-4">
         <CardTitle>Situación en la iglesia</CardTitle>
         {persona.activo ? (

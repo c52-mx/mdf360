@@ -31,6 +31,8 @@ interface Props {
   /** Si la persona puede capturar peticiones en este origen (el servidor lo vuelve a validar). */
   puedeRegistrar: boolean
   titulo?: string
+  /** Alcances que se ofrecen al registrar (por defecto todos). */
+  alcances?: Visibilidad[]
 }
 
 export const etiquetasDe = (f?: Formulario) =>
@@ -102,7 +104,7 @@ export function PeticionItem({
  * Peticiones de oración de un origen (grupo, curso, evento…): captura y consulta.
  * Reutilizable: solo necesita el tipo e id del origen. El servidor decide quién ve qué.
  */
-export function PeticionesPanel({ origenTipo, origenId, referenciaId, puedeRegistrar, titulo }: Props) {
+export function PeticionesPanel({ origenTipo, origenId, referenciaId, puedeRegistrar, titulo, alcances }: Props) {
   const queryClient = useQueryClient()
   const formulario = useFormularioPeticiones()
   const clave = ['peticiones', origenTipo, origenId]
@@ -116,7 +118,8 @@ export function PeticionesPanel({ origenTipo, origenId, referenciaId, puedeRegis
   const [confirmada, setConfirmada] = useState(false)
   const [alcance, setAlcance] = useState<Visibilidad | ''>('')
   const [ocultarNombre, setOcultarNombre] = useState(false)
-  const alcanceActual: Visibilidad = alcance || formulario.data?.visibilidad_por_defecto || 'lideres'
+  const preferido: Visibilidad = alcance || formulario.data?.visibilidad_por_defecto || 'lideres'
+  const alcanceActual: Visibilidad = !alcances || alcances.includes(preferido) ? preferido : alcances[0]
   const opcion = visibilidadOpciones.find((o) => o.value === alcanceActual)
 
   const registrar = useMutation({
@@ -190,7 +193,9 @@ export function PeticionesPanel({ origenTipo, origenId, referenciaId, puedeRegis
             value={alcanceActual}
             hint={opcion?.ayuda}
             onChange={(e) => setAlcance(e.target.value as Visibilidad)}
-            options={visibilidadOpciones.map((o) => ({ value: o.value, label: o.label }))}
+            options={visibilidadOpciones
+              .filter((o) => !alcances || alcances.includes(o.value))
+              .map((o) => ({ value: o.value, label: o.label }))}
           />
           {alcanceActual !== 'lideres' ? (
             <CheckboxField

@@ -8,8 +8,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core import audit
+
 from . import services
-from .models import Persona
+from .models import Persona, Vehiculo
 from .serializers import FOTO_MAX_BYTES
 
 
@@ -112,3 +114,71 @@ class MiFotoView(APIView):
         except DjangoValidationError as exc:
             return _error("invalid_photo", " ".join(exc.messages))
         return Response(perfil_dict(persona))
+
+
+def vehiculo_dict(v: Vehiculo) -> dict:
+    return {
+        "id": v.pk,
+        "tipo": v.tipo,
+        "tipo_display": v.get_tipo_display(),
+        "marca": v.marca,
+        "modelo": v.modelo,
+        "anio": v.anio,
+        "color": v.color,
+        "placas": v.placas,
+    }
+
+
+class VehiculoEscritura(serializers.Serializer):
+    tipo = serializers.ChoiceField(choices=Vehiculo.Tipo.choices)
+    marca = serializers.CharField(max_length=60, required=False, allow_blank=True)
+    modelo = serializers.CharField(max_length=60, required=False, allow_blank=True)
+    anio = serializers.IntegerField(min_value=1950, max_value=2100, required=False, allow_null=True)
+    color = serializers.CharField(max_length=40, required=False, allow_blank=True)
+    placas = serializers.CharField(max_length=15, required=False, allow_blank=True)
+
+
+class MisVehiculosView(APIView):
+    """Los vehículos de la propia persona: los registra, los corrige y los quita ella misma."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response([vehiculo_dict(v) for v in _persona(request).vehiculos.all()])
+
+    def post(self, request):
+        persona = _persona(request)
+        data = VehiculoEscritura(data=request.data)
+        data.is_valid(raise_exception=True)
+        vehiculo = Vehiculo.objects.create(persona=persona, **data.validated_data)
+        audit.log("persona.vehiculo_agregado", actor=request.user, target=persona, request=request)
+        return Response(vehiculo_dict(vehiculo), status=status.HTTP_201_CREATED)
+
+
+class MiVehiculoView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _vehiculo(self, request, pk):
+        vehiculo = _persona(request).vehiculos.filter(pk=pk).first()
+        if vehiculo is None:
+            raise Http404
+        return vehiculo
+
+    def patch(self, request, pk):
+        vehiculo = self._vehiculo(request, pk)
+        data = VehiculoEscritura(data=request.data, partial=True)
+        data.is_valid(raise_exception=True)
+        for campo, valor in data.validated_data.items():
+            setattr(vehiculo, campo, valor)
+        vehiculo.save()
+        audit.log(
+            "persona.vehiculo_editado", actor=request.user, target=vehiculo.persona, request=request
+        )
+        return Response(vehiculo_dict(vehiculo))
+
+    def delete(self, request, pk):
+        vehiculo = self._vehiculo(request, pk)
+        persona = vehiculo.persona
+        vehiculo.delete()
+        audit.log("persona.vehiculo_quitado", actor=request.user, target=persona, request=request)
+        return Response(status=status.HTTP_204_NO_CONTENT)

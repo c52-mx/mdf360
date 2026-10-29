@@ -4,6 +4,7 @@ import { Alert, Button, Card, CardDescription, CardTitle, Field, PageHeader, The
 import { NotificacionesCard } from '@/features/notificaciones/notificaciones-card'
 import { api } from '@/lib/api'
 import { MisDatosCard } from './mis-datos-card'
+import { MisVehiculosCard } from './mis-vehiculos-card'
 import { useAuth, type User } from './use-auth'
 
 export function AccountPage() {
@@ -39,6 +40,8 @@ export function AccountPage() {
       </Card>
 
       <MisDatosCard />
+
+      <MisVehiculosCard />
 
       <Card className="flex flex-col gap-3">
         <CardTitle>Color de la aplicación</CardTitle>
