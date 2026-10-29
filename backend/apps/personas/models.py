@@ -204,6 +204,25 @@ class Consentimiento(models.Model):
         return f"{self.persona} · aviso {self.version}"
 
 
+class AvisoPrivacidad(models.Model):
+    """Texto del aviso de privacidad. Se publica una versión nueva sin tocar el código."""
+
+    version = models.CharField(max_length=40, unique=True)
+    texto = models.TextField()
+    publicado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    publicado_en = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-publicado_en", "-pk"]
+        verbose_name = "aviso de privacidad"
+        verbose_name_plural = "avisos de privacidad"
+
+    def __str__(self):
+        return f"Aviso {self.version}"
+
+
 class PersonaMovimiento(models.Model):
     """Historial de altas, bajas y cambios con fecha y motivo (M1-14)."""
 

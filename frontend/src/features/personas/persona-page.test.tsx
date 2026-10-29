@@ -26,6 +26,8 @@ const persona = {
   faltantes_edu: ['fecha de nacimiento'],
   procesos: [],
   vehiculos: [],
+  datos_extra: {},
+  datos_extra_etiquetas: {},
   actualizado_en: '2026-10-27T10:00:00Z',
 } as unknown as Persona
 
@@ -50,6 +52,7 @@ function montar(llamadas: { url: string; init?: RequestInit }[] = []) {
         return json(200, { ...persona, activo: false })
       }
       if (url.includes('/movimientos/')) return json(200, movimientos)
+      if (url.includes('/api/formularios/')) return json(200, { entidad: 'persona', version: 0, campos: [] })
       return json(200, persona)
     }),
   )

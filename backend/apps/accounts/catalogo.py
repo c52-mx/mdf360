@@ -104,6 +104,12 @@ CATALOGO: tuple[Permiso, ...] = (
     Permiso(
         "config.gestionar", "Administración", "Configuración", "Cambiar los parámetros del sistema"
     ),
+    Permiso(
+        "formularios.gestionar",
+        "Administración",
+        "Formularios",
+        "Diseñar los formularios y sus campos adicionales",
+    ),
 )
 
 POR_CODIGO = {p.codigo: p for p in CATALOGO}

@@ -13,9 +13,9 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import requiere
 from apps.core import audit
+from apps.formularios import services as formularios
 
-from . import jerarquia, services
-from .aviso import AVISO_TEXTO, AVISO_VERSION
+from . import aviso, jerarquia, services
 from .models import Persona, ProcesoDiscipular
 from .serializers import (
     BajaSerializer,
@@ -58,7 +58,27 @@ class AvisoPrivacidadView(APIView):
     authentication_classes: list = []
 
     def get(self, request):
-        return Response({"version": AVISO_VERSION, "texto": AVISO_TEXTO})
+        version, texto = aviso.vigente()
+        return Response({"version": version, "texto": texto})
+
+
+class AvisoPrivacidadPublicarView(APIView):
+    """Publica una versión nueva del aviso: quien administra la configuración del sistema."""
+
+    permission_classes = [requiere("config.gestionar")]
+
+    def post(self, request):
+        try:
+            services.publicar_aviso(
+                version=str(request.data.get("version", "")),
+                texto=str(request.data.get("texto", "")),
+                actor=request.user,
+                request=request,
+            )
+        except DjangoValidationError as exc:
+            return _error("invalid", " ".join(exc.messages))
+        version, texto = aviso.vigente()
+        return Response({"version": version, "texto": texto}, status=status.HTTP_201_CREATED)
 
 
 class CatalogoProcesosView(APIView):
@@ -151,6 +171,10 @@ class PersonaViewSet(viewsets.ModelViewSet):
         acepta_datos = v.pop("acepta_datos")
         acepta_foto = v.pop("acepta_foto")
         try:
+            v["datos_extra"] = formularios.aplicar("persona", {}, v.pop("datos_extra", {}))
+        except DjangoValidationError as exc:
+            return _error("invalid", _validation_detail(exc))
+        try:
             persona = services.crear_persona(
                 datos=v,
                 acepta_datos=acepta_datos,
@@ -182,6 +206,13 @@ class PersonaViewSet(viewsets.ModelViewSet):
         serializer = PersonaDetailSerializer(persona, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         cambiados = sorted(serializer.validated_data.keys())
+        if "datos_extra" in serializer.validated_data:
+            try:
+                serializer.validated_data["datos_extra"] = formularios.aplicar(
+                    "persona", persona.datos_extra, serializer.validated_data["datos_extra"]
+                )
+            except DjangoValidationError as exc:
+                return _error("invalid", _validation_detail(exc))
         serializer.save()
         audit.log(
             "persona.updated", actor=request.user, target=persona, request=request, campos=cambiados

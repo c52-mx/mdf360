@@ -48,6 +48,8 @@ const grupo: GrupoDetalle = {
   puede_gestionar: true,
   puede_administrar: true,
   enlace: null,
+  datos_extra: {},
+  datos_extra_etiquetas: {},
 }
 
 const rol = (clave: string, nombre: string, de_gestion = false) => ({
@@ -70,6 +72,7 @@ function montar(datos = grupo, llamadas: { url: string; init?: RequestInit }[] =
         return json(200, datos)
       }
       if (url.includes('/roles-equipo/')) return json(200, rolesGrupo)
+      if (url.includes('/api/formularios/')) return json(200, { entidad: 'grupo', version: 0, campos: [] })
       if (url.includes('/solicitudes/')) return json(200, [])
       return json(200, datos)
     }),

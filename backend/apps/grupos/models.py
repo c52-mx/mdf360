@@ -31,6 +31,8 @@ class Grupo(models.Model):
     suspendido_en = models.DateField(null=True, blank=True)
     # Enlace (y QR) para pedir ingreso; vacío = desactivado. Regenerarlo invalida el anterior.
     enlace_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    # Campos adicionales definidos en el diseñador de formularios
+    datos_extra = models.JSONField(default=dict, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:

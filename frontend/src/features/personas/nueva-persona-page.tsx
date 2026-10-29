@@ -10,6 +10,9 @@ import {
   PageHeader,
   SelectField,
 } from '@/design-system'
+import { CamposExtra } from '@/features/formularios/campos-extra'
+import { useFormularioExtra } from '@/features/formularios/datos-adicionales-card'
+import type { Respuestas } from '@/features/formularios/types'
 import { api, ApiError } from '@/lib/api'
 import { procedenciaOptions, type Persona, type Procedencia } from './types'
 
@@ -27,6 +30,8 @@ export function NuevaPersonaPage() {
   const [procedencia, setProcedencia] = useState<Procedencia>('visitante')
   const [aceptaDatos, setAceptaDatos] = useState(false)
   const [aceptaFoto, setAceptaFoto] = useState(false)
+  const [extra, setExtra] = useState<Respuestas>({})
+  const formularioExtra = useFormularioExtra('persona')
 
   const aviso = useQuery({
     queryKey: ['aviso-privacidad'],
@@ -45,6 +50,7 @@ export function NuevaPersonaPage() {
           procedencia,
           acepta_datos: aceptaDatos,
           acepta_foto: aceptaFoto,
+          datos_extra: extra,
         },
       }),
     onSuccess: (persona) => {
@@ -91,6 +97,10 @@ export function NuevaPersonaPage() {
             onChange={(e) => setProcedencia(e.target.value as Procedencia)}
             options={procedenciaOptions}
           />
+
+          {formularioExtra.data?.campos.some((c) => c.activo) ? (
+            <CamposExtra campos={formularioExtra.data.campos} valores={extra} onChange={setExtra} />
+          ) : null}
 
           <details className="rounded-control border border-border p-3">
             <summary className="cursor-pointer font-bold">Leer el aviso de privacidad</summary>

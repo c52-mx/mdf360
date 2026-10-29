@@ -17,6 +17,7 @@ import {
   useToast,
 } from '@/design-system'
 import { opcionesDeRol, useRolesEquipo } from '@/features/equipos/use-roles-equipo'
+import { DatosAdicionalesCard } from '@/features/formularios/datos-adicionales-card'
 import { PeticionesPanel } from '@/features/peticiones/peticiones-panel'
 import { TableroPanel } from '@/features/tablero/tablero-panel'
 import { api } from '@/lib/api'
@@ -385,6 +386,14 @@ export function GrupoPage() {
         puedePublicar={g.mis_roles.some((r) => ['lider', 'supervisor', 'secretario'].includes(r)) || g.puede_administrar}
       />
 
+      <DatosAdicionalesCard
+        entidad="grupo"
+        id={g.id}
+        datos={g.datos_extra}
+        etiquetas={g.datos_extra_etiquetas}
+        puedeEditar={g.puede_administrar}
+        refrescar={['grupo', id]}
+      />
       <PeticionesPanel origenTipo="grupo" origenId={g.id} puedeRegistrar={g.puede_capturar} />
 
       <Card className="flex flex-col gap-3">

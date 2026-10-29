@@ -9,9 +9,10 @@ from PIL import Image, ImageOps
 from apps.accounts.phone import normalize_whatsapp
 from apps.core import audit
 
-from .aviso import AVISO_VERSION
+from . import aviso
 from .models import (
     NIVEL_ORDEN,
+    AvisoPrivacidad,
     Consentimiento,
     Nivel,
     Persona,
@@ -60,7 +61,7 @@ def registrar_consentimiento(persona, *, acepta_datos, acepta_foto=False, actor=
         raise ConsentimientoRequerido
     return Consentimiento.objects.create(
         persona=persona,
-        version=AVISO_VERSION,
+        version=aviso.vigente()[0],
         acepta_datos=True,
         acepta_foto=acepta_foto,
         registrado_por=actor if getattr(actor, "pk", None) else None,
@@ -340,3 +341,39 @@ def guardar_foto_propia(persona: Persona, archivo, *, acepta_foto: bool, actor, 
             raise ConsentimientoRequerido
         registrar_consentimiento(persona, acepta_datos=True, acepta_foto=True, actor=actor)
     return guardar_foto(persona, archivo, actor=actor, request=request)
+
+
+def aviso_pendiente(persona: Persona) -> bool:
+    """Hay un aviso vigente distinto al último que la persona aceptó."""
+    ultimo = persona.consentimientos.order_by("-fecha", "-pk").first()
+    return ultimo is None or ultimo.version != aviso.vigente()[0]
+
+
+def aceptar_aviso_vigente(persona: Persona, *, actor, request=None) -> Consentimiento:
+    """Registra que la persona acepta el aviso vigente; conserva su decisión sobre la foto."""
+    ultimo = persona.consentimientos.order_by("-fecha", "-pk").first()
+    consentimiento = registrar_consentimiento(
+        persona,
+        acepta_datos=True,
+        acepta_foto=bool(ultimo and ultimo.acepta_foto),
+        actor=actor,
+    )
+    audit.log(
+        "persona.aviso_aceptado", actor=actor, target=persona, request=request,
+        version=consentimiento.version,
+    )  # fmt: skip
+    return consentimiento
+
+
+@transaction.atomic
+def publicar_aviso(*, version: str, texto: str, actor, request=None):
+    version, texto = version.strip(), texto.strip()
+    if not version or len(version) > 40:
+        raise ValidationError("Escribe la versión del aviso (máximo 40 caracteres).")
+    if len(texto) < 50:
+        raise ValidationError("El texto del aviso es demasiado corto.")
+    if AvisoPrivacidad.objects.filter(version=version).exists():
+        raise ValidationError("Ya existe un aviso con esa versión; usa otra.")
+    nuevo = AvisoPrivacidad.objects.create(version=version, texto=texto, publicado_por=actor)
+    audit.log("aviso.publicado", actor=actor, request=request, version=version)
+    return nuevo

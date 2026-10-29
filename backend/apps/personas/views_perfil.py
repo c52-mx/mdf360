@@ -33,6 +33,7 @@ def perfil_dict(persona: Persona) -> dict:
         "nombre_completo": persona.nombre_completo,
         "tiene_foto": bool(persona.foto),
         "acepto_foto": services.tiene_consentimiento_de_foto(persona),
+        "aviso_pendiente": services.aviso_pendiente(persona),
     }
 
 
@@ -79,6 +80,17 @@ class MiPerfilView(APIView):
             )
         except DjangoValidationError as exc:
             return _error("invalid", " ".join(exc.messages))
+        return Response(perfil_dict(persona))
+
+
+class AceptarAvisoView(APIView):
+    """La persona acepta la versión vigente del aviso de privacidad."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        persona = _persona(request)
+        services.aceptar_aviso_vigente(persona, actor=request.user, request=request)
         return Response(perfil_dict(persona))
 
 

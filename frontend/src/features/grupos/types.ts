@@ -48,6 +48,8 @@ export interface GrupoDetalle extends GrupoResumen {
   puede_capturar: boolean
   puede_gestionar: boolean
   puede_administrar: boolean
+  datos_extra: Record<string, string | number | boolean | null>
+  datos_extra_etiquetas: Record<string, string>
   /** Ruta del enlace de ingreso (solo para quien gestiona el grupo). */
   enlace: string | null
 }
