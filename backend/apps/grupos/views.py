@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
+from apps.accounts import equipos
 from apps.accounts.permissions import requiere
 from apps.core import audit
 
@@ -71,13 +72,14 @@ def grupo_resumen(grupo: Grupo, user) -> dict:
     }
 
 
-def miembro_dict(m: GrupoMiembro) -> dict:
+def miembro_dict(m: GrupoMiembro, nombres: dict | None = None) -> dict:
+    nombres = nombres if nombres is not None else equipos.nombres("grupo")
     return {
         "id": m.pk,
         "persona_id": m.persona_id,
         "nombre": m.persona.nombre_completo,
         "rol": m.rol,
-        "rol_display": m.get_rol_display(),
+        "rol_display": nombres.get(m.rol, m.rol),
         "invitado": m.persona.procedencia == "invitado_grupo",
     }
 
@@ -245,7 +247,7 @@ class GrupoView(APIView):
         return Response(
             {
                 **grupo_resumen(grupo, request.user),
-                "miembros": [miembro_dict(m) for m in miembros],
+                "miembros": [miembro_dict(m, equipos.nombres("grupo")) for m in miembros],
                 "reuniones": reuniones,
                 "puede_capturar": access.puede_capturar(request.user, grupo),
                 "puede_gestionar": access.puede_gestionar_integrantes(request.user, grupo),
@@ -480,11 +482,8 @@ class GrupoReactivarView(APIView):
 class IntegranteSerializer(serializers.Serializer):
     whatsapp = serializers.CharField(max_length=40)
     nombre = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
-    rol = serializers.ChoiceField(choices=GrupoMiembro.Rol.choices, default="asistente")
+    rol = equipos.campo_rol("grupo", default="asistente")
     acepta_datos = serializers.BooleanField(default=False)
-
-
-ROLES_RESERVADOS = {"supervisor", "lider"}
 
 
 class IntegrantesView(APIView):
@@ -499,7 +498,7 @@ class IntegrantesView(APIView):
         data = IntegranteSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         v = data.validated_data
-        if v["rol"] in ROLES_RESERVADOS and not access.puede_administrar(request.user):
+        if equipos.es_de_gestion("grupo", v["rol"]) and not access.puede_administrar(request.user):
             return _error(
                 "role_not_allowed",
                 "Solo la administración asigna Supervisor o Líder.",
@@ -527,7 +526,7 @@ class IntegrantesView(APIView):
 
 
 class CambioRolSerializer(serializers.Serializer):
-    rol = serializers.ChoiceField(choices=GrupoMiembro.Rol.choices)
+    rol = equipos.campo_rol("grupo")
 
 
 class IntegranteView(APIView):
@@ -545,7 +544,7 @@ class IntegranteView(APIView):
         data.is_valid(raise_exception=True)
         nuevo = data.validated_data["rol"]
         if (
-            miembro.rol in ROLES_RESERVADOS or nuevo in ROLES_RESERVADOS
+            equipos.es_de_gestion("grupo", miembro.rol) or equipos.es_de_gestion("grupo", nuevo)
         ) and not access.puede_administrar(request.user):
             return _error(
                 "role_not_allowed",
@@ -574,7 +573,9 @@ class IntegranteView(APIView):
         miembro = get_object_or_404(GrupoMiembro, pk=miembro_id, grupo=grupo)
         if not access.puede_gestionar_integrantes(request.user, grupo):
             return _denegado()
-        if miembro.rol in ROLES_RESERVADOS and not access.puede_administrar(request.user):
+        if equipos.es_de_gestion("grupo", miembro.rol) and not access.puede_administrar(
+            request.user
+        ):
             return _denegado()
         miembro.activo = False
         miembro.save(update_fields=["activo"])
@@ -597,7 +598,9 @@ class IntegranteRestaurarView(APIView):
         miembro = get_object_or_404(GrupoMiembro, pk=miembro_id, grupo=grupo, activo=False)
         if not access.puede_gestionar_integrantes(request.user, grupo):
             return _denegado()
-        if miembro.rol in ROLES_RESERVADOS and not access.puede_administrar(request.user):
+        if equipos.es_de_gestion("grupo", miembro.rol) and not access.puede_administrar(
+            request.user
+        ):
             return _denegado()
         miembro.activo = True
         miembro.save(update_fields=["activo"])

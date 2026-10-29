@@ -53,17 +53,21 @@ class Grupo(models.Model):
 class GrupoMiembro(models.Model):
     """Persona dentro de un grupo, con su rol (M3-01). Los invitados son Contactos."""
 
-    class Rol(models.TextChoices):
-        SUPERVISOR = "supervisor", "Supervisor"
-        LIDER = "lider", "Líder"
-        SECRETARIO = "secretario", "Secretario"
-        ANFITRION = "anfitrion", "Anfitrión"
-        TESORERO = "tesorero", "Tesorero"
-        ASISTENTE = "asistente", "Asistente"
+    class Rol:
+        """Claves de los roles base; los roles y sus permisos se configuran en RolEquipo."""
+
+        SUPERVISOR = "supervisor"
+        LIDER = "lider"
+        RESPALDO = "respaldo"
+        SECRETARIO = "secretario"
+        ANFITRION = "anfitrion"
+        TESORERO = "tesorero"
+        SERVIDOR = "servidor"
+        ASISTENTE = "asistente"
 
     grupo = models.ForeignKey(Grupo, on_delete=models.CASCADE, related_name="miembros")
     persona = models.ForeignKey(Persona, on_delete=models.PROTECT, related_name="membresias")
-    rol = models.CharField(max_length=20, choices=Rol.choices, default=Rol.ASISTENTE)
+    rol = models.CharField(max_length=40, default=Rol.ASISTENTE)
     activo = models.BooleanField(default=True)
     # True si salió porque la persona se dio de baja o se trasladó: al reactivarla, regresa.
     retirado_por_baja = models.BooleanField(default=False)
@@ -76,7 +80,7 @@ class GrupoMiembro(models.Model):
         ordering = ["grupo", "rol", "persona__nombre"]
 
     def __str__(self):
-        return f"{self.persona} · {self.get_rol_display()} · {self.grupo}"
+        return f"{self.persona} · {self.rol} · {self.grupo}"
 
 
 class SolicitudIngreso(models.Model):

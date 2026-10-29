@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import views, views_equipos
 
 urlpatterns = [
     path("csrf/", views.CsrfView.as_view(), name="auth-csrf"),
@@ -25,6 +25,17 @@ urlpatterns = [
         name="rbac-rol-desactivar",
     ),
     path("permisos/", views.CatalogoPermisosView.as_view(), name="rbac-permisos"),
+    path("roles-equipo/", views_equipos.RolesEquipoView.as_view(), name="rbac-roles-equipo"),
+    path(
+        "roles-equipo/<slug:ambito>/<slug:clave>/",
+        views_equipos.RolEquipoView.as_view(),
+        name="rbac-rol-equipo",
+    ),
+    path(
+        "permisos-equipo/<slug:ambito>/",
+        views_equipos.CatalogoEquipoView.as_view(),
+        name="rbac-permisos-equipo",
+    ),
     path(
         "users/<int:user_id>/permisos/",
         views.PermisosDePersonaView.as_view(),

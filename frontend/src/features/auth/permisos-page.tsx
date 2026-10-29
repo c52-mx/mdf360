@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Alert,
   Badge,
@@ -290,6 +291,16 @@ export function PermisosPage() {
         Nadie está por encima del Super Usuario. Solo puedes crear o cambiar roles de un nivel más bajo
         que el tuyo y conceder lo que tú mismo puedes hacer.
       </CardDescription>
+      <Card className="flex flex-col gap-2">
+        <CardTitle>Roles de grupos y ministerios</CardTitle>
+        <CardDescription>
+          Encargado, respaldo, servidor y los demás roles que se tienen dentro de un grupo de conexión
+          o de un ministerio se configuran aparte.
+        </CardDescription>
+        <Link to="/permisos/equipos" className="presionable w-fit font-semibold text-primary">
+          Configurar roles de grupos y ministerios
+        </Link>
+      </Card>
       {error ? <Alert tone="destructive">{error.message}</Alert> : null}
       <Table aria-label="Roles del sistema">
         <TableHead>

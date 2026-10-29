@@ -285,3 +285,58 @@ def ensure_persona_for_user(user) -> Persona:
     )
     _movimiento(persona, PersonaMovimiento.Tipo.ALTA, "Alta por invitación")
     return persona
+
+
+#: Lo que cada persona edita de sí misma desde «Mi cuenta». Nada de esto toca el acceso
+#: (WhatsApp, correo, PIN) ni sus relaciones con la iglesia (grupo, sector, ministerios, roles).
+CAMPOS_DE_PERFIL = (
+    "nombre",
+    "apellido_paterno",
+    "apellido_materno",
+    "fecha_nacimiento",
+    "telefono_fijo",
+    "calle_numero",
+    "colonia",
+    "codigo_postal",
+    "alcaldia",
+    "devocional_personal",
+    "oracion_familias",
+    "oracion_familias_detalle",
+)
+
+
+@transaction.atomic
+def actualizar_perfil(persona: Persona, datos: dict, *, actor, request=None) -> Persona:
+    """Guarda los datos básicos que la propia persona puede corregir."""
+    cambios = {c: v for c, v in datos.items() if c in CAMPOS_DE_PERFIL}
+    if "nombre" in cambios and not str(cambios["nombre"]).strip():
+        raise ValidationError("Escribe tu nombre.")
+    modificados = [c for c, v in cambios.items() if getattr(persona, c) != v]
+    if not modificados:
+        return persona
+    for campo in modificados:
+        setattr(persona, campo, cambios[campo])
+    persona.save(update_fields=[*modificados, "actualizado_en"])
+    usuario = persona.usuario
+    if usuario is not None and usuario.nombre != persona.nombre_completo:
+        usuario.nombre = persona.nombre_completo
+        usuario.save(update_fields=["nombre"])
+    # La bitácora guarda qué campos cambiaron, no sus valores
+    audit.log(
+        "persona.perfil_editado", actor=actor, target=persona, request=request, campos=modificados
+    )
+    return persona
+
+
+def tiene_consentimiento_de_foto(persona: Persona) -> bool:
+    ultimo = persona.consentimientos.order_by("-fecha", "-pk").first()
+    return bool(ultimo and ultimo.acepta_foto)
+
+
+def guardar_foto_propia(persona: Persona, archivo, *, acepta_foto: bool, actor, request=None):
+    """La foto exige el consentimiento correspondiente: si falta, se registra en este momento."""
+    if not tiene_consentimiento_de_foto(persona):
+        if not acepta_foto:
+            raise ConsentimientoRequerido
+        registrar_consentimiento(persona, acepta_datos=True, acepta_foto=True, actor=actor)
+    return guardar_foto(persona, archivo, actor=actor, request=request)

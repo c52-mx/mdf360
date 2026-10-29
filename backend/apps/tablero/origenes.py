@@ -1,4 +1,4 @@
-"""Orígenes del tablero que no pertenecen a un grupo ni a una unidad.
+"""Orígenes del tablero que no pertenecen a un grupo ni a un ministerio.
 
 - «iglesia»: un solo tablero con los avisos a toda la iglesia. Lo leen todas las personas con
   acceso y lo publica quien tiene el permiso `avisos.iglesia`.

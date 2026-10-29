@@ -15,11 +15,10 @@ import {
   SelectField,
   useToast,
 } from '@/design-system'
+import { opcionesDeRol, useRolesEquipo } from '@/features/equipos/use-roles-equipo'
 import { TableroPanel } from '@/features/tablero/tablero-panel'
 import { api } from '@/lib/api'
-import { rolesUnidad, type UnidadDetalle } from './types'
-
-const RESERVADOS = ['encargado', 'respaldo']
+import type { UnidadDetalle } from './types'
 
 export function UnidadPage() {
   const { id = '' } = useParams()
@@ -32,6 +31,7 @@ export function UnidadPage() {
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState({ nombre: '', descripcion: '' })
 
+  const roles = useRolesEquipo('ministerio')
   const unidad = useQuery({
     queryKey: ['unidad', id],
     queryFn: () => api<UnidadDetalle>(`/api/unidades/${id}/`),
@@ -65,7 +65,7 @@ export function UnidadPage() {
       api(`/api/unidades/${id}/integrantes/${miembroId}/`, { method: 'DELETE' }),
     onSuccess: (_, { miembroId, nombre: quien }) => {
       refrescar()
-      toast.mostrar(`${quien} salió de la unidad.`, {
+      toast.mostrar(`${quien} salió del ministerio.`, {
         etiqueta: 'Deshacer',
         onClick: () => restaurarIntegrante(miembroId),
       })
@@ -80,7 +80,7 @@ export function UnidadPage() {
     mutationFn: () => api(`/api/unidades/${id}/`, { method: 'PATCH', body: form }),
     onSuccess: () => {
       setEditando(false)
-      toast.mostrar('Los datos de la unidad se guardaron.')
+      toast.mostrar('Los datos del ministerio se guardaron.')
       refrescar()
     },
   })
@@ -88,7 +88,8 @@ export function UnidadPage() {
   if (unidad.isPending) return <p className="text-muted-foreground">Cargando…</p>
   if (unidad.isError) return <Alert tone="destructive">{unidad.error.message}</Alert>
   const u = unidad.data
-  const opciones = rolesUnidad.filter((r) => u.puede_administrar || !RESERVADOS.includes(r.value))
+  const opciones = opcionesDeRol(roles.data, u.puede_administrar)
+  const deGestion = (clave: string) => roles.data?.find((r) => r.clave === clave)?.de_gestion ?? false
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -97,9 +98,9 @@ export function UnidadPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to="/unidades" className="presionable flex w-fit items-center gap-2 font-semibold text-primary">
+      <Link to="/ministerios" className="presionable flex w-fit items-center gap-2 font-semibold text-primary">
         <ArrowLeft aria-hidden className="size-5" />
-        Volver a unidades
+        Volver a ministerios
       </Link>
       <PageHeader title={u.nombre} description={u.descripcion || undefined} module="grupos" />
 
@@ -112,7 +113,7 @@ export function UnidadPage() {
                 <span className="font-bold">{m.nombre}</span>{' '}
                 <Badge tone={m.rol === 'servidor' ? 'neutral' : 'primary'}>{m.rol_display}</Badge>
               </span>
-              {u.puede_gestionar && (u.puede_administrar || !RESERVADOS.includes(m.rol)) ? (
+              {u.puede_gestionar && (u.puede_administrar || !deGestion(m.rol)) ? (
                 <span className="flex flex-wrap items-center gap-2">
                   <select
                     aria-label={`Rol de ${m.nombre}`}
@@ -158,7 +159,7 @@ export function UnidadPage() {
               required
             />
             <Field label="Nombre (si es nueva)" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-            <SelectField label="Rol en la unidad" value={rol} onChange={(e) => setRol(e.target.value)} options={opciones} />
+            <SelectField label="Rol en el ministerio" value={rol} onChange={(e) => setRol(e.target.value)} options={opciones} />
             <CheckboxField
               checked={acepta}
               onChange={(e) => setAcepta(e.target.checked)}
@@ -175,7 +176,7 @@ export function UnidadPage() {
       {u.puede_administrar ? (
         <Card className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>Datos de la unidad</CardTitle>
+            <CardTitle>Datos del ministerio</CardTitle>
             {!editando ? (
               <Button
                 variant="outline"

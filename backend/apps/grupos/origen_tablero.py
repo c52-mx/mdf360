@@ -1,16 +1,15 @@
 """Los Grupos de Conexión como origen del tablero de mensajes.
 
-Publican el Líder, el Supervisor, el Secretario y el Pastor (administración). Leen todos los
-integrantes activos del grupo y quienes ven todos los grupos (Pastor y Anciano).
+Publican los roles que tengan ese permiso (Líder, Supervisor, Secretario…) y la
+administración. Leen todos los integrantes activos del grupo y quienes ven todos los grupos
+(Pastor y Anciano).
 """
 
 from apps.accounts.permissions import tiene_permiso
 from apps.tablero import registry
 
-from .access import roles_en
+from .access import permisos_en, roles_en
 from .models import Grupo, GrupoMiembro
-
-R = GrupoMiembro.Rol
 
 
 def _grupo(grupo_id: int):
@@ -28,7 +27,7 @@ def _puede_publicar(user, grupo_id: int) -> bool:
         return False
     if tiene_permiso(user, "grupos.gestionar"):
         return True
-    return bool(roles_en(user, grupo) & {R.LIDER, R.SUPERVISOR, R.SECRETARIO})
+    return "avisos" in permisos_en(user, grupo)
 
 
 def _puede_leer(user, grupo_id: int) -> bool:

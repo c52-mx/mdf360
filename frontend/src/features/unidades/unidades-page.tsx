@@ -16,7 +16,7 @@ import { useCan } from '@/features/auth/use-auth'
 import { api } from '@/lib/api'
 import type { UnidadResumen } from './types'
 
-/** Las unidades (áreas de servicio) donde la persona participa o, si administra, todas. */
+/** Los ministerios (áreas de servicio) donde la persona participa o, si administra, todas. */
 export function UnidadesPage() {
   const queryClient = useQueryClient()
   const puedeCrear = useCan('unidades.gestionar')
@@ -46,14 +46,14 @@ export function UnidadesPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Unidades"
+        title="Ministerios"
         description="Áreas de servicio de la iglesia: cafetería, librería, niños, danza y más."
         module="grupos"
         actions={
           puedeCrear ? (
             <Button onClick={() => setCreando((v) => !v)}>
               <Plus aria-hidden className="size-5" />
-              Nueva unidad
+              Nuevo ministerio
             </Button>
           ) : null
         }
@@ -62,7 +62,7 @@ export function UnidadesPage() {
       {creando ? (
         <Card>
           <form onSubmit={onSubmit} className="grid max-w-xl grid-cols-1 gap-4">
-            <CardTitle>Nueva unidad</CardTitle>
+            <CardTitle>Nuevo ministerio</CardTitle>
             <Field label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
             <Field
               label="Descripción (opcional)"
@@ -71,7 +71,7 @@ export function UnidadesPage() {
             />
             {crear.error ? <Alert tone="destructive">{crear.error.message}</Alert> : null}
             <Button type="submit" disabled={crear.isPending || !nombre.trim()}>
-              Guardar unidad
+              Guardar ministerio
             </Button>
           </form>
         </Card>
@@ -79,12 +79,12 @@ export function UnidadesPage() {
 
       {unidades.isError ? <Alert tone="destructive">{unidades.error.message}</Alert> : null}
       {unidades.data && unidades.data.length === 0 ? (
-        <Alert>Todavía no participas en ninguna unidad.</Alert>
+        <Alert>Todavía no participas en ningún ministerio.</Alert>
       ) : null}
       <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {unidades.data?.map((u) => (
           <li key={u.id}>
-            <CardLink to={`/unidades/${u.id}`} className="flex h-full flex-col gap-1">
+            <CardLink to={`/ministerios/${u.id}`} className="flex h-full flex-col gap-1">
               <CardTitle>{u.nombre}</CardTitle>
               {u.descripcion ? <CardDescription>{u.descripcion}</CardDescription> : null}
               <CardDescription>

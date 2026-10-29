@@ -173,6 +173,34 @@ class Rol(models.Model):
         return self.nombre
 
 
+class RolEquipo(models.Model):
+    """Rol dentro de un grupo de conexión o de un ministerio (encargado, respaldo, servidor…).
+
+    Es independiente de los roles del sistema: una persona puede ser encargada de un ministerio y
+    solo asistente de un grupo. Lo que permite cada rol se configura desde la pantalla de roles.
+    """
+
+    ambito = models.CharField(max_length=12)  # «grupo» o «ministerio»
+    clave = models.SlugField(max_length=40)
+    nombre = models.CharField(max_length=80)
+    descripcion = models.CharField(max_length=300, blank=True)
+    permisos = models.JSONField(default=list)
+    activo = models.BooleanField(default=True)
+    es_base = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["ambito", "nombre"]
+        verbose_name = "rol de equipo"
+        verbose_name_plural = "roles de equipo"
+        constraints = [models.UniqueConstraint(fields=["ambito", "clave"], name="rol_equipo_unico")]
+
+    def __str__(self):
+        return f"{self.get_ambito_label()} · {self.nombre}"
+
+    def get_ambito_label(self) -> str:
+        return {"grupo": "Grupo de Conexión", "ministerio": "Ministerio"}.get(self.ambito, "")
+
+
 class AsignacionRol(models.Model):
     usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name="asignaciones")
     rol = models.ForeignKey(Rol, on_delete=models.PROTECT, related_name="asignaciones")

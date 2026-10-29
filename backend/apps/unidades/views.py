@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts import equipos
 from apps.core import audit
 
 from . import access, services
@@ -36,13 +37,14 @@ def unidad_resumen(unidad: Unidad, user) -> dict:
     }
 
 
-def miembro_dict(m: UnidadMiembro) -> dict:
+def miembro_dict(m: UnidadMiembro, nombres: dict | None = None) -> dict:
+    nombres = nombres if nombres is not None else equipos.nombres("ministerio")
     return {
         "id": m.pk,
         "persona_id": m.persona_id,
         "nombre": m.persona.nombre_completo,
         "rol": m.rol,
-        "rol_display": m.get_rol_display(),
+        "rol_display": nombres.get(m.rol, m.rol),
     }
 
 
@@ -67,7 +69,7 @@ class UnidadesView(APIView):
         data = UnidadEscritura(data=request.data)
         data.is_valid(raise_exception=True)
         if Unidad.objects.filter(nombre__iexact=data.validated_data["nombre"].strip()).exists():
-            return _error("duplicate", "Ya existe una unidad con ese nombre.")
+            return _error("duplicate", "Ya existe un ministerio con ese nombre.")
         unidad = Unidad.objects.create(**data.validated_data)
         audit.log("unidad.creada", actor=request.user, target=unidad, request=request)
         return Response(unidad_resumen(unidad, request.user), status=status.HTTP_201_CREATED)
@@ -88,7 +90,7 @@ class UnidadView(APIView):
         return Response(
             {
                 **unidad_resumen(unidad, request.user),
-                "miembros": [miembro_dict(m) for m in miembros],
+                "miembros": [miembro_dict(m, equipos.nombres("ministerio")) for m in miembros],
                 "puede_gestionar": access.puede_gestionar_integrantes(request.user, unidad),
                 "puede_administrar": access.puede_administrar(request.user),
             }
@@ -102,7 +104,7 @@ class UnidadView(APIView):
         data.is_valid(raise_exception=True)
         nombre = data.validated_data.get("nombre", "").strip()
         if nombre and Unidad.objects.filter(nombre__iexact=nombre).exclude(pk=unidad.pk).exists():
-            return _error("duplicate", "Ya existe una unidad con ese nombre.")
+            return _error("duplicate", "Ya existe un ministerio con ese nombre.")
         for campo, valor in data.validated_data.items():
             setattr(unidad, campo, valor)
         unidad.save()
@@ -116,17 +118,20 @@ class UnidadView(APIView):
 class IntegranteEscritura(serializers.Serializer):
     whatsapp = serializers.CharField(max_length=40)
     nombre = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
-    rol = serializers.ChoiceField(choices=UnidadMiembro.Rol.choices, default="servidor")
+    rol = equipos.campo_rol("ministerio", default="servidor")
     acepta_datos = serializers.BooleanField(default=False)
 
 
 class CambioRol(serializers.Serializer):
-    rol = serializers.ChoiceField(choices=UnidadMiembro.Rol.choices)
+    rol = equipos.campo_rol("ministerio")
 
 
 def _reservado_sin_permiso(user, *roles) -> bool:
-    """Encargado y respaldo los asigna solo la administración de unidades."""
-    return any(r in services.RESERVADOS for r in roles) and not access.puede_administrar(user)
+    """Los roles que administran a la gente (encargado, respaldo…) los asigna solo la
+    administración de ministerios."""
+    return any(equipos.es_de_gestion("ministerio", r) for r in roles) and not (
+        access.puede_administrar(user)
+    )
 
 
 class IntegrantesView(APIView):

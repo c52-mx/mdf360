@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '@/design-system'
 import { PermisosPage, type Catalogo, type RolCompleto } from './permisos-page'
@@ -62,7 +63,9 @@ function montar(llamadas: { url: string; init?: RequestInit }[] = []) {
   render(
     <QueryClientProvider client={new QueryClient()}>
       <ToastProvider>
-        <PermisosPage />
+        <MemoryRouter>
+          <PermisosPage />
+        </MemoryRouter>
       </ToastProvider>
     </QueryClientProvider>,
   )

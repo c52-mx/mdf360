@@ -12,7 +12,7 @@ const json = (status: number, body: unknown) =>
 const destinos = [
   { tipo: 'iglesia', tipo_display: 'Toda la iglesia', id: 1, etiqueta: 'Toda la iglesia' },
   { tipo: 'grupo', tipo_display: 'Grupo de Conexión', id: 4, etiqueta: 'Grupo de Conexión · Norte' },
-  { tipo: 'unidad', tipo_display: 'Unidad', id: 2, etiqueta: 'Unidad · Cafetería' },
+  { tipo: 'unidad', tipo_display: 'Ministerio', id: 2, etiqueta: 'Ministerio · Cafetería' },
 ]
 
 function montar(lista = destinos, llamadas: { url: string; init?: RequestInit }[] = []) {
@@ -49,11 +49,11 @@ describe('EnviarAvisoCard', () => {
     expect(screen.queryByRole('button', { name: 'Enviar un aviso' })).toBeNull()
   })
 
-  it('envía un mismo aviso a la iglesia, un grupo, una unidad y una persona', async () => {
+  it('envía un mismo aviso a la iglesia, un grupo, un ministerio y una persona', async () => {
     const llamadas = montar()
     fireEvent.click(await screen.findByRole('button', { name: 'Enviar un aviso' }))
     fireEvent.change(screen.getByLabelText('Mensaje'), { target: { value: 'Domingo de ayuno' } })
-    for (const nombre of ['Toda la iglesia', 'Grupo de Conexión · Norte', 'Unidad · Cafetería']) {
+    for (const nombre of ['Toda la iglesia', 'Grupo de Conexión · Norte', 'Ministerio · Cafetería']) {
       fireEvent.click(screen.getByRole('checkbox', { name: nombre }))
     }
     fireEvent.change(screen.getByLabelText('Buscar persona'), { target: { value: 'ana' } })

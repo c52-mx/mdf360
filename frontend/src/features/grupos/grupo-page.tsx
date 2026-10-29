@@ -16,15 +16,14 @@ import {
   TextareaField,
   useToast,
 } from '@/design-system'
+import { opcionesDeRol, useRolesEquipo } from '@/features/equipos/use-roles-equipo'
 import { PeticionesPanel } from '@/features/peticiones/peticiones-panel'
 import { TableroPanel } from '@/features/tablero/tablero-panel'
 import { api } from '@/lib/api'
 import { esErrorDeRed } from '@/lib/outbox'
 import { IngresoCard } from './ingreso-card'
 import { dinero } from './ofrendas'
-import { dias, fechaLarga, rolesGrupo, SECTORES, type GrupoDetalle } from './types'
-
-const RESERVADOS = ['lider', 'supervisor']
+import { dias, fechaLarga, SECTORES, type GrupoDetalle } from './types'
 
 export function GrupoPage() {
   const { id = '' } = useParams()
@@ -39,6 +38,7 @@ export function GrupoPage() {
   const [form, setForm] = useState({ nombre: '', sector: '', casa: '', dia: '', hora: '', colonia: '' })
   const [motivo, setMotivo] = useState('')
 
+  const roles = useRolesEquipo('grupo')
   const grupo = useQuery({
     queryKey: ['grupo', id],
     queryFn: () => api<GrupoDetalle>(`/api/grupos/${id}/`),
@@ -133,6 +133,7 @@ export function GrupoPage() {
   if (grupo.isPending) return <p className="text-muted-foreground">Cargando…</p>
   if (grupo.isError) return <Alert tone="destructive">{grupo.error.message}</Alert>
   const g = grupo.data
+  const deGestion = (clave: string) => roles.data?.find((r) => r.clave === clave)?.de_gestion ?? false
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -179,7 +180,7 @@ export function GrupoPage() {
                 <Badge tone={m.rol === 'asistente' ? 'neutral' : 'primary'}>{m.rol_display}</Badge>{' '}
                 {m.invitado ? <Badge tone="warning">Invitado</Badge> : null}
               </span>
-              {g.puede_gestionar && (g.puede_administrar || !RESERVADOS.includes(m.rol)) ? (
+              {g.puede_gestionar && (g.puede_administrar || !deGestion(m.rol)) ? (
                 <span className="flex flex-wrap items-center gap-2">
                   <select
                     aria-label={`Rol de ${m.nombre}`}
@@ -188,8 +189,7 @@ export function GrupoPage() {
                     onChange={(e) => cambiarRol.mutate({ miembroId: m.id, nuevo: e.target.value })}
                     className="h-10 rounded-control border-2 border-border bg-card px-2"
                   >
-                    {rolesGrupo
-                      .filter((r) => g.puede_administrar || !RESERVADOS.includes(r.value))
+                    {opcionesDeRol(roles.data, g.puede_administrar)
                       .map((r) => (
                         <option key={r.value} value={r.value}>
                           {r.label}
@@ -360,7 +360,7 @@ export function GrupoPage() {
               label="Rol en el grupo"
               value={rol}
               onChange={(e) => setRol(e.target.value)}
-              options={rolesGrupo.filter((r) => g.puede_administrar || !RESERVADOS.includes(r.value))}
+              options={opcionesDeRol(roles.data, g.puede_administrar)}
             />
             <CheckboxField
               checked={acepta}

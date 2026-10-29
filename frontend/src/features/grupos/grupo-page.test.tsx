@@ -50,6 +50,16 @@ const grupo: GrupoDetalle = {
   enlace: null,
 }
 
+const rol = (clave: string, nombre: string, de_gestion = false) => ({
+  ambito: 'grupo', clave, nombre, descripcion: '', permisos: [], activo: true, es_base: true, en_uso: 0, de_gestion,
+})
+const rolesGrupo = [
+  rol('asistente', 'Asistente'),
+  rol('anfitrion', 'Anfitrión'),
+  rol('lider', 'Líder', true),
+  rol('supervisor', 'Supervisor', true),
+]
+
 function montar(datos = grupo, llamadas: { url: string; init?: RequestInit }[] = []) {
   vi.stubGlobal(
     'fetch',
@@ -59,6 +69,7 @@ function montar(datos = grupo, llamadas: { url: string; init?: RequestInit }[] =
         llamadas.push({ url, init })
         return json(200, datos)
       }
+      if (url.includes('/roles-equipo/')) return json(200, rolesGrupo)
       if (url.includes('/solicitudes/')) return json(200, [])
       return json(200, datos)
     }),
