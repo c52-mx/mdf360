@@ -74,8 +74,13 @@ export function MisVehiculosCard() {
     <Card className="flex flex-col gap-4">
       <CardTitle>Mis vehículos</CardTitle>
       <CardDescription>
-        Registra los vehículos con los que llegas a la iglesia. Solo tú los puedes cambiar o quitar.
+        Puedes registrar uno o varios: auto, camioneta, motocicleta, bicicleta u otro. Solo tú los puedes
+        cambiar o quitar.
       </CardDescription>
+      <Alert tone="info">
+        Estos datos se usan únicamente para ubicarte con rapidez ante cualquier asunto relacionado con tu
+        vehículo (por ejemplo, si estorba o hay que avisarte). No se usan para ningún otro fin.
+      </Alert>
       {lista.data && lista.data.length === 0 ? <CardDescription>Aún no registras ninguno.</CardDescription> : null}
       <ul className="flex flex-col gap-2">
         {lista.data?.map((v) => (

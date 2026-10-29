@@ -14,7 +14,7 @@ import {
   Users,
   UsersRound,
 } from 'lucide-react'
-import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom'
 import { AppShell, type NavItem } from '@/design-system'
 import { AuditoriaPage } from '@/features/auditoria/auditoria-page'
 import { ConfigPage } from '@/features/config/config-page'
@@ -49,6 +49,7 @@ import { PersonasPage } from '@/features/personas/personas-page'
 
 function PrivateLayout() {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const can = (permiso: string) => !!user?.permisos.includes(permiso)
   const operacion = 'Operación'
   const catalogos = 'Catálogos'
@@ -85,7 +86,7 @@ function PrivateLayout() {
     { to: '/cuenta', label: 'Mi cuenta', icon: UserCog },
   ]
   return (
-    <AppShell nav={nav} userName={user?.nombre} onLogout={() => void logout()}>
+    <AppShell nav={nav} userName={user?.nombre} onLogout={() => void logout().then(() => navigate('/login', { replace: true }))}>
       <SyncBanner />
       <Outlet />
     </AppShell>

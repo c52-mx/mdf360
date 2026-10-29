@@ -38,14 +38,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setUser = (user: User | null) => queryClient.setQueryData(['me'], user)
   const logout = async () => {
     await quitarDispositivo() // antes de cerrar sesión: aún tiene permiso para darlo de baja
-    await api('/api/auth/logout/', { method: 'POST' })
-    queryClient.clear()
+    try {
+      await api('/api/auth/logout/', { method: 'POST' })
+    } catch {
+      // la sesión ya no existía en el servidor: de todos modos se limpia este dispositivo
+    }
+    // Primero sin usuario, para que la pantalla salga hacia el login antes de borrar los datos;
+    // si se borraban antes, las consultas abiertas fallaban con 403 en la misma pantalla.
+    setUser(null)
+    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
     try {
       await caches.delete('mdf-api') // datos de grupos guardados para uso sin conexión
     } catch {
       // sin Cache Storage (navegador antiguo o contexto no seguro): no hay nada que borrar
     }
-    setUser(null)
   }
 
   return (
