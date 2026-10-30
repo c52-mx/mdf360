@@ -25,10 +25,12 @@ interface Props {
   /** Ruta del enlace actual (ej. /unirse/abc) o null si no hay. */
   enlace: string | null
   suspendido: boolean
+  /** Dentro de otra tarjeta (p. ej. «Sumar gente»): sin marco propio. */
+  embebida?: boolean
 }
 
 /** Enlace y QR para que alguien pida entrar al grupo; el líder aprueba como en una sala de espera. */
-export function IngresoCard({ grupoId, enlace, suspendido }: Props) {
+export function IngresoCard({ grupoId, enlace, suspendido, embebida = false }: Props) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const [aprobada, setAprobada] = useState<Pendiente | null>(null)
@@ -78,8 +80,9 @@ export function IngresoCard({ grupoId, enlace, suspendido }: Props) {
   }
   const error = generar.error ?? desactivar.error ?? resolver.error ?? solicitudes.error
 
+  const Marco = embebida ? 'div' : Card
   return (
-    <Card className="flex flex-col gap-4">
+    <Marco className={embebida ? 'flex flex-col gap-4 border-t border-border pt-4' : 'flex flex-col gap-4'}>
       <div className="flex flex-col gap-1">
         <CardTitle>Invitar por enlace o QR</CardTitle>
         <CardDescription>
@@ -174,6 +177,6 @@ export function IngresoCard({ grupoId, enlace, suspendido }: Props) {
           ))}
         </ul>
       </div>
-    </Card>
+    </Marco>
   )
 }

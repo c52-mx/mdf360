@@ -2,7 +2,7 @@
 
 from apps.core.models import AuditEvent
 
-from .models import Asistencia, GrupoMiembro, Reunion
+from .models import Asistencia, Grupo, GrupoMiembro, Reunion
 from .test_grupos import api_de, cuenta, mundo  # noqa: F401  (fixture)
 
 
@@ -123,3 +123,23 @@ def test_cada_reunion_trae_lo_que_ocurrio_ese_dia(mundo):
     # el anciano consulta el grupo pero no ve finanzas
     sup = api_de(mundo["anciano"]).get(f"/api/grupos/{norte.pk}/").json()["reuniones"][0]
     assert sup["ofrendas"] is None
+
+
+def test_la_migracion_pone_el_dia_de_la_ultima_reunion(db):
+    from datetime import date
+    from importlib import import_module
+
+    from django.apps import apps
+
+    sin_dia = Grupo.objects.create(nombre="Sin día", dia_semana=None)
+    Reunion.objects.create(grupo=sin_dia, fecha=date(2026, 10, 1))  # jueves
+    Reunion.objects.create(grupo=sin_dia, fecha=date(2026, 10, 8))  # jueves, la última
+    nunca = Grupo.objects.create(nombre="Nunca se reunió", dia_semana=None)
+    con_dia = Grupo.objects.create(nombre="Con día", dia_semana=2)
+    Reunion.objects.create(grupo=con_dia, fecha=date(2026, 10, 9))  # viernes: no se cambia
+    import_module("apps.grupos.migrations.0010_dia_fijo_de_reunion").poner_dia(apps, None)
+    for g in (sin_dia, nunca, con_dia):
+        g.refresh_from_db()
+    assert sin_dia.dia_semana == 3
+    assert nunca.dia_semana is None
+    assert con_dia.dia_semana == 2

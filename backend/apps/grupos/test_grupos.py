@@ -77,9 +77,26 @@ def test_solo_la_administracion_crea_grupos(mundo):
     r = api_de(mundo["pastor"]).post("/api/grupos/", datos, format="json")
     assert r.status_code == 201 and r.json()["dia"] == "Sábado"
     lideres = api_de(mundo["pastor"]).post(
-        "/api/grupos/", {"nombre": "Líderes", "tipo": "lideres"}, format="json"
+        "/api/grupos/",
+        {"nombre": "Líderes", "tipo": "lideres", "dia_semana": 1, "hora": "07:00"},
+        format="json",
     )
     assert lideres.json()["tipo"] == "lideres"
+
+
+def test_la_reunion_es_un_dia_fijo_y_una_hora(mundo):
+    pastor = api_de(mundo["pastor"])
+    sin_dia = pastor.post("/api/grupos/", {"nombre": "Sin día", "hora": "19:00"}, format="json")
+    assert sin_dia.status_code == 400
+    sin_hora = pastor.post("/api/grupos/", {"nombre": "Sin hora", "dia_semana": 2}, format="json")
+    assert sin_hora.status_code == 400
+    url = f"/api/grupos/{mundo['norte'].pk}/"
+    # editar otros datos no exige repetirlos, pero tampoco se pueden borrar
+    assert pastor.patch(url, {"colonia": "Centro"}, format="json").status_code == 200
+    assert pastor.patch(url, {"dia_semana": None}, format="json").status_code == 400
+    assert pastor.patch(url, {"hora": None}, format="json").status_code == 400
+    ok = pastor.patch(url, {"dia_semana": 4, "hora": "20:15"}, format="json")
+    assert ok.status_code == 200 and ok.json()["dia"] == "Viernes" and ok.json()["hora"] == "20:15"
 
 
 # ---------- integrantes ----------

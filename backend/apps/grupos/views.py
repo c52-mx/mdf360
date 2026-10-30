@@ -115,9 +115,19 @@ class GrupoEscritura(serializers.Serializer):
 
     datos_extra = serializers.DictField(required=False)
     colonia = serializers.CharField(max_length=100, required=False, allow_blank=True)
-    dia_semana = serializers.IntegerField(min_value=0, max_value=6, required=False, allow_null=True)
-    hora = serializers.TimeField(required=False, allow_null=True)
+    # La reunión es un evento fijo y recurrente: un solo día de la semana y una hora
+    dia_semana = serializers.IntegerField(min_value=0, max_value=6, required=False)
+    hora = serializers.TimeField(required=False)
     activo = serializers.BooleanField(required=False)
+
+    def validate(self, attrs):
+        if not self.partial:
+            faltan = [c for c in ("dia_semana", "hora") if c not in attrs]
+            if faltan:
+                raise serializers.ValidationError(
+                    {c: "La reunión necesita un día de la semana y una hora." for c in faltan}
+                )
+        return attrs
 
 
 def _reuniones_del_grupo(user, grupo: Grupo) -> list[dict]:

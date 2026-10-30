@@ -187,7 +187,9 @@ def test_el_alta_de_una_persona_pide_los_campos_obligatorios(mundo):
 def test_campos_adicionales_en_grupos(mundo):
     guardar(mundo["pastor"], "grupo", [campo("cupo", "Cupo", "numero", reportable=True)])
     r = api_de(mundo["pastor"]).post(
-        "/api/grupos/", {"nombre": "Sur", "datos_extra": {"cupo": 12}}, format="json"
+        "/api/grupos/",
+        {"nombre": "Sur", "dia_semana": 1, "hora": "19:00", "datos_extra": {"cupo": 12}},
+        format="json",
     )
     assert r.status_code == 201
     detalle = api_de(mundo["pastor"]).get(f"/api/grupos/{r.json()['id']}/").json()

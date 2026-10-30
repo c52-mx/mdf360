@@ -21,6 +21,8 @@ class Grupo(models.Model):
     sector = models.CharField("sector (letra)", max_length=1, blank=True)
     casa = models.PositiveSmallIntegerField("número de casa", null=True, blank=True)
     colonia = models.CharField("zona o colonia", max_length=100, blank=True)
+    # Un solo día fijo a la semana. Sigue admitiendo nulos solo por los grupos viejos que nunca
+    # lo capturaron; la API ya lo exige al crear y no permite borrarlo.
     dia_semana = models.PositiveSmallIntegerField(
         "día de la semana", null=True, blank=True, help_text="0 = lunes … 6 = domingo"
     )

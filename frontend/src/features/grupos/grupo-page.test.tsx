@@ -95,13 +95,33 @@ function montar(datos = grupo, llamadas: { url: string; init?: RequestInit }[] =
 afterEach(() => vi.unstubAllGlobals())
 
 describe('GrupoPage', () => {
-  it('muestra sector y casa y, por cada reunión, lo que ocurrió ese día', async () => {
+  it('muestra sector y casa y, al abrir el historial, lo que ocurrió en cada reunión', async () => {
     montar()
     expect((await screen.findAllByText(/Sector K, Casa 6/)).length).toBeGreaterThan(0)
-    expect(screen.getByText('Se oró por la familia Pérez', { exact: false })).toBeInTheDocument()
+    // El historial arranca cerrado: nada de reuniones hasta consultarlo
+    expect(screen.queryByText('5 de 8 presentes')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Historial de reuniones/ }))
+    expect(screen.getByText('Observaciones: Se oró por la familia Pérez')).toBeInTheDocument()
     expect(screen.getByText('2 peticiones')).toBeInTheDocument()
     expect(screen.getByText(/Ofrendas: \$350\.00/)).toBeInTheDocument()
     expect(screen.getByText('5 de 8 presentes')).toBeInTheDocument()
+  })
+
+  it('pone primero el tablero y al final la zona de riesgo', async () => {
+    montar()
+    await screen.findByRole('heading', { name: 'Integrantes' })
+    const zona = screen.getByRole('region', { name: 'Zona de riesgo' })
+    const integrantes = screen.getByRole('heading', { name: 'Integrantes' })
+    expect(integrantes.compareDocumentPosition(zona) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Sumar gente' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Invitar por enlace o QR' })).toBeInTheDocument()
+  })
+
+  it('la reunión pide día y hora: no se guarda sin ellos', async () => {
+    montar({ ...grupo, dia_semana: null, dia: '', hora: '' })
+    expect(await screen.findByText(/Falta el día o la hora de la reunión/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Editar datos' }))
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled()
   })
 
   it('cambia el rol de un integrante', async () => {
@@ -114,10 +134,12 @@ describe('GrupoPage', () => {
 
   it('suspende el grupo con su motivo después de confirmar', async () => {
     const llamadas = montar()
-    fireEvent.change(await screen.findByLabelText('Suspender el grupo'), {
+    const boton = await screen.findByRole('button', { name: 'Suspender grupo' })
+    expect(boton).toBeDisabled() // sin motivo no se puede
+    fireEvent.change(screen.getByLabelText('Motivo de la suspensión'), {
       target: { value: 'El anfitrión se mudó' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Suspender grupo' }))
+    fireEvent.click(boton)
     fireEvent.click(screen.getByRole('button', { name: 'Sí, suspender' }))
     await waitFor(() => expect(llamadas.map((l) => l.url)).toContain('/api/grupos/4/suspender/'))
     expect(JSON.parse(String(llamadas[0].init?.body))).toEqual({ motivo: 'El anfitrión se mudó' })

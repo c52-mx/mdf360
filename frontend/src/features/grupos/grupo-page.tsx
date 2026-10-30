@@ -9,12 +9,18 @@ import {
   CardDescription,
   CardTitle,
   CheckboxField,
+  Collapsible,
   ConfirmButton,
+  DangerAction,
+  DangerZone,
+  DataTable,
   Field,
+  Modal,
   PageHeader,
   SelectField,
   TextareaField,
   useToast,
+  type DataColumn,
 } from '@/design-system'
 import { opcionesDeRol, useRolesEquipo } from '@/features/equipos/use-roles-equipo'
 import { DatosAdicionalesCard } from '@/features/formularios/datos-adicionales-card'
@@ -26,6 +32,9 @@ import { IngresoCard } from './ingreso-card'
 import { dinero } from './ofrendas'
 import { dias, fechaLarga, SECTORES, type GrupoDetalle } from './types'
 
+type Integrante = GrupoDetalle['miembros'][number]
+type Reunion = GrupoDetalle['reuniones'][number]
+
 export function GrupoPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
@@ -36,6 +45,7 @@ export function GrupoPage() {
   const [rol, setRol] = useState('asistente')
   const [acepta, setAcepta] = useState(false)
   const [editando, setEditando] = useState(false)
+  const [agregando, setAgregando] = useState(false)
   const [form, setForm] = useState({ nombre: '', sector: '', casa: '', dia: '', hora: '', colonia: '' })
   const [motivo, setMotivo] = useState('')
 
@@ -56,6 +66,8 @@ export function GrupoPage() {
       setWhatsapp('')
       setNombre('')
       setAcepta(false)
+      setAgregando(false)
+      toast.mostrar('La persona se agregó al grupo.')
       void refrescar()
     },
   })
@@ -141,6 +153,106 @@ export function GrupoPage() {
     agregar.mutate()
   }
 
+  const puedeCambiar = (m: Integrante) =>
+    g.puede_gestionar && (g.puede_administrar || !deGestion(m.rol))
+  const columnasIntegrantes: DataColumn<Integrante>[] = [
+    {
+      clave: 'nombre',
+      titulo: 'Nombre',
+      orden: (m) => m.nombre,
+      celda: (m) => (
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="font-bold">{m.nombre}</span>
+          {m.invitado ? <Badge tone="warning">Invitado</Badge> : null}
+        </span>
+      ),
+    },
+    {
+      clave: 'rol',
+      titulo: 'Rol',
+      orden: (m) => m.rol_display,
+      celda: (m) =>
+        puedeCambiar(m) ? (
+          <select
+            aria-label={`Rol de ${m.nombre}`}
+            value={m.rol}
+            disabled={cambiarRol.isPending}
+            onChange={(e) => cambiarRol.mutate({ miembroId: m.id, nuevo: e.target.value })}
+            className="h-10 rounded-control border-2 border-border bg-card px-2"
+          >
+            {opcionesDeRol(roles.data, g.puede_administrar).map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <Badge tone={m.rol === 'asistente' ? 'neutral' : 'primary'}>{m.rol_display}</Badge>
+        ),
+    },
+    ...(g.puede_gestionar
+      ? [
+          {
+            clave: 'acciones',
+            titulo: 'Acciones',
+            celda: (m: Integrante) =>
+              puedeCambiar(m) ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => quitar.mutate({ miembroId: m.id, nombre: m.nombre })}
+                >
+                  Quitar
+                </Button>
+              ) : null,
+          },
+        ]
+      : []),
+  ]
+  const columnasReuniones: DataColumn<Reunion>[] = [
+    {
+      clave: 'fecha',
+      titulo: 'Fecha',
+      orden: (r) => r.fecha,
+      celda: (r) => (
+        <Link className="font-bold capitalize underline" to={`/grupos/reuniones/${r.id}`}>
+          {fechaLarga(r.fecha)}
+        </Link>
+      ),
+    },
+    {
+      clave: 'asistencia',
+      titulo: 'Asistencia',
+      numerica: true,
+      orden: (r) => r.presentes ?? null,
+      celda: (r) => (r.registrados !== undefined ? `${r.presentes} de ${r.registrados} presentes` : '–'),
+    },
+    {
+      clave: 'peticiones',
+      titulo: 'Peticiones',
+      numerica: true,
+      orden: (r) => r.peticiones ?? 0,
+      celda: (r) => (r.peticiones ? (r.peticiones === 1 ? '1 petición' : `${r.peticiones} peticiones`) : '–'),
+    },
+    ...(g.reuniones.some((r) => r.ofrendas)
+      ? [
+          {
+            clave: 'ofrendas',
+            titulo: 'Ofrendas',
+            numerica: true,
+            orden: (r: Reunion) => (r.ofrendas ? Number(r.ofrendas.total) : null),
+            celda: (r: Reunion) =>
+              r.ofrendas && r.ofrendas.cantidad > 0 ? `Ofrendas: ${dinero(r.ofrendas.total)}` : '–',
+          },
+        ]
+      : []),
+    {
+      clave: 'notas',
+      titulo: 'Observaciones',
+      celda: (r) => (r.notas ? `Observaciones: ${r.notas}` : '–'),
+    },
+  ]
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -171,79 +283,143 @@ export function GrupoPage() {
         </Alert>
       ) : null}
 
+      <TableroPanel origenTipo="grupo" origenId={g.id} puedePublicar={g.puede_publicar} />
+
       <Card className="flex flex-col gap-3">
         <CardTitle>Integrantes</CardTitle>
-        <ul className="flex flex-col gap-2">
-          {g.miembros.map((m) => (
-            <li key={m.id} className="flex flex-wrap items-center justify-between gap-2">
-              <span>
-                <span className="font-bold">{m.nombre}</span>{' '}
-                <Badge tone={m.rol === 'asistente' ? 'neutral' : 'primary'}>{m.rol_display}</Badge>{' '}
-                {m.invitado ? <Badge tone="warning">Invitado</Badge> : null}
-              </span>
-              {g.puede_gestionar && (g.puede_administrar || !deGestion(m.rol)) ? (
-                <span className="flex flex-wrap items-center gap-2">
-                  <select
-                    aria-label={`Rol de ${m.nombre}`}
-                    value={m.rol}
-                    disabled={cambiarRol.isPending}
-                    onChange={(e) => cambiarRol.mutate({ miembroId: m.id, nuevo: e.target.value })}
-                    className="h-10 rounded-control border-2 border-border bg-card px-2"
-                  >
-                    {opcionesDeRol(roles.data, g.puede_administrar)
-                      .map((r) => (
-                        <option key={r.value} value={r.value}>
-                          {r.label}
-                        </option>
-                      ))}
-                  </select>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => quitar.mutate({ miembroId: m.id, nombre: m.nombre })}
-                  >
-                    Quitar
-                  </Button>
-                </span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+        <DataTable
+          titulo="Integrantes del grupo"
+          columnas={columnasIntegrantes}
+          filas={g.miembros}
+          clave={(m) => m.id}
+          ordenInicial={{ clave: 'nombre' }}
+          vacio="El grupo aún no tiene integrantes."
+        />
         {quitar.error ? <Alert tone="destructive">{quitar.error.message}</Alert> : null}
         {cambiarRol.error ? <Alert tone="destructive">{cambiarRol.error.message}</Alert> : null}
       </Card>
+
+      {g.puede_gestionar ? (
+        <Card className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <CardTitle>Sumar gente</CardTitle>
+              <CardDescription>
+                Agrégala tú, o comparte el enlace o el QR para que pida entrar.
+              </CardDescription>
+            </div>
+            <Button onClick={() => setAgregando(true)}>Agregar persona</Button>
+          </div>
+          <IngresoCard grupoId={g.id} enlace={g.enlace} suspendido={g.suspendido} embebida />
+          <Modal
+            open={agregando}
+            onClose={() => setAgregando(false)}
+            title="Agregar una persona"
+            description="Si el número ya está registrado, se vincula a la misma persona sin duplicarla."
+          >
+            <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4">
+              <Field
+                label="WhatsApp"
+                inputMode="tel"
+                value={whatsapp}
+                onChange={(e) => setWhatsapp(e.target.value)}
+                required
+              />
+              <Field
+                label="Nombre (si es nueva)"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+              />
+              <SelectField
+                label="Rol en el grupo"
+                value={rol}
+                onChange={(e) => setRol(e.target.value)}
+                options={opcionesDeRol(roles.data, g.puede_administrar)}
+              />
+              <CheckboxField
+                checked={acepta}
+                onChange={(e) => setAcepta(e.target.checked)}
+                label="La persona nueva acepta el aviso de privacidad"
+              />
+              {agregar.error ? <Alert tone="destructive">{agregar.error.message}</Alert> : null}
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" disabled={agregar.isPending}>
+                  Agregar
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setAgregando(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </form>
+          </Modal>
+        </Card>
+      ) : null}
+
+      <Collapsible title="Peticiones de oración" summary="Se muestran solo cuando las consultas.">
+        <PeticionesPanel origenTipo="grupo" origenId={g.id} puedeRegistrar={g.puede_capturar} />
+      </Collapsible>
+
+      <Collapsible
+        title="Historial de reuniones"
+        summary={
+          g.reuniones.length === 0
+            ? 'Aún no hay reuniones registradas.'
+            : `${g.reuniones.length} reuniones recientes`
+        }
+      >
+        <DataTable
+          titulo="Reuniones del grupo"
+          columnas={columnasReuniones}
+          filas={g.reuniones}
+          clave={(r) => r.id}
+          ordenInicial={{ clave: 'fecha', descendente: true }}
+          vacio="Aún no hay reuniones registradas."
+        />
+      </Collapsible>
 
       {g.puede_administrar ? (
         <Card className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle>Datos del grupo</CardTitle>
-            {!editando ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setForm({
-                    nombre: g.nombre,
-                    sector: g.sector,
-                    casa: g.casa === null ? '' : String(g.casa),
-                    dia: g.dia_semana === null ? '' : String(g.dia_semana),
-                    hora: g.hora,
-                    colonia: g.colonia,
-                  })
-                  setEditando(true)
-                }}
-              >
-                Editar datos
-              </Button>
-            ) : null}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setForm({
+                  nombre: g.nombre,
+                  sector: g.sector,
+                  casa: g.casa === null ? '' : String(g.casa),
+                  dia: g.dia_semana === null ? '' : String(g.dia_semana),
+                  hora: g.hora,
+                  colonia: g.colonia,
+                })
+                setEditando(true)
+              }}
+            >
+              Editar datos
+            </Button>
           </div>
-          {editando ? (
+          <CardDescription>
+            {[g.ubicacion, g.dia && `${g.dia} ${g.hora}`.trim(), g.colonia].filter(Boolean).join(' · ') ||
+              'Aún sin sector, día ni colonia.'}
+          </CardDescription>
+          {g.dia_semana === null || !g.hora ? (
+            <Alert tone="warning">
+              Falta el día o la hora de la reunión. Complétalos: la reunión es un evento fijo a la semana.
+            </Alert>
+          ) : null}
+          <Modal
+            open={editando}
+            onClose={() => setEditando(false)}
+            title="Datos del grupo"
+            description="La reunión es un solo día fijo a la semana y una hora."
+          >
             <form
               onSubmit={(e) => {
                 e.preventDefault()
                 guardarGrupo.mutate()
               }}
-              className="grid max-w-xl grid-cols-1 gap-4"
+              className="grid grid-cols-1 gap-4"
             >
               <Field
                 label="Nombre"
@@ -274,8 +450,9 @@ export function GrupoPage() {
                 label="Día de reunión"
                 value={form.dia}
                 onChange={(e) => setForm({ ...form, dia: e.target.value })}
+                required
                 options={[
-                  { value: '', label: 'Sin definir' },
+                  { value: '', label: 'Elige un día' },
                   ...dias.map((d, i) => ({ value: String(i), label: d })),
                 ]}
               />
@@ -284,6 +461,7 @@ export function GrupoPage() {
                 type="time"
                 value={form.hora}
                 onChange={(e) => setForm({ ...form, hora: e.target.value })}
+                required
               />
               <Field
                 label="Zona o colonia"
@@ -292,7 +470,7 @@ export function GrupoPage() {
               />
               {guardarGrupo.error ? <Alert tone="destructive">{guardarGrupo.error.message}</Alert> : null}
               <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={guardarGrupo.isPending}>
+                <Button type="submit" disabled={guardarGrupo.isPending || !form.dia || !form.hora}>
                   Guardar
                 </Button>
                 <Button type="button" variant="outline" onClick={() => setEditando(false)}>
@@ -300,91 +478,9 @@ export function GrupoPage() {
                 </Button>
               </div>
             </form>
-          ) : (
-            <CardDescription>
-              {[g.ubicacion, g.dia && `${g.dia} ${g.hora}`.trim(), g.colonia].filter(Boolean).join(' · ') ||
-                'Aún sin sector, día ni colonia.'}
-            </CardDescription>
-          )}
-
-          {g.suspendido ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <Button variant="success" onClick={() => reactivar.mutate()} disabled={reactivar.isPending}>
-                Reactivar grupo
-              </Button>
-              {reactivar.error ? <Alert tone="destructive">{reactivar.error.message}</Alert> : null}
-            </div>
-          ) : (
-            <div className="flex max-w-xl flex-col gap-3">
-              <TextareaField
-                label="Suspender el grupo"
-                hint="Un grupo suspendido no abre reuniones ni cuenta en el resumen. Escribe el motivo."
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-              />
-              {suspender.error ? <Alert tone="destructive">{suspender.error.message}</Alert> : null}
-              {motivo.trim() ? (
-                <ConfirmButton
-                  variant="outline"
-                  pregunta="¿Suspender este grupo?"
-                  etiquetaConfirmar="Sí, suspender"
-                  onConfirm={() => suspender.mutate()}
-                >
-                  Suspender grupo
-                </ConfirmButton>
-              ) : null}
-            </div>
-          )}
+          </Modal>
         </Card>
       ) : null}
-
-      {g.puede_gestionar ? (
-        <Card>
-          <form onSubmit={onSubmit} className="grid max-w-xl grid-cols-1 gap-4">
-            <CardTitle>Agregar una persona</CardTitle>
-            <CardDescription>
-              Si el número ya está registrado, se vincula a la misma persona sin duplicarla.
-            </CardDescription>
-            <Field
-              label="WhatsApp"
-              inputMode="tel"
-              value={whatsapp}
-              onChange={(e) => setWhatsapp(e.target.value)}
-              required
-            />
-            <Field
-              label="Nombre (si es nueva)"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-            />
-            <SelectField
-              label="Rol en el grupo"
-              value={rol}
-              onChange={(e) => setRol(e.target.value)}
-              options={opcionesDeRol(roles.data, g.puede_administrar)}
-            />
-            <CheckboxField
-              checked={acepta}
-              onChange={(e) => setAcepta(e.target.checked)}
-              label="La persona nueva acepta el aviso de privacidad"
-            />
-            {agregar.error ? <Alert tone="destructive">{agregar.error.message}</Alert> : null}
-            <Button type="submit" disabled={agregar.isPending}>
-              Agregar
-            </Button>
-          </form>
-        </Card>
-      ) : null}
-
-      {g.puede_gestionar ? (
-        <IngresoCard grupoId={g.id} enlace={g.enlace} suspendido={g.suspendido} />
-      ) : null}
-
-      <TableroPanel
-        origenTipo="grupo"
-        origenId={g.id}
-        puedePublicar={g.puede_publicar}
-      />
 
       <DatosAdicionalesCard
         entidad="grupo"
@@ -394,45 +490,45 @@ export function GrupoPage() {
         puedeEditar={g.puede_administrar}
         refrescar={['grupo', id]}
       />
-      <PeticionesPanel origenTipo="grupo" origenId={g.id} puedeRegistrar={g.puede_capturar} />
 
-      <Card className="flex flex-col gap-3">
-        <CardTitle>Reuniones</CardTitle>
-        {g.reuniones.length === 0 ? (
-          <CardDescription>Aún no hay reuniones registradas.</CardDescription>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {g.reuniones.map((r) => (
-              <li key={r.id} className="flex flex-col gap-1 border-b border-border pb-2 last:border-b-0">
-                <Link
-                  className="flex flex-wrap justify-between gap-2 font-bold underline"
-                  to={`/grupos/reuniones/${r.id}`}
+      {g.puede_administrar ? (
+        <DangerZone>
+          {g.suspendido ? (
+            <DangerAction
+              title="El grupo está suspendido"
+              description="No abre reuniones ni cuenta en el resumen. Reactívalo cuando vuelva a reunirse."
+            >
+              <Button variant="success" onClick={() => reactivar.mutate()} disabled={reactivar.isPending}>
+                Reactivar grupo
+              </Button>
+            </DangerAction>
+          ) : (
+            <DangerAction
+              title="Suspender el grupo"
+              description="Un grupo suspendido no abre reuniones ni cuenta en el resumen."
+            >
+              <div className="flex w-full flex-col gap-3 sm:w-80">
+                <TextareaField
+                  label="Motivo de la suspensión"
+                  value={motivo}
+                  onChange={(e) => setMotivo(e.target.value)}
+                />
+                <ConfirmButton
+                  variant="destructive"
+                  disabled={!motivo.trim()}
+                  pregunta="¿Suspender este grupo?"
+                  etiquetaConfirmar="Sí, suspender"
+                  onConfirm={() => suspender.mutate()}
                 >
-                  <span className="capitalize">{fechaLarga(r.fecha)}</span>
-                  {r.registrados !== undefined ? (
-                    <span className="font-normal text-muted-foreground">
-                      {r.presentes} de {r.registrados} presentes
-                    </span>
-                  ) : null}
-                </Link>
-                {r.peticiones || r.ofrendas ? (
-                  <span className="flex flex-wrap gap-2">
-                    {r.peticiones ? (
-                      <Badge tone="primary">
-                        {r.peticiones === 1 ? '1 petición' : `${r.peticiones} peticiones`}
-                      </Badge>
-                    ) : null}
-                    {r.ofrendas && r.ofrendas.cantidad > 0 ? (
-                      <Badge tone="neutral">Ofrendas: {dinero(r.ofrendas.total)}</Badge>
-                    ) : null}
-                  </span>
-                ) : null}
-                {r.notas ? <CardDescription>Observaciones: {r.notas}</CardDescription> : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+                  Suspender grupo
+                </ConfirmButton>
+              </div>
+            </DangerAction>
+          )}
+          {suspender.error ? <Alert tone="destructive">{suspender.error.message}</Alert> : null}
+          {reactivar.error ? <Alert tone="destructive">{reactivar.error.message}</Alert> : null}
+        </DangerZone>
+      ) : null}
     </div>
   )
 }
