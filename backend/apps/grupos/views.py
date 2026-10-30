@@ -167,6 +167,7 @@ def _reuniones_del_grupo(user, grupo: Grupo) -> list[dict]:
         fila = {
             "id": r.pk,
             "fecha": r.fecha.isoformat(),
+            "fuera_de_dia": r.fuera_de_dia,
             "presentes": a.get("presentes", 0),
             "registrados": a.get("registrados", 0),
             "notas": r.notas,

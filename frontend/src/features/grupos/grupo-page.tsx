@@ -148,6 +148,9 @@ export function GrupoPage() {
   const g = grupo.data
   const deGestion = (clave: string) => roles.data?.find((r) => r.clave === clave)?.de_gestion ?? false
 
+  // Lunes = 0, igual que en el servidor. Sin día definido no hay con qué comparar.
+  const hoyEsDiaDelGrupo = g.dia_semana === null || (new Date().getDay() + 6) % 7 === g.dia_semana
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     agregar.mutate()
@@ -215,9 +218,12 @@ export function GrupoPage() {
       titulo: 'Fecha',
       orden: (r) => r.fecha,
       celda: (r) => (
-        <Link className="font-bold capitalize underline" to={`/grupos/reuniones/${r.id}`}>
-          {fechaLarga(r.fecha)}
-        </Link>
+        <span className="flex flex-wrap items-center gap-2">
+          <Link className="font-bold capitalize underline" to={`/grupos/reuniones/${r.id}`}>
+            {fechaLarga(r.fecha)}
+          </Link>
+          {r.fuera_de_dia ? <Badge tone="warning">Fuera de tiempo</Badge> : null}
+        </span>
       ),
     },
     {
@@ -263,9 +269,20 @@ export function GrupoPage() {
         module="grupos"
         actions={
           g.puede_capturar && !g.suspendido ? (
-            <Button onClick={() => abrir.mutate()} disabled={abrir.isPending}>
-              Pasar lista de hoy
-            </Button>
+            hoyEsDiaDelGrupo ? (
+              <Button onClick={() => abrir.mutate()} disabled={abrir.isPending}>
+                Pasar lista de hoy
+              </Button>
+            ) : (
+              <ConfirmButton
+                disabled={abrir.isPending}
+                pregunta={`Hoy no es el día del grupo (${g.dia}). Se registrará que fue fuera de tiempo. ¿Pasar lista de todos modos?`}
+                etiquetaConfirmar="Sí, pasar lista"
+                onConfirm={() => abrir.mutate()}
+              >
+                Pasar lista de hoy
+              </ConfirmButton>
+            )
           ) : null
         }
       />

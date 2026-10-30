@@ -143,3 +143,22 @@ def test_la_migracion_pone_el_dia_de_la_ultima_reunion(db):
     assert sin_dia.dia_semana == 3
     assert nunca.dia_semana is None
     assert con_dia.dia_semana == 2
+
+
+def test_abrir_la_reunion_fuera_del_dia_del_grupo_se_permite_pero_queda_registrado(mundo):
+    from datetime import date
+
+    norte = mundo["norte"]  # se reúne los jueves
+    api = api_de(mundo["lider"])
+    url = f"/api/grupos/{norte.pk}/reuniones/"
+    jueves = api.post(url, {"fecha": "2026-10-29"}, format="json")
+    martes = api.post(url, {"fecha": "2026-10-27"}, format="json")
+    assert jueves.status_code == martes.status_code == 201
+    assert Reunion.objects.get(grupo=norte, fecha=date(2026, 10, 29)).fuera_de_dia is False
+    assert Reunion.objects.get(grupo=norte, fecha=date(2026, 10, 27)).fuera_de_dia is True
+    assert AuditEvent.objects.filter(action="reunion.creada", detail__fuera_de_dia=True).exists()
+    detalle = api.get(f"/api/grupos/{norte.pk}/").json()["reuniones"]
+    assert {r["fecha"]: r["fuera_de_dia"] for r in detalle} == {
+        "2026-10-29": False,
+        "2026-10-27": True,
+    }

@@ -107,6 +107,20 @@ describe('GrupoPage', () => {
     expect(screen.getByText('5 de 8 presentes')).toBeInTheDocument()
   })
 
+  it('avisa antes de pasar lista un día que no es el del grupo', async () => {
+    const hoy = (new Date().getDay() + 6) % 7
+    montar({ ...grupo, dia_semana: (hoy + 1) % 7, dia: 'Otro día' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Pasar lista de hoy' }))
+    expect(screen.getByText(/Hoy no es el día del grupo \(Otro día\)/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sí, pasar lista' })).toBeInTheDocument()
+  })
+
+  it('el historial marca las reuniones abiertas fuera de tiempo', async () => {
+    montar({ ...grupo, reuniones: [{ ...grupo.reuniones[0], fuera_de_dia: true }] })
+    fireEvent.click(await screen.findByRole('button', { name: /Historial de reuniones/ }))
+    expect(screen.getByText('Fuera de tiempo')).toBeInTheDocument()
+  })
+
   it('pone primero el tablero y al final la zona de riesgo', async () => {
     montar()
     await screen.findByRole('heading', { name: 'Integrantes' })
