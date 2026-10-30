@@ -6,9 +6,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts import equipos
 from apps.core import audit
 
 from . import ofrendas as of
+from .access import AMBITO
 from .models import Grupo, GrupoMiembro, Ofrenda, Reunion
 
 
@@ -140,9 +142,10 @@ class AvalView(APIView):
 
 
 class OfrendasPendientesView(APIView):
-    """Ofrendas por avalar (o con diferencia) de los grupos donde la persona es Tesorera.
+    """Ofrendas por avalar (o con diferencia) de los grupos donde la persona puede avalar.
 
-    Si un grupo no tiene Tesorero, también aparecen para su Líder y para el Pastor (suplencia).
+    Si un grupo no tiene quien avale, también aparecen para quien tiene la suplencia y para el
+    Pastor.
     """
 
     permission_classes = [IsAuthenticated]
@@ -153,7 +156,9 @@ class OfrendasPendientesView(APIView):
         if persona is not None:
             ids |= set(
                 GrupoMiembro.objects.filter(
-                    persona=persona, activo=True, rol=GrupoMiembro.Rol.TESORERO
+                    persona=persona,
+                    activo=True,
+                    rol__in=equipos.con_permiso(AMBITO, "ofrendas_avalar"),
                 ).values_list("grupo_id", flat=True)
             )
         for grupo in Grupo.objects.filter(activo=True):

@@ -261,6 +261,8 @@ class GrupoView(APIView):
                 "puede_capturar": access.puede_capturar(request.user, grupo),
                 "puede_gestionar": access.puede_gestionar_integrantes(request.user, grupo),
                 "puede_administrar": access.puede_administrar(request.user),
+                "puede_publicar": access.puede_administrar(request.user)
+                or "avisos" in access.permisos_en(request.user, grupo),
                 "enlace": (
                     f"/unirse/{grupo.enlace_token}"
                     if grupo.enlace_token

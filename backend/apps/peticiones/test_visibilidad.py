@@ -169,3 +169,33 @@ def test_el_formulario_informa_los_dias_de_conservacion_para_la_leyenda(rico):
         "/api/config/peticiones.dias_retencion/", {"valor": 15}, format="json"
     )
     assert api.get("/api/peticiones/formulario/").json()["dias_retencion"] == 15
+
+
+# ---------- quién registra y quién lee depende del rol que se configure ----------
+def test_registrar_peticiones_del_grupo_es_un_permiso_del_rol(rico):
+    from apps.accounts.models import RolEquipo
+
+    assert crear(rico, "secre").status_code == 201
+    rol = RolEquipo.objects.get(ambito="grupo", clave="secretario")
+    rol.permisos = sorted(set(rol.permisos) - {"peticiones_registrar"})
+    rol.save()
+    assert crear(rico, "secre").status_code == 403
+    anf = RolEquipo.objects.get(ambito="grupo", clave="tesorero")
+    anf.permisos = sorted({*anf.permisos, "peticiones_registrar"})
+    anf.save()
+    assert crear(rico, "tesorero").status_code == 201
+
+
+def test_ver_las_de_solo_lideres_es_un_permiso_del_rol(rico):
+    from apps.accounts.models import RolEquipo
+
+    con_alcance(rico, "lideres")
+    assert ve(rico, "sup") == 1 and ve(rico, "tesorero") == 0
+    sup = RolEquipo.objects.get(ambito="grupo", clave="supervisor")
+    sup.permisos = sorted(set(sup.permisos) - {"peticiones_ver"})
+    sup.save()
+    assert ve(rico, "sup") == 0
+    tes = RolEquipo.objects.get(ambito="grupo", clave="tesorero")
+    tes.permisos = sorted({*tes.permisos, "peticiones_ver"})
+    tes.save()
+    assert ve(rico, "tesorero") == 1

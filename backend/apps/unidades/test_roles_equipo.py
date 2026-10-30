@@ -32,9 +32,14 @@ def test_los_roles_base_de_grupo_replican_lo_que_ya_se_hacia(db):
     claves = {"lider", "respaldo", "supervisor", "secretario", "anfitrion", "tesorero"}
     assert set(permisos) == claves | {"servidor", "asistente"}
     assert permisos["lider"] >= {"ver", "integrantes", "historial", "capturar", "corregir"}
-    assert permisos["supervisor"] == {"ver", "historial", "estudio", "avisos"}
-    assert permisos["secretario"] == {"ver", "capturar", "estudio", "avisos"}
-    assert permisos["asistente"] == permisos["anfitrion"] == permisos["tesorero"] == set()
+    assert permisos["supervisor"] == {
+        "ver", "historial", "estudio", "avisos", "ofrendas_ver", "peticiones_ver",
+    }  # fmt: skip
+    assert permisos["secretario"] == {
+        "ver", "capturar", "estudio", "avisos", "ofrendas_capturar", "peticiones_registrar",
+    }  # fmt: skip
+    assert permisos["tesorero"] == {"ofrendas_ver", "ofrendas_avalar"}
+    assert permisos["asistente"] == permisos["anfitrion"] == set()
 
 
 def test_un_rol_nuevo_de_ministerio_se_crea_y_se_asigna(mundo):  # noqa: F811
@@ -92,9 +97,11 @@ def test_reglas_de_los_roles_de_equipo(mundo):  # noqa: F811
         pastor.patch("/api/auth/roles-equipo/ministerio/nada/", {}, format="json").status_code
         == 404
     )
-    # un permiso de ministerio no sirve en un grupo
+    # un permiso de grupo no sirve en un ministerio
     en_grupo = pastor.patch(
-        "/api/auth/roles-equipo/grupo/lider/", {"permisos": ["peticiones_ver"]}, format="json"
+        "/api/auth/roles-equipo/ministerio/servidor/",
+        {"permisos": ["ofrendas_avalar"]},
+        format="json",
     )
     assert en_grupo.status_code == 400
     # un rol en uso no se desactiva; uno sin uso, sí

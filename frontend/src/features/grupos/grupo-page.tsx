@@ -383,7 +383,7 @@ export function GrupoPage() {
       <TableroPanel
         origenTipo="grupo"
         origenId={g.id}
-        puedePublicar={g.mis_roles.some((r) => ['lider', 'supervisor', 'secretario'].includes(r)) || g.puede_administrar}
+        puedePublicar={g.puede_publicar}
       />
 
       <DatosAdicionalesCard

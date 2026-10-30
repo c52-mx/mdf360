@@ -1,13 +1,18 @@
 """Ofrendas del grupo con aval del Tesorero (M3-04).
 
-Reglas (matriz de confidencialidad aprobada, v3.2, sec. 3.3):
-- El Secretario captura. Si el grupo no tiene Secretario, el Líder lo suple. Líder y Supervisor
+Quién puede ver, capturar o avalar lo decide el rol que la persona tiene en el grupo (se configura
+en la pantalla de roles: ofrendas_ver, ofrendas_capturar, ofrendas_avalar y sus suplencias). Con
+los roles que vienen de fábrica (matriz de confidencialidad aprobada, v3.2, sec. 3.3):
+- El Secretario captura. Si el grupo no tiene quien capture, lo suple el Líder. Líder y Supervisor
   consultan; el Pastor consulta todo.
 - El Anciano no ve finanzas.
 - El Tesorero cuenta, escribe su cifra y confirma con su PIN (aval electrónico simple). Si el
   grupo no tiene Tesorero, lo suple el Líder o el Pastor. Toda suplencia queda en bitácora.
+
+Reglas que no se configuran, para proteger el dinero:
 - Una ofrenda avalada no se edita sin motivo; la corrección exige un nuevo aval.
 - Quien capturó no puede avalar su propia captura.
+- El aval siempre pide el PIN y toda suplencia queda en bitácora.
 """
 
 from decimal import Decimal
@@ -16,27 +21,29 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from apps.accounts import equipos
 from apps.accounts.permissions import tiene_permiso
 from apps.core import audit, config
 
-from .access import roles_en
+from .access import AMBITO, permisos_en
 from .models import GrupoMiembro, Ofrenda, OfrendaMovimiento, Reunion
-
-R = GrupoMiembro.Rol
 
 
 # ---------- permisos ----------
-def _tiene_activo(grupo, rol) -> bool:
-    return GrupoMiembro.objects.filter(grupo=grupo, rol=rol, activo=True).exists()
+def _grupo_tiene(grupo, permiso: str) -> bool:
+    """Hay en el grupo alguien activo cuyo rol incluye ese permiso."""
+    return GrupoMiembro.objects.filter(
+        grupo=grupo, rol__in=equipos.con_permiso(AMBITO, permiso), activo=True
+    ).exists()
 
 
 def captura_suplente(user, reunion: Reunion) -> bool:
-    """El Líder captura cuando el grupo no tiene Secretario."""
-    roles = roles_en(user, reunion.grupo)
+    """Captura quien tiene la suplencia cuando nadie en el grupo tiene el permiso de capturar."""
+    permisos = permisos_en(user, reunion.grupo)
     return (
-        R.LIDER in roles
-        and R.SECRETARIO not in roles
-        and not _tiene_activo(reunion.grupo, R.SECRETARIO)
+        "ofrendas_capturar_suplente" in permisos
+        and "ofrendas_capturar" not in permisos
+        and not _grupo_tiene(reunion.grupo, "ofrendas_capturar")
     )
 
 
@@ -45,18 +52,22 @@ def puede_capturar_ofrenda(user, reunion: Reunion) -> bool:
         return True
     if reunion.fecha != timezone.localdate():
         return False
-    return R.SECRETARIO in roles_en(user, reunion.grupo) or captura_suplente(user, reunion)
+    return "ofrendas_capturar" in permisos_en(user, reunion.grupo) or captura_suplente(
+        user, reunion
+    )
 
 
 def aval_suplente(user, grupo) -> bool:
-    """Sin Tesorero en el grupo, avalan el Líder o el Pastor."""
-    if _tiene_activo(grupo, R.TESORERO):
+    """Sin quien pueda avalar en el grupo, avala quien tiene la suplencia o el Pastor."""
+    if _grupo_tiene(grupo, "ofrendas_avalar"):
         return False
-    return R.LIDER in roles_en(user, grupo) or tiene_permiso(user, "grupos.gestionar")
+    return "ofrendas_avalar_suplente" in permisos_en(user, grupo) or tiene_permiso(
+        user, "grupos.gestionar"
+    )
 
 
 def puede_avalar(user, grupo) -> bool:
-    return R.TESORERO in roles_en(user, grupo) or aval_suplente(user, grupo)
+    return "ofrendas_avalar" in permisos_en(user, grupo) or aval_suplente(user, grupo)
 
 
 def puede_ver_ofrendas(user, reunion: Reunion) -> bool:
@@ -66,10 +77,10 @@ def puede_ver_ofrendas(user, reunion: Reunion) -> bool:
 def puede_ver_finanzas_grupo(user, grupo, fecha=None) -> bool:
     if tiene_permiso(user, "ofrendas.ver_todas"):
         return True
-    roles = roles_en(user, grupo)
-    if roles & {R.LIDER, R.SUPERVISOR, R.TESORERO}:
+    permisos = permisos_en(user, grupo)
+    if "ofrendas_ver" in permisos:
         return True
-    return R.SECRETARIO in roles and fecha == timezone.localdate()
+    return "ofrendas_capturar" in permisos and fecha == timezone.localdate()
 
 
 def puede_corregir(user, ofrenda: Ofrenda) -> bool:
@@ -159,7 +170,7 @@ def avalar(ofrenda: Ofrenda, *, monto_contado, actor, request=None) -> Ofrenda:
     diferencia = contado - ofrenda.monto
     ofrenda.estado = Ofrenda.Estado.AVALADA if diferencia == 0 else Ofrenda.Estado.DIFERENCIA
     ofrenda.save(update_fields=["estado"])
-    suplencia = R.TESORERO not in roles_en(actor, ofrenda.reunion.grupo)
+    suplencia = "ofrendas_avalar" not in permisos_en(actor, ofrenda.reunion.grupo)
     OfrendaMovimiento.objects.create(
         ofrenda=ofrenda, tipo="aval", monto_anterior=ofrenda.monto, monto=contado,
         diferencia=diferencia, usuario=actor,

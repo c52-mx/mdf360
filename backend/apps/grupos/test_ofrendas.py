@@ -6,7 +6,7 @@ from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.accounts.models import AsignacionRol, Rol, User
+from apps.accounts.models import AsignacionRol, Rol, RolEquipo, User
 from apps.core.models import AuditEvent
 from apps.personas import services as personas
 
@@ -383,3 +383,86 @@ def test_la_configuracion_exige_permiso_y_valida(m):
 def test_el_admin_tecnico_tambien_configura(db):
     admin = cuenta("55 0000 0050", "Admin", "admin_tecnico", credencial=FUERTE)
     assert api_de(admin).get("/api/config/").status_code == 200
+
+
+# ---------- las reglas salen de los permisos del rol, no del nombre del rol ----------
+def _dar(clave, *permisos, ambito="grupo"):
+    rol = RolEquipo.objects.get(ambito=ambito, clave=clave)
+    rol.permisos = sorted({*rol.permisos, *permisos})
+    rol.save()
+
+
+def _quitar(clave, *permisos, ambito="grupo"):
+    rol = RolEquipo.objects.get(ambito=ambito, clave=clave)
+    rol.permisos = sorted(set(rol.permisos) - set(permisos))
+    rol.save()
+
+
+def test_un_rol_nuevo_con_el_permiso_captura_y_otro_con_el_permiso_avala(m):
+    cajero = RolEquipo.objects.create(
+        ambito="grupo", clave="cajero", nombre="Cajero", permisos=["ofrendas_capturar"]
+    )
+    contador = RolEquipo.objects.create(
+        ambito="grupo", clave="contador", nombre="Contador", permisos=["ofrendas_avalar"]
+    )
+    c = cuenta("55 0000 0010", "Cajero", "miembro")
+    k = cuenta("55 0000 0011", "Contador", "miembro", credencial=FUERTE)
+    GrupoMiembro.objects.create(grupo=m["grupo"], persona=c.persona, rol=cajero.clave)
+    GrupoMiembro.objects.create(grupo=m["grupo"], persona=k.persona, rol=contador.clave)
+    m.update(cajero=c, contador=k)
+    # el cajero captura el mismo día (permiso del rol), aunque no sea Secretario
+    r = capturar(m, usuario="cajero")
+    assert r.status_code == 201
+    # el contador avala con su PIN; quien no tiene el permiso, no
+    oid = r.json()["id"]
+    sin = api_de(m["sup"]).post(
+        f"/api/grupos/ofrendas/{oid}/aval/",
+        {"monto_contado": "1250.00", "credential": PIN},
+        format="json",
+    )
+    assert sin.status_code == 404
+    ok = api_de(k).post(
+        f"/api/grupos/ofrendas/{oid}/aval/",
+        {"monto_contado": "1250.00", "credential": FUERTE},
+        format="json",
+    )
+    assert ok.status_code == 200 and ok.json()["estado"] == "avalada"
+
+
+def test_quitar_el_permiso_al_secretario_le_quita_la_captura_y_la_suple_el_lider(m):
+    _quitar("secretario", "ofrendas_capturar")
+    assert capturar(m, usuario="secre").status_code == 404  # ni ve las ofrendas
+    # ya nadie tiene el permiso principal en el grupo: el Líder entra como suplente
+    r = capturar(m, usuario="lider")
+    assert r.status_code == 201
+    assert r.json()["movimientos"][0]["motivo"].startswith("Captura como suplente")
+
+
+def test_si_se_quita_la_suplencia_el_lider_ya_no_captura_sin_secretario(m):
+    GrupoMiembro.objects.filter(rol="secretario").update(activo=False)
+    _quitar("lider", "ofrendas_capturar_suplente")
+    assert capturar(m, usuario="lider").status_code == 403
+
+
+def test_ver_las_ofrendas_es_un_permiso_del_rol(m):
+    capturar(m)
+    url = f"/api/grupos/reuniones/{m['reunion'].pk}/ofrendas/"
+    assert api_de(m["sup"]).get(url).status_code == 200
+    _quitar("supervisor", "ofrendas_ver")
+    assert api_de(m["sup"]).get(url).status_code == 404
+    _dar("anfitrion", "ofrendas_ver")
+    anf = cuenta("55 0000 0012", "Anfitrión", "miembro")
+    GrupoMiembro.objects.create(grupo=m["grupo"], persona=anf.persona, rol="anfitrion")
+    assert api_de(anf).get(url).status_code == 200
+
+
+def test_quien_capturo_nunca_avala_aunque_tenga_ambos_permisos(m):
+    _dar("secretario", "ofrendas_avalar")
+    r = capturar(m)
+    oid = r.json()["id"]
+    propio = api_de(m["secre"]).post(
+        f"/api/grupos/ofrendas/{oid}/aval/",
+        {"monto_contado": "1250.00", "credential": PIN},
+        format="json",
+    )
+    assert propio.status_code == 403 and propio.json()["code"] == "own_capture"
