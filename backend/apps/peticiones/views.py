@@ -57,6 +57,50 @@ class FormularioView(APIView):
         return Response({"version": f.version, "campos": f.campos})
 
 
+class ResumenView(APIView):
+    """Cuántas peticiones se han atendido y cuántas no, por semana. Solo cuenta lo que la persona
+    puede leer, y solo números: nunca el contenido."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from datetime import timedelta
+
+        from django.db.models import Count
+        from django.db.models.functions import TruncWeek
+        from django.utils import timezone
+
+        services.purgar_vencidas()
+        filas = (
+            services.peticiones_visibles(request.user)
+            .annotate(semana=TruncWeek("creada_en"))
+            .values("semana", "estado")
+            .annotate(n=Count("id"))
+        )
+        por_semana: dict = {}
+        for f in filas:
+            dia = timezone.localtime(f["semana"]).date()
+            cuenta = por_semana.setdefault(dia, {"activas": 0, "atendidas": 0})
+            cuenta["atendidas" if f["estado"] == Peticion.Estado.ATENDIDA else "activas"] += f["n"]
+        semanas = []
+        if por_semana:
+            dia, ultimo = min(por_semana), max(por_semana)
+            while dia <= ultimo:  # semanas sin peticiones también cuentan (en cero)
+                cuenta = por_semana.get(dia, {"activas": 0, "atendidas": 0})
+                semanas.append({"semana": dia.isoformat(), **cuenta})
+                dia += timedelta(days=7)
+        return Response(
+            {
+                "semanas": semanas,
+                "totales": {
+                    "activas": sum(s["activas"] for s in semanas),
+                    "atendidas": sum(s["atendidas"] for s in semanas),
+                },
+                "dias_retencion": int(config.obtener("peticiones.dias_retencion")),
+            }
+        )
+
+
 class CrearSerializer(serializers.Serializer):
     origen_tipo = serializers.CharField(max_length=40)
     origen_id = serializers.IntegerField(min_value=1)

@@ -110,19 +110,18 @@ describe('PeticionesPanel', () => {
       vi.fn((url: string, init?: RequestInit) => {
         if (url.includes('/csrf/')) return json(200, { csrfToken: 'x' })
         if (init?.method === 'POST') return post(JSON.parse(String(init.body)) as Record<string, unknown>)
-        if (url.includes('/formulario/')) return json(200, { ...formulario, visibilidad_por_defecto: 'grupo', dias_retencion: 30 })
+        if (url.includes('/formulario/')) return json(200, { ...formulario, visibilidad_por_defecto: 'equipo', dias_retencion: 30 })
         return json(200, { count: 0, next: null, previous: null, results: [] })
       }),
     )
     montar(true)
     const alcance = await screen.findByLabelText('¿Quién puede verla?')
-    expect(alcance).toHaveValue('grupo') // el valor por defecto viene de la configuración
+    expect(alcance).toHaveValue('equipo') // el valor por defecto viene de la configuración
+    expect(screen.queryByRole('option', { name: 'Mi grupo' })).toBeNull() // ya no se ofrece
     expect(screen.getByLabelText(/Ocultar el nombre/)).toBeInTheDocument()
     // Leyenda de privacidad siempre visible, según el alcance y los días de conservación
-    expect(screen.getByText(/de acuerdo en que la lea todos los integrantes del grupo/)).toBeInTheDocument()
+    expect(screen.getByText(/de acuerdo en que la lea el equipo de oración de la iglesia/)).toBeInTheDocument()
     expect(screen.getByText(/se borra sola a los 30 días/)).toBeInTheDocument()
-    fireEvent.change(alcance, { target: { value: 'equipo' } })
-    expect(screen.getByText(/de acuerdo en que la lea todos los integrantes del grupo, el equipo de oración/)).toBeInTheDocument()
     fireEvent.click(screen.getByLabelText(/Ocultar el nombre/))
     fireEvent.change(screen.getByLabelText('Petición'), { target: { value: 'Por mi familia' } })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar petición' }))
