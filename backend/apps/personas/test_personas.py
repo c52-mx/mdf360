@@ -512,3 +512,40 @@ def test_solo_un_superior_da_de_baja_y_nunca_a_si_mismo_ni_a_su_nivel(api, staff
         ).status_code
         == 200
     )
+
+
+# ---------- la baja es un permiso de rol, limitado a la gente que cada quien atiende ----------
+def _dar_permiso(rol, permiso):
+    from apps.accounts.models import Rol
+
+    r = Rol.objects.get(clave=rol)
+    r.permisos = sorted({*r.permisos, permiso})
+    r.save()
+
+
+def _baja(user, persona):
+    c = APIClient()
+    c.force_authenticate(user)
+    return c.post(
+        f"/api/personas/{persona.pk}/baja/", {"fecha": "2026-10-20", "motivo": "x"}, format="json"
+    )
+
+
+def test_el_lider_da_de_baja_solo_a_la_gente_de_su_grupo_si_el_rol_tiene_el_permiso(db):
+    from apps.grupos.models import Grupo, GrupoMiembro
+
+    lider = _con_rol(User.objects.create_user("55 7777 0001", pin="482915", nombre="Lía"), "lider")
+    yo = Persona.objects.create(nombre="Lía", whatsapp="55 7777 0001", usuario=lider)
+    mi_gente = Persona.objects.create(nombre="Rosa", whatsapp="55 7777 0002")
+    ajena = Persona.objects.create(nombre="Sara", whatsapp="55 7777 0003")
+    norte = Grupo.objects.create(nombre="Norte")
+    sur = Grupo.objects.create(nombre="Sur")
+    GrupoMiembro.objects.create(grupo=norte, persona=yo, rol="lider")
+    GrupoMiembro.objects.create(grupo=norte, persona=mi_gente, rol="asistente")
+    GrupoMiembro.objects.create(grupo=sur, persona=ajena, rol="asistente")
+    # sin el permiso en su rol, no puede
+    assert _baja(lider, mi_gente).status_code == 403
+    _dar_permiso("lider", "personas.baja")
+    lider = User.objects.get(pk=lider.pk)  # los permisos se guardan en la instancia
+    assert _baja(lider, ajena).status_code == 403  # no es de su grupo
+    assert _baja(lider, mi_gente).status_code == 200

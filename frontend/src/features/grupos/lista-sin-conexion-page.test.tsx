@@ -37,6 +37,7 @@ const grupo = {
   puede_capturar: true,
   puede_gestionar: false,
   puede_administrar: false,
+  puede_publicar: false,
 }
 
 const json = (status: number, body: unknown) =>

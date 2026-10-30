@@ -1,17 +1,17 @@
 """Los Grupos de Conexión como origen de peticiones de oración.
 
-Registran el Líder y el Secretario (y el Pastor). Quién lee depende del alcance que se eligió al
-registrar: «solo líderes» (Líder, Supervisor, Pastor y Anciano), «mi grupo» (todos los
-integrantes del grupo) o «equipo de oración» (además, quien tenga ese rol).
+Registra quien tenga el permiso «peticiones_registrar» en su rol del grupo (y la administración de
+grupos). Quién lee depende del alcance que se eligió al registrar: «solo líderes» (quien tenga
+«peticiones_ver», además del Pastor y el Anciano), «mi grupo» (todos los integrantes del grupo) o
+«equipo de oración» (además, quien tenga ese rol).
 """
 
+from apps.accounts import equipos
 from apps.accounts.permissions import tiene_permiso
 from apps.peticiones import registry
 
-from .access import roles_en
+from .access import AMBITO, permisos_en, roles_en
 from .models import Grupo, GrupoMiembro, Reunion
-
-R = GrupoMiembro.Rol
 
 
 def _etiqueta(grupo_id: int, referencia_id: int | None) -> str | None:
@@ -31,8 +31,8 @@ def _puede_registrar(user, grupo_id: int) -> bool:
     grupo = Grupo.objects.filter(pk=grupo_id).first()
     if grupo is None:
         return False
-    return tiene_permiso(user, "grupos.gestionar") or bool(
-        roles_en(user, grupo) & {R.LIDER, R.SECRETARIO}
+    return tiene_permiso(user, "grupos.gestionar") or "peticiones_registrar" in permisos_en(
+        user, grupo
     )
 
 
@@ -43,10 +43,9 @@ def _acceso(user, grupo_id: int) -> str | None:
     grupo = Grupo.objects.filter(pk=grupo_id).first()
     if grupo is None:
         return None
-    roles = roles_en(user, grupo)
-    if roles & {R.LIDER, R.SUPERVISOR}:
+    if "peticiones_ver" in permisos_en(user, grupo):
         return registry.LIDER
-    return registry.MIEMBRO if roles else None
+    return registry.MIEMBRO if roles_en(user, grupo) else None
 
 
 def _ids_por_acceso(user) -> dict[str, list[int] | None]:
@@ -58,7 +57,9 @@ def _ids_por_acceso(user) -> dict[str, list[int] | None]:
     membresias = GrupoMiembro.objects.filter(persona=persona, activo=True)
     return {
         registry.LIDER: list(
-            membresias.filter(rol__in=[R.LIDER, R.SUPERVISOR]).values_list("grupo_id", flat=True)
+            membresias.filter(rol__in=equipos.con_permiso(AMBITO, "peticiones_ver")).values_list(
+                "grupo_id", flat=True
+            )
         ),
         registry.MIEMBRO: list(membresias.values_list("grupo_id", flat=True).distinct()),
     }

@@ -47,6 +47,7 @@ const grupo: GrupoDetalle = {
   puede_capturar: true,
   puede_gestionar: true,
   puede_administrar: true,
+  puede_publicar: true,
   enlace: null,
   datos_extra: {},
   datos_extra_etiquetas: {},
