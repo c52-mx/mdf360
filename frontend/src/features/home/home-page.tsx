@@ -32,7 +32,9 @@ export function HomePage() {
     { to: '/grupos', titulo: 'Grupos', detalle: 'Pasar lista, estudio y reuniones.', icono: UsersRound },
     { to: '/peticiones', titulo: 'Peticiones', detalle: 'Motivos de oración.', icono: HandHeart },
     { to: '/avisos', titulo: 'Avisos', detalle: 'Mensajes de tus grupos.', icono: Bell },
-    { to: '/ofrendas', titulo: 'Ofrendas', detalle: 'Registro y aval.', icono: Coins },
+    ...(can('ofrendas.acceso')
+      ? [{ to: '/ofrendas', titulo: 'Ofrendas', detalle: 'Registro y aval.', icono: Coins }]
+      : []),
     ...(can('personas.crear')
       ? [
           {

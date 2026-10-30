@@ -174,13 +174,16 @@ def peticiones_visibles(user):
     """Peticiones que `user` puede leer.
 
     - Quien tiene acceso de líder a un origen ve todas las de ese origen.
-    - Quien pertenece al origen ve las de alcance «grupo» y «equipo».
+    - Quien pertenece al origen ve las de alcance «grupo» y «equipo» si el origen lo permite.
     - Quien tiene el rol de Equipo de oración ve las de alcance «equipo» de cualquier origen.
+    - Quien la registró la sigue viendo, salvo en «solo líderes» (ahí quien registra no lee).
     """
     from django.db.models import Q
 
     V = Peticion.Visibilidad
     condicion = Q(pk__in=[])
+    if getattr(user, "pk", None):
+        condicion |= Q(creada_por=user) & ~Q(visibilidad=V.LIDERES)
     for origen in registry.todos():
         niveles = origen.ids_por_acceso(user)
         lider = niveles.get(registry.LIDER)
@@ -207,6 +210,8 @@ def puede_ver(user, peticion: Peticion) -> bool:
         return True
     if peticion.visibilidad == V.LIDERES:
         return False
+    if peticion.creada_por_id is not None and peticion.creada_por_id == getattr(user, "pk", None):
+        return True
     if nivel == registry.MIEMBRO:
         return True
     return peticion.visibilidad == V.EQUIPO and tiene_permiso(user, "peticiones.equipo_oracion")

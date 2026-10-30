@@ -509,3 +509,18 @@ def test_una_reunion_de_la_tarde_noche_lleva_la_fecha_de_mexico(mundo):
             f"/api/grupos/reuniones/{rid}/", {"asistencias": []}, format="json"
         )
         assert ok.status_code == 200
+
+
+# ---------- el Asistente participa ----------
+def test_el_asistente_ve_su_grupo_y_el_estudio(mundo):
+    asistente = cuenta("55 0000 0098", "Ana Asistente", "miembro")
+    GrupoMiembro.objects.create(grupo=mundo["norte"], persona=asistente.persona, rol="asistente")
+    api = api_de(asistente)
+    assert [g["nombre"] for g in api.get("/api/grupos/").json()] == ["Conexión Norte"]
+    assert api.get(f"/api/grupos/{mundo['norte'].pk}/").status_code == 200
+    assert api.get(f"/api/grupos/{mundo['sur'].pk}/").status_code == 404
+    assert api.get("/api/grupos/estudios/").status_code == 200
+    # ver el grupo no le da la asistencia ni la gestión de la gente
+    detalle = api.get(f"/api/grupos/{mundo['norte'].pk}/").json()
+    assert detalle["puede_capturar"] is False and detalle["puede_gestionar"] is False
+    assert detalle["puede_publicar"] is True

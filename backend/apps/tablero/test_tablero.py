@@ -73,9 +73,9 @@ def leer(m, quien, grupo="norte"):
 
 # ---------- permisos ----------
 def test_quien_publica(m):
-    for quien in ("lider", "sup", "secre", "pastor"):
+    for quien in ("lider", "sup", "secre", "pastor", "asistente"):
         assert publicar(m, quien).status_code == 201, quien
-    for quien in ("asistente", "tesorero", "anciano", "otro"):
+    for quien in ("tesorero", "anciano", "otro"):
         assert publicar(m, quien).status_code == 403, quien
 
 
@@ -234,3 +234,17 @@ def test_otro_modulo_puede_usar_el_tablero(m):
         assert api_de(m["asistente"]).get("/api/tablero/no-leidos/").json() == {"curso": {"5": 1}}
     finally:
         registry._ORIGENES.pop("curso", None)
+
+
+def test_el_asistente_publica_en_su_grupo_pero_no_en_otro_ni_modera_lo_ajeno(m):
+    assert publicar(m, "asistente").status_code == 201
+    ajeno = publicar(m, "lider").json()["id"]
+    api = api_de(m["asistente"])
+    assert api.patch(f"/api/tablero/{ajeno}/", {"fijado": True}, format="json").status_code == 403
+    assert api.delete(f"/api/tablero/{ajeno}/").status_code == 403
+    en_sur = api.post(
+        "/api/tablero/",
+        {"origen_tipo": "grupo", "origen_id": m["sur"].pk, "texto": "Hola"},
+        format="json",
+    )
+    assert en_sur.status_code in (403, 404)

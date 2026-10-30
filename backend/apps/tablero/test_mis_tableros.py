@@ -26,7 +26,9 @@ def test_indica_no_leidos_y_si_puede_publicar(m):
     publicar(m, texto="Uno")
     publicar(m, texto="Dos")
     fila = tableros(m, "asistente")[0]
-    assert fila["no_leidos"] == 2 and fila["puede_publicar"] is False
+    assert (
+        fila["no_leidos"] == 2 and fila["puede_publicar"] is True
+    )  # el Asistente publica en su grupo
     assert fila["tipo"] == "grupo" and fila["id"] == m["norte"].pk
     propia = tableros(m, "lider")[0]
     assert propia["no_leidos"] == 0 and propia["puede_publicar"] is True  # sus mensajes no cuentan

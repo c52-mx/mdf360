@@ -43,7 +43,13 @@ class UserSerializer(serializers.ModelSerializer):
         return obj.roles_clave()
 
     def get_permisos(self, obj) -> list[str]:
-        return sorted(obj.permisos())
+        permisos = set(obj.permisos())
+        # Permiso calculado (no es de ningún rol): decide si el menú muestra Ofrendas
+        from apps.grupos import ofrendas
+
+        if ofrendas.tiene_acceso(obj):
+            permisos.add("ofrendas.acceso")
+        return sorted(permisos)
 
 
 def _error(code: str, detail: str, http_status: int):

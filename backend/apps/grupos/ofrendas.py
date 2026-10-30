@@ -37,6 +37,27 @@ def _grupo_tiene(grupo, permiso: str) -> bool:
     ).exists()
 
 
+PERMISOS_DE_OFRENDAS = (
+    "ofrendas_ver",
+    "ofrendas_capturar",
+    "ofrendas_capturar_suplente",
+    "ofrendas_avalar",
+    "ofrendas_avalar_suplente",
+)
+
+
+def tiene_acceso(user) -> bool:
+    """¿Puede entrar al módulo de Ofrendas? Quien administra los grupos, ve todas las ofrendas o
+    tiene en algún grupo un rol con permisos de ofrendas. Un Asistente o Servidor no."""
+    if tiene_permiso(user, "ofrendas.ver_todas") or tiene_permiso(user, "grupos.gestionar"):
+        return True
+    persona = getattr(user, "persona", None)
+    if persona is None:
+        return False
+    roles = set().union(*(equipos.con_permiso(AMBITO, p) for p in PERMISOS_DE_OFRENDAS))
+    return GrupoMiembro.objects.filter(persona=persona, activo=True, rol__in=roles).exists()
+
+
 def captura_suplente(user, reunion: Reunion) -> bool:
     """Captura quien tiene la suplencia cuando nadie en el grupo tiene el permiso de capturar."""
     permisos = permisos_en(user, reunion.grupo)

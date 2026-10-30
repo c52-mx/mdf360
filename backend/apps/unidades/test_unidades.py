@@ -82,11 +82,13 @@ def test_el_alcance_de_cada_rol_es_independiente_por_unidad(mundo):
     assert caf["puede_gestionar"] is True  # encargada en la cafetería
     assert lib["puede_gestionar"] is False  # solo servidora en la librería
     assert lib["mis_roles"] == ["servidor"]
-    # como asistente de un grupo no administra nada de él: ve solo su tablero de avisos
-    assert api_de(mundo["encargada"]).get(f"/api/grupos/{mundo['norte'].pk}/").status_code == 404
+    # como asistente de un grupo lo ve y publica en su tablero, pero no lo administra
+    detalle = api_de(mundo["encargada"]).get(f"/api/grupos/{mundo['norte'].pk}/")
+    assert detalle.status_code == 200
+    assert detalle.json()["puede_gestionar"] is False and detalle.json()["puede_capturar"] is False
     avisos = api_de(mundo["encargada"]).get("/api/tablero/mis-tableros/").json()
     grupo = next(t for t in avisos if t["tipo"] == "grupo")
-    assert grupo["puede_publicar"] is False
+    assert grupo["puede_publicar"] is True
 
 
 def test_una_unidad_ajena_no_existe_para_quien_no_participa(mundo):
@@ -203,7 +205,10 @@ def test_destinos_segun_lo_que_cada_quien_puede_publicar(mundo):
         "unidad",
         mundo["libreria"].pk,
     ) in pastor
-    assert destinos(mundo["encargada"]) == {("unidad", mundo["cafeteria"].pk)}
+    assert destinos(mundo["encargada"]) == {
+        ("unidad", mundo["cafeteria"].pk),
+        ("grupo", mundo["norte"].pk),  # y como asistente publica en el tablero de su grupo
+    }
     assert destinos(mundo["lider"]) == {("grupo", mundo["norte"].pk)}
     assert destinos(mundo["ajena"]) == set()
 

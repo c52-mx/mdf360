@@ -154,6 +154,9 @@ CATALOGO_EQUIPO: dict[str, tuple[Permiso, ...]] = {
         Permiso("estudio", "Grupo", "Estudio semanal", "Ver el estudio de la semana"),
         Permiso("avisos", "Grupo", "Tablero", "Publicar avisos en el tablero del grupo"),
         Permiso(
+            "avisos_moderar", "Grupo", "Tablero", "Fijar y quitar los avisos de otras personas"
+        ),
+        Permiso(
             "ofrendas_ver",
             "Grupo",
             "Ofrendas",
@@ -231,10 +234,13 @@ def agrupado_equipo(ambito: str) -> list[dict]:
 
 # Roles que vienen con el sistema y lo que permiten al inicio.
 _LIDER_GRUPO = (
-    "avisos", "corregir", "capturar", "estudio", "historial", "integrantes", "ver",
+    "avisos", "avisos_moderar", "corregir", "capturar", "estudio", "historial", "integrantes",
+    "ver",
     "ofrendas_ver", "ofrendas_capturar_suplente", "ofrendas_avalar_suplente",
     "peticiones_registrar", "peticiones_ver",
 )  # fmt: skip
+# Lo mínimo para participar: ver su grupo, el estudio de la semana y publicar en su tablero.
+_BASICO_GRUPO = ("avisos", "estudio", "ver")
 BASE_EQUIPO: dict[str, tuple[tuple[str, str, str, tuple[str, ...]], ...]] = {
     AMBITO_GRUPO: (
         ("lider", "Líder", "Encargado del grupo.", _LIDER_GRUPO),
@@ -243,13 +249,29 @@ BASE_EQUIPO: dict[str, tuple[tuple[str, str, str, tuple[str, ...]], ...]] = {
             "supervisor",
             "Supervisor",
             "Consulta sus grupos.",
-            ("ver", "historial", "estudio", "avisos", "ofrendas_ver", "peticiones_ver"),
+            (
+                "ver",
+                "historial",
+                "estudio",
+                "avisos",
+                "avisos_moderar",
+                "ofrendas_ver",
+                "peticiones_ver",
+            ),  # fmt: skip
         ),
         (
             "secretario",
             "Secretario",
             "Captura la asistencia y la ofrenda.",
-            ("ver", "capturar", "estudio", "avisos", "ofrendas_capturar", "peticiones_registrar"),
+            (
+                "ver",
+                "capturar",
+                "estudio",
+                "avisos",
+                "avisos_moderar",
+                "ofrendas_capturar",
+                "peticiones_registrar",
+            ),  # fmt: skip
         ),
         ("anfitrion", "Anfitrión", "Abre su casa para la reunión.", ()),
         (
@@ -258,8 +280,8 @@ BASE_EQUIPO: dict[str, tuple[tuple[str, str, str, tuple[str, ...]], ...]] = {
             "Cuida las ofrendas del grupo.",
             ("ofrendas_ver", "ofrendas_avalar"),
         ),
-        ("servidor", "Servidor", "Sirve en el grupo.", ()),
-        ("asistente", "Asistente", "Participa en el grupo.", ()),
+        ("servidor", "Servidor", "Sirve en el grupo.", _BASICO_GRUPO),
+        ("asistente", "Asistente", "Participa en el grupo.", _BASICO_GRUPO),
     ),
     AMBITO_MINISTERIO: (
         (

@@ -33,13 +33,16 @@ def test_los_roles_base_de_grupo_replican_lo_que_ya_se_hacia(db):
     assert set(permisos) == claves | {"servidor", "asistente"}
     assert permisos["lider"] >= {"ver", "integrantes", "historial", "capturar", "corregir"}
     assert permisos["supervisor"] == {
-        "ver", "historial", "estudio", "avisos", "ofrendas_ver", "peticiones_ver",
+        "ver", "historial", "estudio", "avisos", "avisos_moderar", "ofrendas_ver", "peticiones_ver",
     }  # fmt: skip
     assert permisos["secretario"] == {
-        "ver", "capturar", "estudio", "avisos", "ofrendas_capturar", "peticiones_registrar",
+        "ver", "capturar", "estudio", "avisos", "avisos_moderar", "ofrendas_capturar",
+        "peticiones_registrar",
     }  # fmt: skip
     assert permisos["tesorero"] == {"ofrendas_ver", "ofrendas_avalar"}
-    assert permisos["asistente"] == permisos["anfitrion"] == set()
+    # Quien participa ve su grupo y el estudio y publica en su tablero, pero no modera ni gestiona
+    assert permisos["asistente"] == permisos["servidor"] == {"ver", "estudio", "avisos"}
+    assert permisos["anfitrion"] == set()
 
 
 def test_un_rol_nuevo_de_ministerio_se_crea_y_se_asigna(mundo):  # noqa: F811

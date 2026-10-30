@@ -36,19 +36,44 @@ def test_por_defecto_solo_lideres(rico):
         assert ve(rico, quien) == 0, quien
 
 
-def test_alcance_mi_grupo_lo_ven_todos_los_integrantes_y_nadie_mas(rico):
+def test_un_integrante_no_ve_las_peticiones_del_grupo_aunque_sean_de_alcance_grupo(rico):
+    """Cada persona ve solo las suyas; el líder o rol superior ve las de su grupo."""
     assert con_alcance(rico, "grupo").status_code == 201
-    for quien in ("lider", "sup", "pastor", "anciano", "asistente", "secre", "tesorero"):
+    for quien in ("lider", "sup", "pastor", "anciano"):
         assert ve(rico, quien) == 1, quien
-    for quien in ("asistente_sur", "lider_sur", "oracion", "admin"):
+    for quien in (
+        "asistente",
+        "secre",
+        "tesorero",
+        "asistente_sur",
+        "lider_sur",
+        "oracion",
+        "admin",
+    ):
         assert ve(rico, quien) == 0, quien
 
 
-def test_alcance_equipo_suma_al_equipo_de_oracion(rico):
+def test_el_asistente_ve_su_peticion_personal_y_no_las_de_otros(rico):
+    crear(rico, "lider", visibilidad="equipo")
+    propia = api_de(rico["asistente"]).post(
+        "/api/peticiones/",
+        {
+            "origen_tipo": "persona",
+            "origen_id": rico["asistente"].pk,
+            "datos": {"peticion": "Por mi familia", "solicitante": "Yo"},
+        },
+        format="json",
+    )
+    assert propia.status_code == 201
+    vistas = api_de(rico["asistente"]).get("/api/peticiones/").json()["results"]
+    assert [v["datos"]["peticion"] for v in vistas] == ["Por mi familia"]
+
+
+def test_alcance_equipo_lo_leen_los_lideres_y_el_equipo_de_oracion(rico):
     assert con_alcance(rico, "equipo").status_code == 201
-    for quien in ("lider", "asistente", "secre", "oracion", "pastor"):
+    for quien in ("lider", "oracion", "pastor"):
         assert ve(rico, quien) == 1, quien
-    for quien in ("asistente_sur", "lider_sur", "admin"):
+    for quien in ("asistente", "secre", "asistente_sur", "lider_sur", "admin"):
         assert ve(rico, quien) == 0, quien
     assert Peticion.objects.get().visibilidad == "equipo"
 
@@ -69,11 +94,15 @@ def test_el_equipo_no_ve_las_de_alcance_grupo_ni_solo_lideres(rico):
 def test_quien_no_es_lider_no_gestiona_aunque_la_vea(rico):
     con_alcance(rico, "equipo")
     pid = Peticion.objects.get().pk
-    for quien in ("asistente", "oracion", "secre"):
+    r = api_de(rico["oracion"]).patch(
+        f"/api/peticiones/{pid}/", {"estado": "atendida"}, format="json"
+    )
+    assert r.status_code == 403
+    for quien in ("asistente", "secre"):  # un integrante ni siquiera la ve
         r = api_de(rico[quien]).patch(
             f"/api/peticiones/{pid}/", {"estado": "atendida"}, format="json"
         )
-        assert r.status_code == 403, quien
+        assert r.status_code == 404, quien
     ok = api_de(rico["lider"]).patch(
         f"/api/peticiones/{pid}/", {"estado": "atendida"}, format="json"
     )
@@ -87,23 +116,22 @@ def test_quien_no_es_lider_no_gestiona_aunque_la_vea(rico):
         api_de(rico["lider"]).get("/api/peticiones/").json()["results"][0]["puede_gestionar"]
         is True
     )
-    otra = api_de(rico["asistente"]).get("/api/peticiones/").json()["results"][0]
+    otra = api_de(rico["oracion"]).get("/api/peticiones/").json()["results"][0]
     assert otra["puede_gestionar"] is False
 
 
 def test_ocultar_nombre_solo_lo_ven_lideres_y_quien_la_registro(rico):
     datos = {"peticion": "Por mi matrimonio", "solicitante": "Carmen Ruiz"}
     con_alcance(rico, "equipo", ocultar=True, datos=datos)
-    for quien in ("asistente", "oracion", "tesorero"):
-        d = api_de(rico[quien]).get("/api/peticiones/").json()["results"][0]["datos"]
-        assert d["peticion"] == "Por mi matrimonio" and "solicitante" not in d, quien
+    d = api_de(rico["oracion"]).get("/api/peticiones/").json()["results"][0]["datos"]
+    assert d["peticion"] == "Por mi matrimonio" and "solicitante" not in d
     for quien in ("lider", "sup", "pastor", "anciano"):
         d = api_de(rico[quien]).get("/api/peticiones/").json()["results"][0]["datos"]
         assert d["solicitante"] == "Carmen Ruiz", quien
-    # sin ocultar, todos ven el nombre
+    # sin ocultar, el equipo de oración ve el nombre
     Peticion.objects.all().delete()
-    con_alcance(rico, "grupo", ocultar=False, datos=datos)
-    visto = api_de(rico["asistente"]).get("/api/peticiones/").json()["results"][0]["datos"]
+    con_alcance(rico, "equipo", ocultar=False, datos=datos)
+    visto = api_de(rico["oracion"]).get("/api/peticiones/").json()["results"][0]["datos"]
     assert visto["solicitante"] == "Carmen Ruiz"
 
 

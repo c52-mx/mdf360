@@ -151,6 +151,8 @@ class OfrendasPendientesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        if not of.tiene_acceso(request.user):
+            return _denegado()
         persona = getattr(request.user, "persona", None)
         ids = set()
         if persona is not None:

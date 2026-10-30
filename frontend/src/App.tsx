@@ -66,7 +66,9 @@ function PrivateLayout() {
     { to: '/ministerios', label: 'Ministerios', icon: Building2, module: 'grupos', group: operacion },
     { to: '/peticiones', label: 'Peticiones', icon: HandHeart, module: 'grupos', group: operacion },
     { to: '/avisos', label: 'Avisos', icon: Bell, module: 'grupos', group: operacion },
-    { to: '/ofrendas', label: 'Ofrendas', icon: Coins, module: 'grupos', group: operacion },
+    ...(can('ofrendas.acceso')
+      ? [{ to: '/ofrendas', label: 'Ofrendas', icon: Coins, module: 'grupos' as const, group: operacion }]
+      : []),
     ...(can('personas.ver')
       ? [{ to: '/personas', label: 'Personas', icon: Users, module: 'admin' as const, group: catalogos }]
       : []),

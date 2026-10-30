@@ -78,13 +78,12 @@ def mensajes_de(user, origen_tipo, origen_id):
 
 
 def puede_moderar(user, mensaje: Mensaje) -> bool:
-    """Fijar o quitar: quien publicó o quien puede publicar en ese origen."""
+    """Fijar o quitar: quien publicó o quien modera el origen (por omisión, quien publica)."""
     origen = registry.obtener(mensaje.origen_tipo)
     if origen is None:
         return False
-    return mensaje.autor_id == getattr(user, "pk", None) or origen.puede_publicar(
-        user, mensaje.origen_id
-    )
+    moderador = origen.puede_moderar or origen.puede_publicar
+    return mensaje.autor_id == getattr(user, "pk", None) or moderador(user, mensaje.origen_id)
 
 
 def marcar_visto(user, origen_tipo, origen_id) -> bool:

@@ -21,6 +21,8 @@ class Origen:
     listar: Callable[[object], list[tuple[int, str]]] | None = None
     # Pantalla donde se lee el tablero (al tocar la notificación); None = «Avisos»
     ruta: Callable[[int], str] | None = None
+    # Quién fija o quita los avisos de otras personas; None = quien puede publicar
+    puede_moderar: Callable[[object, int], bool] | None = None
 
 
 _ORIGENES: dict[str, Origen] = {}

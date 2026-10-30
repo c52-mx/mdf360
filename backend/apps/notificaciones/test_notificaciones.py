@@ -138,11 +138,11 @@ def test_el_cuerpo_largo_se_recorta(m, enviados, django_capture_on_commit_callba
 
 
 @pytest.mark.django_db
-def test_un_estudio_nuevo_avisa_a_lideres_y_no_a_asistentes(  # noqa: F811
+def test_un_estudio_nuevo_avisa_a_lideres_y_asistentes_pero_no_a_quien_no_lo_ve(  # noqa: F811
     m, enviados, django_capture_on_commit_callbacks
 ):
     s_lider = suscribir(m["lider"])
-    suscribir(m["asistente"])
+    s_asistente = suscribir(m["asistente"])
     pdf = SimpleUploadedFile("estudio.pdf", b"%PDF-1.4 prueba", content_type="application/pdf")
     with django_capture_on_commit_callbacks(execute=True):
         grupos_services.guardar_estudio(
@@ -151,7 +151,7 @@ def test_un_estudio_nuevo_avisa_a_lideres_y_no_a_asistentes(  # noqa: F811
             archivos={"pdf_adultos": pdf},
             actor=m["pastor"],
         )
-    assert _destinos(enviados) == [s_lider.endpoint]
+    assert sorted(_destinos(enviados)) == sorted([s_lider.endpoint, s_asistente.endpoint])
     datos = json.loads(enviados[0][1])
     assert datos["titulo"] == "Estudio de la semana"
     assert datos["url"] == "/estudios"

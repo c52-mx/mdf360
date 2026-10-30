@@ -30,6 +30,16 @@ def _puede_publicar(user, grupo_id: int) -> bool:
     return "avisos" in permisos_en(user, grupo)
 
 
+def _puede_moderar(user, grupo_id: int) -> bool:
+    """Fijar o quitar avisos ajenos. Publicar no basta: un Asistente publica pero no modera."""
+    grupo = _grupo(grupo_id)
+    if grupo is None:
+        return False
+    if tiene_permiso(user, "grupos.gestionar"):
+        return True
+    return "avisos_moderar" in permisos_en(user, grupo)
+
+
 def _puede_leer(user, grupo_id: int) -> bool:
     grupo = _grupo(grupo_id)
     if grupo is None:
@@ -65,6 +75,7 @@ def registrar_origen():
             nombre="Grupo de Conexión",
             etiqueta=_etiqueta,
             puede_publicar=_puede_publicar,
+            puede_moderar=_puede_moderar,
             puede_leer=_puede_leer,
             ids_legibles=_ids_legibles,
             listar=_listar,

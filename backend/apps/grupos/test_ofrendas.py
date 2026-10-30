@@ -466,3 +466,15 @@ def test_quien_capturo_nunca_avala_aunque_tenga_ambos_permisos(m):
         format="json",
     )
     assert propio.status_code == 403 and propio.json()["code"] == "own_capture"
+
+
+# ---------- el módulo de Ofrendas solo existe para quien lo usa ----------
+def test_el_asistente_no_tiene_ofrendas_ni_en_el_menu_ni_en_la_api(m):
+    asistente = cuenta("55 0000 0097", "Ana Asistente", "miembro")
+    GrupoMiembro.objects.create(grupo=m["grupo"], persona=asistente.persona, rol="asistente")
+    api = api_de(asistente)
+    assert "ofrendas.acceso" not in api.get("/api/auth/me/").json()["permisos"]
+    assert api.get("/api/grupos/ofrendas/pendientes/").status_code == 403
+    for quien in ("pastor", "tesorero", "secre"):
+        permisos = api_de(m[quien]).get("/api/auth/me/").json()["permisos"]
+        assert "ofrendas.acceso" in permisos, quien

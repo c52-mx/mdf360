@@ -10,7 +10,7 @@ from apps.accounts import equipos
 from apps.accounts.permissions import tiene_permiso
 from apps.peticiones import registry
 
-from .access import AMBITO, permisos_en, roles_en
+from .access import AMBITO, permisos_en
 from .models import Grupo, GrupoMiembro, Reunion
 
 
@@ -37,15 +37,14 @@ def _puede_registrar(user, grupo_id: int) -> bool:
 
 
 def _acceso(user, grupo_id: int) -> str | None:
-    """LIDER: Pastor, Anciano, Líder o Supervisor. MIEMBRO: cualquier integrante activo."""
+    """LIDER: Pastor, Anciano, Líder o Supervisor. Quien solo es integrante no lee las de otros:
+    cada persona ve únicamente las peticiones que registró (eso lo resuelve el servicio)."""
     if tiene_permiso(user, "peticiones.ver_todas"):
         return registry.LIDER
     grupo = Grupo.objects.filter(pk=grupo_id).first()
     if grupo is None:
         return None
-    if "peticiones_ver" in permisos_en(user, grupo):
-        return registry.LIDER
-    return registry.MIEMBRO if roles_en(user, grupo) else None
+    return registry.LIDER if "peticiones_ver" in permisos_en(user, grupo) else None
 
 
 def _ids_por_acceso(user) -> dict[str, list[int] | None]:
@@ -61,7 +60,7 @@ def _ids_por_acceso(user) -> dict[str, list[int] | None]:
                 "grupo_id", flat=True
             )
         ),
-        registry.MIEMBRO: list(membresias.values_list("grupo_id", flat=True).distinct()),
+        registry.MIEMBRO: [],
     }
 
 
