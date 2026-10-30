@@ -56,8 +56,9 @@ describe('EnviarAvisoCard', () => {
     for (const nombre of ['Toda la iglesia', 'Grupo de Conexión · Norte', 'Ministerio · Cafetería']) {
       fireEvent.click(screen.getByRole('checkbox', { name: nombre }))
     }
-    fireEvent.change(screen.getByLabelText('Buscar persona'), { target: { value: 'ana' } })
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'Ana Ajena' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Buscar persona' }), { target: { value: 'ana' } })
+    fireEvent.click(await screen.findByRole('option', { name: /Ana Ajena/ }))
+    expect(screen.getByRole('list', { name: 'Personas elegidas' })).toHaveTextContent('Ana Ajena')
     fireEvent.click(screen.getByRole('button', { name: 'Enviar a 4' }))
     await waitFor(() => expect(llamadas.map((l) => l.url)).toContain('/api/tablero/masivo/'))
     expect(JSON.parse(String(llamadas[0].init?.body))).toEqual({
@@ -70,6 +71,30 @@ describe('EnviarAvisoCard', () => {
       ],
     })
     expect(await screen.findByText(/Aviso enviado a 1 lugar/)).toBeInTheDocument()
+  })
+
+  it('marca que el aviso a toda la iglesia requiere autorización y avisa que quedó por autorizar', async () => {
+    const lista = [{ ...destinos[0], requiere_autorizacion: true }, destinos[1]]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url.includes('/csrf/')) return json(200, { csrfToken: 'x' })
+        if (init?.method === 'POST')
+          return json(201, { enviados: [], omitidos: [], pendientes: [{ tipo: 'iglesia', id: 1, etiqueta: 'x' }] })
+        return json(200, lista)
+      }),
+    )
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <EnviarAvisoCard />
+      </QueryClientProvider>,
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar un aviso' }))
+    expect(screen.getByText('Requiere autorización')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Mensaje'), { target: { value: 'Convivio' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Toda la iglesia' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar a 1' }))
+    expect(await screen.findByText(/quedó por autorizar/)).toBeInTheDocument()
   })
 
   it('no deja enviar sin mensaje o sin destinos', async () => {

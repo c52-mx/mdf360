@@ -248,3 +248,76 @@ def test_el_asistente_publica_en_su_grupo_pero_no_en_otro_ni_modera_lo_ajeno(m):
         format="json",
     )
     assert en_sur.status_code in (403, 404)
+
+
+# ---------- avisos a toda la iglesia: se autorizan ----------
+def a_la_iglesia(m, quien, texto="Convivio de la iglesia"):
+    return api_de(m[quien]).post(
+        "/api/tablero/masivo/",
+        {"texto": texto, "destinos": [{"tipo": "iglesia", "id": 1}]},
+        format="json",
+    )
+
+
+def en_la_iglesia(m, quien):
+    return api_de(m[quien]).get("/api/tablero/?origen_tipo=iglesia&origen_id=1").json()
+
+
+def test_el_asistente_pide_un_aviso_a_toda_la_iglesia_y_queda_pendiente(m):
+    r = a_la_iglesia(m, "asistente")
+    assert r.status_code == 201
+    assert r.json()["enviados"] == [] and len(r.json()["pendientes"]) == 1
+    assert en_la_iglesia(m, "lider") == []  # nadie lo ve todavía
+    destinos = api_de(m["asistente"]).get("/api/tablero/destinos/").json()
+    iglesia = next(d for d in destinos if d["tipo"] == "iglesia")
+    assert iglesia["requiere_autorizacion"] is True
+    pastor = api_de(m["pastor"]).get("/api/tablero/destinos/").json()
+    assert next(d for d in pastor if d["tipo"] == "iglesia")["requiere_autorizacion"] is False
+    # y lo que el Pastor envía sí sale directo
+    assert a_la_iglesia(m, "pastor").json()["enviados"]
+
+
+def test_quien_no_participa_en_ningun_tablero_no_puede_ni_pedirlo(m):
+    sin_grupo = cuenta("55 0000 0090", "Sin grupo", "miembro")
+    m["sin_grupo"] = sin_grupo
+    assert a_la_iglesia(m, "sin_grupo").json()["pendientes"] == []
+
+
+@pytest.mark.parametrize("quien", ["pastor", "lider", "sup"])
+def test_pastor_lider_y_supervisor_autorizan_y_el_aviso_sale(m, quien):
+    a_la_iglesia(m, "asistente")
+    por = api_de(m[quien]).get("/api/tablero/por-autorizar/").json()
+    assert por["puede_autorizar"] is True and len(por["avisos"]) == 1
+    aviso = por["avisos"][0]
+    assert api_de(m[quien]).post(f"/api/tablero/{aviso['id']}/autorizar/").status_code == 200
+    visto = en_la_iglesia(m, "otro")
+    assert [x["texto"] for x in visto] == ["Convivio de la iglesia"]
+    assert visto[0]["autor"] == "Ana Asistente"
+    assert AuditEvent.objects.filter(action="tablero.autorizado").exists()
+
+
+def test_un_aviso_rechazado_no_sale_y_su_autor_lo_sabe(m):
+    a_la_iglesia(m, "asistente")
+    aviso = api_de(m["pastor"]).get("/api/tablero/por-autorizar/").json()["avisos"][0]
+    assert api_de(m["pastor"]).post(f"/api/tablero/{aviso['id']}/rechazar/").status_code == 200
+    assert en_la_iglesia(m, "otro") == []
+    propio = api_de(m["asistente"]).get("/api/tablero/por-autorizar/").json()
+    assert [(x["estado"], x["puede_resolver"]) for x in propio["avisos"]] == [("rechazado", False)]
+    # ya resuelto, no se puede volver a resolver
+    assert api_de(m["pastor"]).post(f"/api/tablero/{aviso['id']}/autorizar/").status_code == 404
+
+
+def test_nadie_autoriza_su_propio_aviso_ni_lo_hace_quien_no_tiene_autoridad(m):
+    a_la_iglesia(m, "lider")  # el líder no publica directo a la iglesia: lo pide
+    a_la_iglesia(m, "asistente", texto="Otro")
+    pid = api_de(m["lider"]).get("/api/tablero/por-autorizar/").json()["avisos"]
+    propio = next(x for x in pid if x["texto"] == "Convivio de la iglesia")
+    assert propio["puede_resolver"] is False
+    assert api_de(m["lider"]).post(f"/api/tablero/{propio['id']}/autorizar/").status_code == 403
+    # el asistente ve solo lo suyo y no puede autorizar
+    suyo = api_de(m["asistente"]).get("/api/tablero/por-autorizar/").json()
+    assert suyo["puede_autorizar"] is False and [x["texto"] for x in suyo["avisos"]] == ["Otro"]
+    propio_id = suyo["avisos"][0]["id"]
+    assert api_de(m["asistente"]).post(f"/api/tablero/{propio_id}/autorizar/").status_code == 403
+    # y un pendiente no se puede fijar ni borrar como si estuviera publicado
+    assert api_de(m["pastor"]).delete(f"/api/tablero/{propio['id']}/").status_code == 404

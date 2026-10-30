@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ComboField } from './combo-field'
 
 const personas = [
@@ -87,5 +87,29 @@ describe('ComboField', () => {
     expect(opciones()).toHaveLength(3)
     fireEvent.keyDown(caja(), { key: 'Escape' })
     expect(opciones()).toHaveLength(0)
+  })
+})
+
+describe('ComboField con búsqueda en el servidor', () => {
+  it('avisa lo que se escribe, no vuelve a filtrar y se vacía al elegir', () => {
+    const buscar = vi.fn()
+    const elegidas: string[] = []
+    render(
+      <ComboField
+        label="Persona"
+        options={[{ value: '9', label: 'Zacarías Ruiz', detalle: '55 0000 1111' }]}
+        value=""
+        onChange={(v) => elegidas.push(v)}
+        onBuscar={buscar}
+        filtrar={false}
+        limpiarAlElegir
+      />,
+    )
+    fireEvent.change(caja(), { target: { value: '5500' } }) // el nombre no contiene lo escrito
+    expect(buscar).toHaveBeenLastCalledWith('5500')
+    expect(opciones()).toEqual(['Zacarías Ruiz55 0000 1111'])
+    fireEvent.click(screen.getByRole('option'))
+    expect(elegidas).toEqual(['9'])
+    expect(caja()).toHaveValue('')
   })
 })

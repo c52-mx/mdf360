@@ -59,7 +59,9 @@ class MensajeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def _mensaje(self, request, pk):
-        mensaje = get_object_or_404(Mensaje, pk=pk, eliminado=False)
+        mensaje = get_object_or_404(
+            Mensaje, pk=pk, eliminado=False, estado=Mensaje.Estado.PUBLICADO
+        )
         if services.mensajes_de(request.user, mensaje.origen_tipo, mensaje.origen_id) is None:
             raise Http404
         return mensaje
@@ -97,7 +99,7 @@ class MensajeRestaurarView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
-        mensaje = get_object_or_404(Mensaje, pk=pk, eliminado=True)
+        mensaje = get_object_or_404(Mensaje, pk=pk, eliminado=True, estado=Mensaje.Estado.PUBLICADO)
         if services.mensajes_de(request.user, mensaje.origen_tipo, mensaje.origen_id) is None:
             raise Http404
         if not services.puede_moderar(request.user, mensaje):
@@ -170,3 +172,63 @@ class NoLeidosView(APIView):
 
     def get(self, request):
         return Response(services.no_leidos(request.user))
+
+
+class PorAutorizarView(APIView):
+    """Avisos a toda la iglesia que esperan autorización (o que se rechazaron, para su autor)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        puede = services.puede_autorizar_iglesia(request.user)
+        pendientes = services.por_autorizar(request.user)
+        # El autor también ve cuáles se rechazaron en los últimos días
+        rechazados = Mensaje.objects.filter(
+            estado=Mensaje.Estado.RECHAZADO,
+            autor=request.user,
+            resuelto_en__gte=timezone.now() - timedelta(days=7),
+        )
+        filas = list(pendientes) + list(rechazados)
+        return Response(
+            {
+                "puede_autorizar": puede,
+                "avisos": [
+                    {
+                        **services.mensaje_dict(m, request.user),
+                        "puede_resolver": puede and m.autor_id != request.user.pk,
+                    }
+                    for m in filas
+                ],
+            }
+        )
+
+
+class ResolverAvisoView(APIView):
+    permission_classes = [IsAuthenticated]
+    autorizar = True
+
+    def post(self, request, pk):
+        mensaje = get_object_or_404(Mensaje, pk=pk, estado=Mensaje.Estado.PENDIENTE)
+        if mensaje not in services.por_autorizar(request.user):
+            raise Http404
+        try:
+            services.resolver(
+                mensaje, autorizar=self.autorizar, actor=request.user, request=request
+            )
+        except services.SinPermiso:
+            return _error("forbidden", "No puedes resolver este aviso.", status.HTTP_403_FORBIDDEN)
+        except DjangoValidationError as exc:
+            return _error("invalid", " ".join(exc.messages))
+        return Response(services.mensaje_dict(mensaje, request.user))
+
+
+class AutorizarAvisoView(ResolverAvisoView):
+    autorizar = True
+
+
+class RechazarAvisoView(ResolverAvisoView):
+    autorizar = False

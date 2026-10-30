@@ -21,6 +21,12 @@ interface ComboFieldProps {
   /** Texto cuando nada coincide. */
   vacio?: string
   disabled?: boolean
+  /** Avisa lo que se escribe, para pedir al servidor las coincidencias en listas muy largas. */
+  onBuscar?: (texto: string) => void
+  /** false = las opciones ya vienen filtradas por el servidor (no se vuelven a filtrar aquí). */
+  filtrar?: boolean
+  /** Para elegir varias personas, una tras otra: al elegir, el campo queda vacío de nuevo. */
+  limpiarAlElegir?: boolean
 }
 
 /** Sin acentos, mayúsculas, espacios ni signos: «55 1234-5678» y «551234» coinciden. */
@@ -45,6 +51,9 @@ export function ComboField({
   error,
   vacio = 'Nadie coincide con la búsqueda.',
   disabled,
+  onBuscar,
+  filtrar = true,
+  limpiarAlElegir = false,
 }: ComboFieldProps) {
   const id = useId()
   const listaId = `${id}-lista`
@@ -66,15 +75,16 @@ export function ComboField({
 
   const coincidencias = useMemo(() => {
     const q = normalizar(texto)
-    if (!q || elegida?.label === texto) return options.slice(0, 50)
+    if (!q || elegida?.label === texto || !filtrar) return options.slice(0, 50)
     return options
       .filter((o) => normalizar(`${o.label} ${o.detalle ?? ''}`).includes(q))
       .slice(0, 50)
-  }, [options, texto, elegida])
+  }, [options, texto, elegida, filtrar])
 
   function elegir(o: ComboOption) {
     onChange(o.value)
-    setTexto(o.label)
+    setTexto(limpiarAlElegir ? '' : o.label)
+    if (limpiarAlElegir) onBuscar?.('')
     setAbierta(false)
   }
 
@@ -108,6 +118,7 @@ export function ComboField({
         onFocus={() => setAbierta(true)}
         onChange={(e) => {
           setTexto(e.target.value)
+          onBuscar?.(e.target.value)
           setAbierta(true)
           setActiva(0)
           if (value) onChange('') // al escribir se pierde la elección anterior

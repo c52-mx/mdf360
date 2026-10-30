@@ -208,8 +208,9 @@ def test_destinos_segun_lo_que_cada_quien_puede_publicar(mundo):
     assert destinos(mundo["encargada"]) == {
         ("unidad", mundo["cafeteria"].pk),
         ("grupo", mundo["norte"].pk),  # y como asistente publica en el tablero de su grupo
+        ("iglesia", 1),  # toda la iglesia se pide: alguien la autoriza
     }
-    assert destinos(mundo["lider"]) == {("grupo", mundo["norte"].pk)}
+    assert destinos(mundo["lider"]) == {("grupo", mundo["norte"].pk), ("iglesia", 1)}
     assert destinos(mundo["ajena"]) == set()
 
 
@@ -254,9 +255,10 @@ def test_cada_destino_respeta_sus_propios_permisos(mundo):
     assert r.status_code == 201
     assert [e["tipo"] for e in r.json()["enviados"]] == ["unidad"]
     assert {(o["tipo"], o["id"]) for o in r.json()["omitidos"]} == {
-        ("unidad", mundo["libreria"].pk),
-        ("iglesia", 1),
+        ("unidad", mundo["libreria"].pk)
     }
+    # a toda la iglesia no llega directo: queda pendiente de autorización
+    assert [(p["tipo"], p["id"]) for p in r.json()["pendientes"]] == [("iglesia", 1)]
 
 
 def test_avisos_a_personas_solo_los_lee_la_persona(mundo):
