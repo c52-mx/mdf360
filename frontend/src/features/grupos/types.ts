@@ -32,6 +32,8 @@ export interface Miembro {
 export interface ReunionDelGrupo {
   id: number
   fecha: string
+  /** Se abrió otro día distinto al fijo del grupo. */
+  fuera_de_dia?: boolean
   presentes?: number
   registrados?: number
   notas?: string

@@ -15,20 +15,19 @@ export type Visibilidad = 'lideres' | 'grupo' | 'equipo'
 
 export const visibilidadOpciones: { value: Visibilidad; label: string; ayuda: string }[] = [
   { value: 'lideres', label: 'Solo líderes', ayuda: 'La ven el Líder, el Supervisor y la dirección.' },
-  { value: 'grupo', label: 'Mi grupo', ayuda: 'La ven todos los integrantes del grupo.' },
   {
     value: 'equipo',
     label: 'Equipo de oración',
-    ayuda: 'La ve el grupo y el equipo de oración de la iglesia.',
+    ayuda: 'La ven también quienes forman el equipo de oración de la iglesia.',
   },
 ]
 
 /** Quién podrá leer la petición según su alcance (para la leyenda de privacidad al capturar). */
 export const quienLee: Record<Visibilidad, string> = {
   lideres: 'el Líder, el Supervisor y la dirección de la iglesia',
-  grupo: 'todos los integrantes del grupo, el Líder, el Supervisor y la dirección de la iglesia',
-  equipo:
-    'todos los integrantes del grupo, el equipo de oración de la iglesia, el Líder, el Supervisor y la dirección',
+  // «Mi grupo» ya no se ofrece: un integrante común solo ve las peticiones que él mismo registró
+  grupo: 'el Líder, el Supervisor y la dirección de la iglesia',
+  equipo: 'el equipo de oración de la iglesia, el Líder, el Supervisor y la dirección',
 }
 
 export interface Formulario {

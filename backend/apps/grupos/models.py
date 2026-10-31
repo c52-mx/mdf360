@@ -21,6 +21,8 @@ class Grupo(models.Model):
     sector = models.CharField("sector (letra)", max_length=1, blank=True)
     casa = models.PositiveSmallIntegerField("número de casa", null=True, blank=True)
     colonia = models.CharField("zona o colonia", max_length=100, blank=True)
+    # Un solo día fijo a la semana. Sigue admitiendo nulos solo por los grupos viejos que nunca
+    # lo capturaron; la API ya lo exige al crear y no permite borrarlo.
     dia_semana = models.PositiveSmallIntegerField(
         "día de la semana", null=True, blank=True, help_text="0 = lunes … 6 = domingo"
     )
@@ -156,6 +158,8 @@ class Reunion(models.Model):
     grupo = models.ForeignKey(Grupo, on_delete=models.CASCADE, related_name="reuniones")
     fecha = models.DateField(default=timezone.localdate)
     notas = models.TextField(blank=True)
+    # La reunión es un evento fijo a la semana; si se abrió otro día, queda registrado
+    fuera_de_dia = models.BooleanField("fuera del día del grupo", default=False)
     creada_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )

@@ -227,3 +227,41 @@ def test_ver_las_de_solo_lideres_es_un_permiso_del_rol(rico):
     tes.permisos = sorted({*tes.permisos, "peticiones_ver"})
     tes.save()
     assert ve(rico, "tesorero") == 1
+
+
+# ---------- resumen para la gráfica ----------
+def test_el_resumen_cuenta_atendidas_y_pendientes_por_semana_solo_de_lo_que_se_ve(rico):
+    crear(rico, "lider")
+    crear(rico, "lider")
+    pid = Peticion.objects.first().pk
+    assert (
+        api_de(rico["lider"]).patch(
+            f"/api/peticiones/{pid}/", {"estado": "atendida"}, format="json"
+        )
+    ).status_code == 200
+    crear(rico, "lider_sur", "sur")  # de otro grupo
+    vista = api_de(rico["lider"]).get("/api/peticiones/resumen/").json()
+    assert vista["totales"] == {"activas": 1, "atendidas": 1}
+    assert len(vista["semanas"]) == 1 and vista["semanas"][0]["activas"] == 1
+    assert api_de(rico["pastor"]).get("/api/peticiones/resumen/").json()["totales"] == {
+        "activas": 2,
+        "atendidas": 1,
+    }
+    # quien no ve ninguna recibe un resumen vacío, sin contenido
+    vacio = api_de(rico["asistente"]).get("/api/peticiones/resumen/").json()
+    assert vacio["semanas"] == [] and vacio["totales"] == {"activas": 0, "atendidas": 0}
+    assert "datos" not in str(vista)
+
+
+def test_el_resumen_rellena_con_ceros_las_semanas_sin_peticiones(rico):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    crear(rico, "lider")
+    crear(rico, "lider")
+    antigua = Peticion.objects.last()
+    Peticion.objects.filter(pk=antigua.pk).update(creada_en=timezone.now() - timedelta(days=15))
+    semanas = api_de(rico["lider"]).get("/api/peticiones/resumen/").json()["semanas"]
+    assert len(semanas) >= 3
+    assert any(s["activas"] == 0 and s["atendidas"] == 0 for s in semanas)

@@ -118,12 +118,13 @@ export function GruposPage() {
               label="Día de reunión"
               value={dia}
               onChange={(e) => setDia(e.target.value)}
+              required
               options={[
-                { value: '', label: 'Sin definir' },
+                { value: '', label: 'Elige un día' },
                 ...dias.map((d, i) => ({ value: String(i), label: d })),
               ]}
             />
-            <Field label="Hora" type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+            <Field label="Hora" type="time" value={hora} onChange={(e) => setHora(e.target.value)} required />
             <div className="grid grid-cols-2 gap-4">
               <SelectField
                 label="Sector"

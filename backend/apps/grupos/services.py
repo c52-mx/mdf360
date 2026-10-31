@@ -221,11 +221,16 @@ def guardar_asistencia(
 
 
 def abrir_reunion(grupo, fecha: date | None, *, actor, request=None) -> Reunion:
+    dia = fecha or timezone.localdate()
+    # Solo se advierte, no se bloquea: se registra que fue fuera del día fijo del grupo
+    fuera = grupo.dia_semana is not None and dia.weekday() != grupo.dia_semana
     reunion, creada = Reunion.objects.get_or_create(
-        grupo=grupo, fecha=fecha or timezone.localdate(), defaults={"creada_por": actor}
+        grupo=grupo, fecha=dia, defaults={"creada_por": actor, "fuera_de_dia": fuera}
     )
     if creada:
-        audit.log("reunion.creada", actor=actor, target=reunion, request=request)
+        audit.log(
+            "reunion.creada", actor=actor, target=reunion, request=request, fuera_de_dia=fuera
+        )
     return reunion
 
 

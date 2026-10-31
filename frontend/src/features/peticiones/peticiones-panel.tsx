@@ -118,7 +118,9 @@ export function PeticionesPanel({ origenTipo, origenId, referenciaId, puedeRegis
   const [confirmada, setConfirmada] = useState(false)
   const [alcance, setAlcance] = useState<Visibilidad | ''>('')
   const [ocultarNombre, setOcultarNombre] = useState(false)
-  const preferido: Visibilidad = alcance || formulario.data?.visibilidad_por_defecto || 'lideres'
+  const porDefecto = formulario.data?.visibilidad_por_defecto
+  // «Mi grupo» ya no es una opción: si es el valor por defecto, se parte de «Solo líderes»
+  const preferido: Visibilidad = alcance || (porDefecto === 'grupo' ? 'lideres' : porDefecto) || 'lideres'
   const alcanceActual: Visibilidad = !alcances || alcances.includes(preferido) ? preferido : alcances[0]
   const opcion = visibilidadOpciones.find((o) => o.value === alcanceActual)
 

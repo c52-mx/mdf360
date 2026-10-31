@@ -3,6 +3,12 @@ from django.db import models
 
 
 class Mensaje(models.Model):
+    class Estado(models.TextChoices):
+        PUBLICADO = "publicado", "Publicado"
+        # Un aviso a toda la iglesia de quien no puede publicarlo directo espera una autorización
+        PENDIENTE = "pendiente", "Por autorizar"
+        RECHAZADO = "rechazado", "Rechazado"
+
     origen_tipo = models.CharField(max_length=40, db_index=True)
     origen_id = models.PositiveIntegerField()
     origen_etiqueta = models.CharField(max_length=250)  # texto fijo con el que se publicó
@@ -13,6 +19,11 @@ class Mensaje(models.Model):
     texto = models.TextField(max_length=1000)
     fijado = models.BooleanField(default=False)
     eliminado = models.BooleanField(default=False)
+    estado = models.CharField(max_length=12, choices=Estado.choices, default=Estado.PUBLICADO)
+    resuelto_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    resuelto_en = models.DateTimeField(null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
