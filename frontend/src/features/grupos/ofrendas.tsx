@@ -23,10 +23,12 @@ export interface Movimiento {
 
 export interface Ofrenda {
   id: number
-  reunion_id: number
+  /** De un grupo o de la iglesia: cada una se avala en su propia ruta. */
+  origen?: 'grupo' | 'iglesia'
+  reunion_id?: number
   fecha: string
   grupo: string
-  tipo: 'regular' | 'especial'
+  tipo: 'regular' | 'especial' | number
   tipo_display: string
   concepto: string
   monto: string
@@ -49,7 +51,7 @@ export function AvalForm({ ofrenda, onListo }: { ofrenda: Ofrenda; onListo: () =
 
   const avalar = useMutation({
     mutationFn: () =>
-      api<Ofrenda>(`/api/grupos/ofrendas/${ofrenda.id}/aval/`, {
+      api<Ofrenda>(`/api/grupos/ofrendas/${ofrenda.origen === 'iglesia' ? 'iglesia/' : ''}${ofrenda.id}/aval/`, {
         method: 'POST',
         body: { monto_contado: contado, credential: pin },
       }),
