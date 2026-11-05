@@ -6,6 +6,7 @@ urlpatterns = [
     path("", views.GruposView.as_view(), name="grupos"),
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
     path("<int:pk>/", views.GrupoView.as_view(), name="grupo"),
+    path("mis-enlaces/", views.MisEnlacesView.as_view(), name="mis-enlaces"),
     path("enlace/<str:token>/", views.EnlacePublicoView.as_view(), name="enlace-publico"),
     path(
         "enlace/<str:token>/solicitar/",
