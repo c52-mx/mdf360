@@ -10,8 +10,9 @@ from apps.accounts import equipos
 from apps.core import audit
 
 from . import ofrendas as of
+from . import ofrendas_iglesia as ig
 from .access import AMBITO
-from .models import Grupo, GrupoMiembro, Ofrenda, Reunion
+from .models import Grupo, GrupoMiembro, Ofrenda, OfrendaIglesia, Reunion
 
 
 def _error(code, detail, http_status=status.HTTP_400_BAD_REQUEST):
@@ -170,4 +171,12 @@ class OfrendasPendientesView(APIView):
             reunion__grupo_id__in=list(ids),
             estado__in=[Ofrenda.Estado.PENDIENTE, Ofrenda.Estado.DIFERENCIA],
         ).select_related("reunion__grupo")
-        return Response([of.ofrenda_dict(o, detalle=False) for o in lista])
+        datos = [of.ofrenda_dict(o, detalle=False) for o in lista]
+        if ig.puede_avalar(request.user):
+            de_iglesia = OfrendaIglesia.objects.filter(
+                estado__in=[Ofrenda.Estado.PENDIENTE, Ofrenda.Estado.DIFERENCIA]
+            ).exclude(capturada_por=request.user)
+            datos += [
+                ig.ofrenda_iglesia_dict(o, detalle=False) for o in de_iglesia.select_related("tipo")
+            ]
+        return Response(datos)
