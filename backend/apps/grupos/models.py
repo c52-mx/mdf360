@@ -192,6 +192,22 @@ class Asistencia(models.Model):
         return f"{self.persona} · {'presente' if self.presente else 'ausente'}"
 
 
+class TipoOfrenda(models.Model):
+    """Catálogo único de tipos de ofrenda. Cada tipo dice dónde se puede usar: en los grupos, en la
+    iglesia o en ambos."""
+
+    nombre = models.CharField(max_length=80, unique=True)
+    para_grupo = models.BooleanField("se usa en los grupos", default=False)
+    para_iglesia = models.BooleanField("se usa en la iglesia", default=False)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+
 class Ofrenda(models.Model):
     class Tipo(models.TextChoices):
         REGULAR = "regular", "Ofrenda regular"
@@ -207,6 +223,9 @@ class Ofrenda(models.Model):
     concepto = models.CharField(max_length=150, blank=True)
     monto = models.DecimalField("monto capturado", max_digits=10, decimal_places=2)
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.PENDIENTE)
+    tipo_ofrenda = models.ForeignKey(
+        TipoOfrenda, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
     capturada_por = models.ForeignKey(
         "accounts.User", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
@@ -230,6 +249,52 @@ class OfrendaMovimiento(models.Model):
 
     ofrenda = models.ForeignKey(Ofrenda, on_delete=models.CASCADE, related_name="movimientos")
     tipo = models.CharField(max_length=20, choices=Tipo.choices)
+    monto_anterior = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    monto = models.DecimalField(max_digits=10, decimal_places=2)
+    diferencia = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    motivo = models.CharField(max_length=300, blank=True)
+    usuario = models.ForeignKey(
+        "accounts.User", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["creado_en", "id"]
+
+    def __str__(self):
+        return f"{self.ofrenda_id} · {self.get_tipo_display()} · {self.monto}"
+
+
+class OfrendaIglesia(models.Model):
+    """Ofrenda que se recibe en la iglesia (no en un grupo). Pasa por el mismo aval que las de
+    grupo."""
+
+    fecha = models.DateField()
+    tipo = models.ForeignKey(TipoOfrenda, on_delete=models.PROTECT, related_name="+")
+    nota = models.CharField(max_length=150, blank=True)
+    monto = models.DecimalField("monto capturado", max_digits=10, decimal_places=2)
+    estado = models.CharField(
+        max_length=20, choices=Ofrenda.Estado.choices, default=Ofrenda.Estado.PENDIENTE
+    )
+    capturada_por = models.ForeignKey(
+        "accounts.User", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    creada_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha", "-creada_en"]
+
+    def __str__(self):
+        return f"Iglesia · {self.fecha} · {self.tipo} · {self.monto}"
+
+
+class OfrendaIglesiaMovimiento(models.Model):
+    """Historial de captura, corrección y aval de una ofrenda de la iglesia."""
+
+    ofrenda = models.ForeignKey(
+        OfrendaIglesia, on_delete=models.CASCADE, related_name="movimientos"
+    )
+    tipo = models.CharField(max_length=20, choices=OfrendaMovimiento.Tipo.choices)
     monto_anterior = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     diferencia = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)

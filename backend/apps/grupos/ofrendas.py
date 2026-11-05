@@ -26,7 +26,7 @@ from apps.accounts.permissions import tiene_permiso
 from apps.core import audit, config
 
 from .access import AMBITO, permisos_en
-from .models import GrupoMiembro, Ofrenda, OfrendaMovimiento, Reunion
+from .models import GrupoMiembro, Ofrenda, OfrendaMovimiento, Reunion, TipoOfrenda
 
 
 # ---------- permisos ----------
@@ -49,7 +49,14 @@ PERMISOS_DE_OFRENDAS = (
 def tiene_acceso(user) -> bool:
     """¿Puede entrar al módulo de Ofrendas? Quien administra los grupos, ve todas las ofrendas o
     tiene en algún grupo un rol con permisos de ofrendas. Un Asistente o Servidor no."""
-    if tiene_permiso(user, "ofrendas.ver_todas") or tiene_permiso(user, "grupos.gestionar"):
+    permisos_globales = (
+        "ofrendas.ver_todas",
+        "grupos.gestionar",
+        "ofrendas.iglesia_capturar",
+        "ofrendas.iglesia_avalar",
+        "ofrendas.catalogo",
+    )
+    if any(tiene_permiso(user, p) for p in permisos_globales):
         return True
     persona = getattr(user, "persona", None)
     if persona is None:
@@ -147,8 +154,9 @@ def capturar(reunion, *, tipo, concepto, monto, actor, request=None) -> Ofrenda:
         )
     suplencia = captura_suplente(actor, reunion)
     ofrenda = Ofrenda.objects.create(
-        reunion=reunion, tipo=tipo, concepto=concepto, monto=monto, capturada_por=actor
-    )
+        reunion=reunion, tipo=tipo, concepto=concepto, monto=monto, capturada_por=actor,
+        tipo_ofrenda=TipoOfrenda.objects.filter(nombre=Ofrenda.Tipo(tipo).label).first(),
+    )  # fmt: skip
     OfrendaMovimiento.objects.create(
         ofrenda=ofrenda, tipo="captura", monto=monto, usuario=actor,
         motivo="Captura como suplente del Secretario" if suplencia else "",
@@ -209,6 +217,7 @@ def avalar(ofrenda: Ofrenda, *, monto_contado, actor, request=None) -> Ofrenda:
 def ofrenda_dict(o: Ofrenda, *, detalle: bool = True) -> dict:
     base = {
         "id": o.pk,
+        "origen": "grupo",
         "reunion_id": o.reunion_id,
         "fecha": o.reunion.fecha.isoformat(),
         "grupo": o.reunion.grupo.nombre,

@@ -47,6 +47,27 @@ CATALOGO: tuple[Permiso, ...] = (
         sensible=True,
     ),
     Permiso(
+        "ofrendas.iglesia_capturar",
+        "Grupos",
+        "Ofrendas",
+        "Capturar las ofrendas de la iglesia",
+        sensible=True,
+    ),
+    Permiso(
+        "ofrendas.iglesia_avalar",
+        "Grupos",
+        "Ofrendas",
+        "Avalar las ofrendas de la iglesia con su PIN",
+        sensible=True,
+    ),
+    Permiso(
+        "ofrendas.catalogo",
+        "Grupos",
+        "Ofrendas",
+        "Administrar los tipos de ofrenda",
+        sensible=True,
+    ),
+    Permiso(
         "peticiones.ver_todas",
         "Peticiones",
         "Peticiones de oración",

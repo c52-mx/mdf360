@@ -6,8 +6,11 @@ from .models import (
     Grupo,
     GrupoMiembro,
     Ofrenda,
+    OfrendaIglesia,
+    OfrendaIglesiaMovimiento,
     OfrendaMovimiento,
     Reunion,
+    TipoOfrenda,
 )
 
 
@@ -23,3 +26,6 @@ admin.site.register(Reunion)
 admin.site.register(Asistencia)
 admin.site.register(Ofrenda)
 admin.site.register(OfrendaMovimiento)
+admin.site.register(OfrendaIglesia)
+admin.site.register(OfrendaIglesiaMovimiento)
+admin.site.register(TipoOfrenda)

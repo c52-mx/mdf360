@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_ofrendas
+from . import views, views_ofrendas, views_ofrendas_iglesia
 
 urlpatterns = [
     path("", views.GruposView.as_view(), name="grupos"),
@@ -49,6 +49,30 @@ urlpatterns = [
         "ofrendas/pendientes/",
         views_ofrendas.OfrendasPendientesView.as_view(),
         name="ofrendas-pendientes",
+    ),
+    path(
+        "ofrendas/resumen/",
+        views_ofrendas_iglesia.ResumenOfrendasView.as_view(),
+        name="ofrendas-resumen",
+    ),
+    path("ofrendas/tipos/", views_ofrendas_iglesia.TiposView.as_view(), name="ofrendas-tipos"),
+    path(
+        "ofrendas/tipos/<int:tid>/", views_ofrendas_iglesia.TipoView.as_view(), name="ofrendas-tipo"
+    ),
+    path(
+        "ofrendas/iglesia/",
+        views_ofrendas_iglesia.OfrendasIglesiaView.as_view(),
+        name="ofrendas-iglesia",
+    ),
+    path(
+        "ofrendas/iglesia/<int:oid>/",
+        views_ofrendas_iglesia.OfrendaIglesiaView.as_view(),
+        name="ofrenda-iglesia",
+    ),
+    path(
+        "ofrendas/iglesia/<int:oid>/aval/",
+        views_ofrendas_iglesia.AvalIglesiaView.as_view(),
+        name="ofrenda-iglesia-aval",
     ),
     path("ofrendas/<int:oid>/", views_ofrendas.OfrendaView.as_view(), name="ofrenda"),
     path("ofrendas/<int:oid>/aval/", views_ofrendas.AvalView.as_view(), name="ofrenda-aval"),
