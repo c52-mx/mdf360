@@ -73,6 +73,7 @@ afterEach(() => vi.unstubAllGlobals())
 describe('PersonaPage', () => {
   it('explica cada nivel de registro y qué falta para el siguiente', async () => {
     montar()
+    fireEvent.click(await screen.findByRole('tab', { name: 'En la iglesia' }))
     expect(await screen.findByText('Nivel de registro')).toBeInTheDocument()
     expect(screen.getByText(/Expediente digital completo \(EDU\)/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Subir a participante' })).toBeInTheDocument()
@@ -81,7 +82,28 @@ describe('PersonaPage', () => {
 
   it('muestra el destino de un traslado en el historial', async () => {
     montar()
+    fireEvent.click(await screen.findByRole('tab', { name: 'Notas e historial' }))
     expect(await screen.findByText('→ Vida Nueva')).toBeInTheDocument()
+  })
+
+  it('ordena la ficha en pestañas y lo escrito en una sigue al cambiar de pestaña', async () => {
+    montar()
+    const nombre = await screen.findByLabelText('Nombre')
+    fireEvent.change(nombre, { target: { value: 'Gloria María' } })
+    for (const t of ['Datos personales', 'Contacto', 'En la iglesia', 'Discipulado', 'Notas e historial']) {
+      expect(screen.getByRole('tab', { name: t })).toBeInTheDocument()
+    }
+    fireEvent.click(screen.getByRole('tab', { name: 'Contacto' }))
+    expect(screen.getByLabelText('Celular / WhatsApp')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Datos personales' }))
+    expect(screen.getByLabelText('Nombre')).toHaveValue('Gloria María')
+  })
+
+  it('baja y traslado quedan en la zona de riesgo', async () => {
+    montar()
+    const zona = await screen.findByRole('region', { name: 'Zona de riesgo' })
+    expect(zona).toHaveTextContent('Dar de baja')
+    expect(zona).toHaveTextContent('Pasar a otra iglesia')
   })
 
   it('pasa a la persona a otra iglesia con su destino', async () => {
