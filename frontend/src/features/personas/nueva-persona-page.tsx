@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Alert,
   Button,
@@ -9,40 +9,41 @@ import {
   Field,
   PageHeader,
   SelectField,
-} from '@/design-system'
-import { CamposExtra } from '@/features/formularios/campos-extra'
-import { useFormularioExtra } from '@/features/formularios/datos-adicionales-card'
-import type { Respuestas } from '@/features/formularios/types'
-import { api, ApiError } from '@/lib/api'
-import { procedenciaOptions, type Persona, type Procedencia } from './types'
+  Tabs,
+} from "@/design-system";
+import { CamposExtra } from "@/features/formularios/campos-extra";
+import { useFormularioExtra } from "@/features/formularios/datos-adicionales-card";
+import type { Respuestas } from "@/features/formularios/types";
+import { api, ApiError } from "@/lib/api";
+import { procedenciaOptions, type Persona, type Procedencia } from "./types";
 
 interface Aviso {
-  version: string
-  texto: string
+  version: string;
+  texto: string;
 }
 
 export function NuevaPersonaPage() {
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const [nombre, setNombre] = useState('')
-  const [apellidoPaterno, setApellidoPaterno] = useState('')
-  const [whatsapp, setWhatsapp] = useState('')
-  const [procedencia, setProcedencia] = useState<Procedencia>('visitante')
-  const [aceptaDatos, setAceptaDatos] = useState(false)
-  const [aceptaFoto, setAceptaFoto] = useState(false)
-  const [extra, setExtra] = useState<Respuestas>({})
-  const formularioExtra = useFormularioExtra('persona')
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [nombre, setNombre] = useState("");
+  const [apellidoPaterno, setApellidoPaterno] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [procedencia, setProcedencia] = useState<Procedencia>("visitante");
+  const [aceptaDatos, setAceptaDatos] = useState(false);
+  const [aceptaFoto, setAceptaFoto] = useState(false);
+  const [extra, setExtra] = useState<Respuestas>({});
+  const formularioExtra = useFormularioExtra("persona");
 
   const aviso = useQuery({
-    queryKey: ['aviso-privacidad'],
-    queryFn: () => api<Aviso>('/api/personas/aviso-privacidad/'),
+    queryKey: ["aviso-privacidad"],
+    queryFn: () => api<Aviso>("/api/personas/aviso-privacidad/"),
     staleTime: Infinity,
-  })
+  });
 
   const crear = useMutation({
     mutationFn: () =>
-      api<Persona>('/api/personas/', {
-        method: 'POST',
+      api<Persona>("/api/personas/", {
+        method: "POST",
         body: {
           nombre,
           apellido_paterno: apellidoPaterno,
@@ -54,19 +55,22 @@ export function NuevaPersonaPage() {
         },
       }),
     onSuccess: (persona) => {
-      void queryClient.invalidateQueries({ queryKey: ['personas'] })
-      navigate(`/personas/${persona.id}`)
+      void queryClient.invalidateQueries({ queryKey: ["personas"] });
+      navigate(`/personas/${persona.id}`);
     },
-  })
+  });
 
-  const duplicado = crear.error instanceof ApiError && crear.error.code === 'duplicate'
+  const duplicado =
+    crear.error instanceof ApiError && crear.error.code === "duplicate";
   const duplicadoId =
-    crear.error instanceof ApiError ? (crear.error.data.persona_id as number | undefined) : undefined
+    crear.error instanceof ApiError
+      ? (crear.error.data.persona_id as number | undefined)
+      : undefined;
 
   const onSubmit = (event: FormEvent) => {
-    event.preventDefault()
-    crear.mutate()
-  }
+    event.preventDefault();
+    crear.mutate();
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -77,51 +81,91 @@ export function NuevaPersonaPage() {
       />
       <Card>
         <form onSubmit={onSubmit} className="flex max-w-xl flex-col gap-4">
-          <Field label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-          <Field
-            label="Apellido paterno (opcional)"
-            value={apellidoPaterno}
-            onChange={(e) => setApellidoPaterno(e.target.value)}
-          />
-          <Field
-            label="Número de WhatsApp"
-            inputMode="tel"
-            hint="10 dígitos. Sirve para darle seguimiento y evitar registros duplicados."
-            value={whatsapp}
-            onChange={(e) => setWhatsapp(e.target.value)}
-            required
-          />
-          <SelectField
-            label="¿De dónde viene?"
-            value={procedencia}
-            onChange={(e) => setProcedencia(e.target.value as Procedencia)}
-            options={procedenciaOptions}
-          />
-
-          {formularioExtra.data?.campos.some((c) => c.activo) ? (
-            <CamposExtra campos={formularioExtra.data.campos} valores={extra} onChange={setExtra} />
-          ) : null}
-
-          <details className="rounded-control border border-border p-3">
-            <summary className="cursor-pointer font-bold">Leer el aviso de privacidad</summary>
-            <p className="mt-3 whitespace-pre-line text-sm text-muted-foreground">
-              {aviso.data?.texto ?? 'Cargando aviso…'}
-            </p>
-          </details>
-          <CheckboxField
-            checked={aceptaDatos}
-            onChange={(e) => setAceptaDatos(e.target.checked)}
-            label="La persona acepta el aviso de privacidad"
-          />
-          <CheckboxField
-            checked={aceptaFoto}
-            onChange={(e) => setAceptaFoto(e.target.checked)}
-            label="La persona autoriza el uso de su fotografía (opcional)"
+          <Tabs
+            titulo="Datos del nuevo contacto"
+            pestanas={[
+              {
+                id: "basicos",
+                titulo: "Datos básicos",
+                contenido: (
+                  <div className="flex flex-col gap-4">
+                    <Field
+                      label="Nombre"
+                      value={nombre}
+                      onChange={(e) => setNombre(e.target.value)}
+                      required
+                    />
+                    <Field
+                      label="Apellido paterno (opcional)"
+                      value={apellidoPaterno}
+                      onChange={(e) => setApellidoPaterno(e.target.value)}
+                    />
+                    <Field
+                      label="Número de WhatsApp"
+                      inputMode="tel"
+                      hint="10 dígitos. Sirve para darle seguimiento y evitar registros duplicados."
+                      value={whatsapp}
+                      onChange={(e) => setWhatsapp(e.target.value)}
+                      required
+                    />
+                    <SelectField
+                      label="¿De dónde viene?"
+                      value={procedencia}
+                      onChange={(e) =>
+                        setProcedencia(e.target.value as Procedencia)
+                      }
+                      options={procedenciaOptions}
+                    />
+                  </div>
+                ),
+              },
+              ...(formularioExtra.data?.campos.some((c) => c.activo)
+                ? [
+                    {
+                      id: "mas",
+                      titulo: "Más datos",
+                      contenido: formularioExtra.data ? (
+                        <CamposExtra
+                          campos={formularioExtra.data.campos}
+                          valores={extra}
+                          onChange={setExtra}
+                        />
+                      ) : null,
+                    },
+                  ]
+                : []),
+              {
+                id: "privacidad",
+                titulo: "Privacidad",
+                contenido: (
+                  <div className="flex flex-col gap-4">
+                    <details className="rounded-control border border-border p-3">
+                      <summary className="cursor-pointer font-bold">
+                        Leer el aviso de privacidad
+                      </summary>
+                      <p className="mt-3 whitespace-pre-line text-sm text-muted-foreground">
+                        {aviso.data?.texto ?? "Cargando aviso…"}
+                      </p>
+                    </details>
+                    <CheckboxField
+                      checked={aceptaDatos}
+                      onChange={(e) => setAceptaDatos(e.target.checked)}
+                      label="La persona acepta el aviso de privacidad"
+                    />
+                    <CheckboxField
+                      checked={aceptaFoto}
+                      onChange={(e) => setAceptaFoto(e.target.checked)}
+                      label="La persona autoriza el uso de su fotografía (opcional)"
+                    />
+                  </div>
+                ),
+              },
+            ]}
           />
 
           {duplicado ? (
             <Alert tone="warning">
-              {crear.error?.message}{' '}
+              {crear.error?.message}{" "}
               {duplicadoId ? (
                 <Link className="underline" to={`/personas/${duplicadoId}`}>
                   Abrir su registro
@@ -132,11 +176,15 @@ export function NuevaPersonaPage() {
             <Alert tone="destructive">{crear.error.message}</Alert>
           ) : null}
 
-          <Button type="submit" size="lg" disabled={crear.isPending || !aceptaDatos}>
-            {crear.isPending ? 'Guardando…' : 'Guardar contacto'}
+          <Button
+            type="submit"
+            size="lg"
+            disabled={crear.isPending || !aceptaDatos}
+          >
+            {crear.isPending ? "Guardando…" : "Guardar contacto"}
           </Button>
         </form>
       </Card>
     </div>
-  )
+  );
 }

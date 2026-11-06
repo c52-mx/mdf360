@@ -1,4 +1,4 @@
-import { Badge, Button, Card, CardDescription, CardTitle, Field, PageHeader } from '@/design-system'
+import { Badge, Button, Card, CardDescription, CardTitle, Field, PageHeader, Tabs } from '@/design-system'
 
 /** Catálogo vivo del sistema de diseño: así se ve cada componente. Ruta: /diseno */
 export function DesignPage() {
@@ -37,6 +37,22 @@ export function DesignPage() {
         <CardTitle>Campos</CardTitle>
         <Field label="Número de WhatsApp" hint="10 dígitos, sin espacios" placeholder="5512345678" />
         <Field label="PIN" type="password" error="El PIN debe tener 6 dígitos" />
+      </Card>
+
+      <Card className="flex flex-col gap-4">
+        <CardTitle>Pestañas</CardTitle>
+        <CardDescription>
+          Para formularios largos: ninguna es obligatoria y se puede ir a cualquiera. Teclado: flechas,
+          Inicio y Fin.
+        </CardDescription>
+        <Tabs
+          titulo="Ejemplo de pestañas"
+          pestanas={[
+            { id: 'uno', titulo: 'Datos personales', contenido: <Field label="Nombre" /> },
+            { id: 'dos', titulo: 'Contacto', contenido: <Field label="Número de WhatsApp" /> },
+            { id: 'tres', titulo: 'Notas', contenido: <CardDescription>Aquí van las notas.</CardDescription> },
+          ]}
+        />
       </Card>
 
       <Card>

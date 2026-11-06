@@ -25,6 +25,8 @@ def _denegado():
 
 class CapturaSerializer(serializers.Serializer):
     tipo = serializers.ChoiceField(choices=Ofrenda.Tipo.choices, default="regular")
+    # Cualquier tipo activo del catálogo marcado para grupos; si falta, vale «tipo»
+    tipo_ofrenda = serializers.IntegerField(required=False, allow_null=True, default=None)
     concepto = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
     monto = serializers.DecimalField(max_digits=10, decimal_places=2)
 

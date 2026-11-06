@@ -127,4 +127,10 @@ describe('UnidadPage', () => {
     fireEvent.click(await screen.findByRole('tab', { name: 'Vista del servidor' }))
     expect(await screen.findByText('Tu ministerio')).toBeInTheDocument()
   })
+
+  it('quien gestiona al equipo ve el QR fijo del ministerio', async () => {
+    montar({ ...unidad, enlace: '/servir/xyz' })
+    expect(await screen.findByRole('img', { name: 'Código QR de Cafetería' })).toBeInTheDocument()
+    expect(screen.getByText(/\/servir\/xyz/)).toBeInTheDocument()
+  })
 })

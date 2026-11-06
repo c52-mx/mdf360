@@ -21,6 +21,8 @@ export interface UnidadDetalle extends UnidadResumen {
   puede_gestionar: boolean
   puede_administrar: boolean
   puede_ver_panel?: boolean
+  /** Ruta del enlace (/servir/…) para quien gestiona al equipo; null si no hay o no puede verlo. */
+  enlace?: string | null
 }
 
 export interface PanelUnidad {

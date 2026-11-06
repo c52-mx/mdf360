@@ -217,13 +217,13 @@ def test_pendientes_incluyen_las_de_la_iglesia_menos_las_propias(m):
 def test_nadie_ve_lo_de_otros_salvo_pastor_y_secretaria(m):
     oid = captura(m["secretaria"]).json()["id"]
     sin_ver = cuenta("55 0000 0009", "Otra tesorera", "tesorero", credencial=FUERTE)
-    # quien puede avalar ve lo pendiente, pero no lo ya avalado de otros
+    # quien puede avalar (Tesorería) ve también lo ya avalado
     api_de(m["tesorero"]).post(
         f"/api/grupos/ofrendas/iglesia/{oid}/aval/",
         {"monto_contado": "500", "credential": FUERTE},
         format="json",
     )
-    assert api_de(sin_ver).get(f"/api/grupos/ofrendas/iglesia/{oid}/").status_code == 404
+    assert api_de(sin_ver).get(f"/api/grupos/ofrendas/iglesia/{oid}/").status_code == 200
     assert api_de(m["asistente"]).get(f"/api/grupos/ofrendas/iglesia/{oid}/").status_code == 404
     assert api_de(m["pastor"]).get(f"/api/grupos/ofrendas/iglesia/{oid}/").status_code == 200
     assert api_de(m["secretaria"]).get(f"/api/grupos/ofrendas/iglesia/{oid}/").status_code == 200
@@ -282,7 +282,7 @@ def test_quien_captura_ve_en_su_resumen_solo_lo_suyo(m):
     # la Secretaria tiene ver_todas, como el Pastor
     assert r["totales"]["total"] == "1200.00"
     r = api_de(m["tesorero"]).get("/api/grupos/ofrendas/resumen/").json()
-    # el Tesorero ve lo que está por avalar (nada propio)
+    # el Tesorero ve todo lo de la iglesia
     assert r["totales"]["total"] == "1200.00"
     oid = OfrendaIglesia.objects.get(monto="300").pk
     api_de(m["tesorero"]).post(
@@ -291,7 +291,8 @@ def test_quien_captura_ve_en_su_resumen_solo_lo_suyo(m):
         format="json",
     )
     r = api_de(m["tesorero"]).get("/api/grupos/ofrendas/resumen/").json()
-    assert r["totales"]["total"] == "900.00"  # la ya avalada deja de verse para quien no es dueña
+    assert r["totales"]["total"] == "1200.00"  # Tesorería sigue viendo lo ya avalado
+    assert r["totales"]["avalado"] == "300.00"
 
 
 def test_el_secretario_de_grupo_ve_en_el_resumen_solo_su_grupo(m):
