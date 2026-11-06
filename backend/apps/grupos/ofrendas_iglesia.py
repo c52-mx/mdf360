@@ -14,7 +14,6 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.permissions import tiene_permiso
@@ -48,8 +47,7 @@ def puede_avalar(user, ofrenda: OfrendaIglesia | None = None) -> bool:
 def puede_ver(user, ofrenda: OfrendaIglesia) -> bool:
     if tiene_permiso(user, "ofrendas.ver_todas") or ofrenda.capturada_por_id == user.pk:
         return True
-    pendiente = ofrenda.estado != Ofrenda.Estado.AVALADA
-    return pendiente and tiene_permiso(user, "ofrendas.iglesia_avalar")
+    return tiene_permiso(user, "ofrendas.iglesia_avalar")
 
 
 def puede_administrar_catalogo(user) -> bool:
@@ -61,10 +59,9 @@ def visibles(user):
     todas = OfrendaIglesia.objects.select_related("tipo", "capturada_por")
     if tiene_permiso(user, "ofrendas.ver_todas"):
         return todas
-    filtro = Q(capturada_por=user)
     if tiene_permiso(user, "ofrendas.iglesia_avalar"):
-        filtro |= ~Q(estado=Ofrenda.Estado.AVALADA)
-    return todas.filter(filtro)
+        return todas  # Tesorería ve también lo ya avalado
+    return todas.filter(capturada_por=user)
 
 
 # ---------- catálogo ----------

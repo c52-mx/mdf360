@@ -478,3 +478,28 @@ def test_el_asistente_no_tiene_ofrendas_ni_en_el_menu_ni_en_la_api(m):
     for quien in ("pastor", "tesorero", "secre"):
         permisos = api_de(m[quien]).get("/api/auth/me/").json()["permisos"]
         assert "ofrendas.acceso" in permisos, quien
+
+
+# ---------- tipos del catálogo en las ofrendas de grupo ----------
+def test_el_grupo_captura_con_cualquier_tipo_activo_del_catalogo(m):
+    from .models import TipoOfrenda
+
+    diezmo = TipoOfrenda.objects.create(nombre="Diezmo de prueba", para_grupo=True)
+    r = capturar(m, monto="200", tipo_ofrenda=diezmo.pk)
+    assert r.status_code == 201
+    assert r.json()["tipo_display"] == "Diezmo de prueba" and r.json()["concepto"] == ""
+    # no hace falta concepto, pero el mismo tipo no se repite en la reunión
+    assert capturar(m, monto="50", tipo_ofrenda=diezmo.pk).status_code == 400
+    # otro tipo sí, y también la regular
+    otro = TipoOfrenda.objects.create(nombre="Misiones de prueba", para_grupo=True)
+    assert capturar(m, monto="75", tipo_ofrenda=otro.pk).status_code == 201
+
+
+def test_no_se_captura_con_un_tipo_inactivo_o_solo_de_iglesia(m):
+    from .models import TipoOfrenda
+
+    solo_iglesia = TipoOfrenda.objects.create(nombre="Solo iglesia", para_grupo=False)
+    apagado = TipoOfrenda.objects.create(nombre="Apagado", para_grupo=True, activo=False)
+    assert capturar(m, tipo_ofrenda=solo_iglesia.pk).status_code == 400
+    assert capturar(m, tipo_ofrenda=apagado.pk).status_code == 400
+    assert capturar(m, tipo_ofrenda=99999).status_code == 400

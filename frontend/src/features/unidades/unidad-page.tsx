@@ -19,6 +19,7 @@ import {
 import { opcionesDeRol, useRolesEquipo } from '@/features/equipos/use-roles-equipo'
 import { TableroPanel } from '@/features/tablero/tablero-panel'
 import { api } from '@/lib/api'
+import { EnlaceUnidadCard } from './enlace-unidad-card'
 import { ComunidadUnidad } from './comunidad-unidad'
 import { PanelUnidadCard } from './panel-unidad'
 import type { UnidadDetalle } from './types'
@@ -168,6 +169,10 @@ export function UnidadPage() {
             </Button>
           </form>
         </Card>
+      ) : null}
+
+      {u.puede_gestionar ? (
+        <EnlaceUnidadCard unidadId={u.id} nombre={u.nombre} enlace={u.enlace ?? null} />
       ) : null}
 
       {u.puede_administrar ? (

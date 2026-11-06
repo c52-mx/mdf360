@@ -11,6 +11,7 @@ import {
   SelectField,
 } from '@/design-system'
 import { api } from '@/lib/api'
+import type { TiposRespuesta } from './ofrendas-types'
 
 export interface Movimiento {
   tipo: 'captura' | 'correccion' | 'aval'
@@ -115,7 +116,14 @@ export function OfrendasReunion({ reunionId }: { reunionId: number }) {
     queryFn: () => api<Respuesta>(`/api/grupos/reuniones/${reunionId}/ofrendas/`),
     retry: false,
   })
-  const [tipo, setTipo] = useState('regular')
+  const tipos = useQuery({
+    queryKey: ['ofrendas-tipos', 'grupo'],
+    queryFn: () => api<TiposRespuesta>('/api/grupos/ofrendas/tipos/?para=grupo'),
+    enabled: datos.data?.puede_capturar === true,
+  })
+  const disponibles = (tipos.data?.tipos ?? []).filter((t) => t.activo)
+  const [elegido, setElegido] = useState('')
+  const tipoActual = disponibles.find((t) => String(t.id) === elegido) ?? disponibles[0]
   const [concepto, setConcepto] = useState('')
   const [monto, setMonto] = useState('')
   const [corrigiendo, setCorrigiendo] = useState<number | null>(null)
@@ -127,7 +135,7 @@ export function OfrendasReunion({ reunionId }: { reunionId: number }) {
     mutationFn: () =>
       api(`/api/grupos/reuniones/${reunionId}/ofrendas/`, {
         method: 'POST',
-        body: { tipo, concepto, monto },
+        body: tipoActual ? { tipo_ofrenda: tipoActual.id, concepto, monto } : { tipo: 'regular', concepto, monto },
       }),
     onSuccess: () => {
       setMonto('')
@@ -217,15 +225,18 @@ export function OfrendasReunion({ reunionId }: { reunionId: number }) {
           <CardTitle>Capturar ofrenda</CardTitle>
           <SelectField
             label="Tipo"
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value)}
-            options={[
-              { value: 'regular', label: 'Ofrenda regular' },
-              { value: 'especial', label: 'Ofrenda especial' },
-            ]}
+            value={tipoActual ? String(tipoActual.id) : ''}
+            onChange={(e) => setElegido(e.target.value)}
+            options={disponibles.map((t) => ({ value: String(t.id), label: t.nombre }))}
           />
-          {tipo === 'especial' ? (
-            <Field label="Concepto" hint="Ej. Retiro, despensas" value={concepto} onChange={(e) => setConcepto(e.target.value)} required />
+          {tipoActual && tipoActual.nombre !== 'Ofrenda regular' ? (
+            <Field
+              label={tipoActual.nombre === 'Ofrenda especial' ? 'Concepto' : 'Nota (opcional)'}
+              hint="Ej. Retiro, despensas"
+              value={concepto}
+              onChange={(e) => setConcepto(e.target.value)}
+              required={tipoActual.nombre === 'Ofrenda especial'}
+            />
           ) : null}
           <Field label="Monto" inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value)} required />
           {capturar.error ? <Alert tone="destructive">{capturar.error.message}</Alert> : null}

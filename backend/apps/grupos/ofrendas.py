@@ -138,15 +138,30 @@ def _monto(valor) -> Decimal:
     return monto
 
 
+def _resolver_tipo(tipo, tipo_ofrenda_id) -> tuple[str, TipoOfrenda | None]:
+    """Del catálogo: un tipo elegido (activo y de grupo) o, sin elegir, el regular/especial."""
+    if tipo_ofrenda_id is None:
+        return tipo, TipoOfrenda.objects.filter(nombre=Ofrenda.Tipo(tipo).label).first()
+    elegido = TipoOfrenda.objects.filter(pk=tipo_ofrenda_id, activo=True, para_grupo=True).first()
+    if elegido is None:
+        raise ValidationError("Ese tipo de ofrenda no está disponible para los grupos.")
+    regular = elegido.nombre == Ofrenda.Tipo.REGULAR.label
+    return (Ofrenda.Tipo.REGULAR if regular else Ofrenda.Tipo.ESPECIAL), elegido
+
+
 @transaction.atomic
-def capturar(reunion, *, tipo, concepto, monto, actor, request=None) -> Ofrenda:
+def capturar(reunion, *, tipo, concepto, monto, actor, request=None, tipo_ofrenda=None) -> Ofrenda:
     monto = _monto(monto)
     concepto = (concepto or "").strip()
-    if tipo == Ofrenda.Tipo.ESPECIAL and not concepto:
+    tipo, catalogo = _resolver_tipo(tipo, tipo_ofrenda)
+    es_especial_libre = catalogo is None or catalogo.nombre == Ofrenda.Tipo.ESPECIAL.label
+    if tipo == Ofrenda.Tipo.ESPECIAL and es_especial_libre and not concepto:
         raise ValidationError("Escribe el concepto de la ofrenda especial.")
     if tipo == Ofrenda.Tipo.REGULAR:
         concepto = ""
-    repetida = Ofrenda.objects.filter(reunion=reunion, tipo=tipo, concepto=concepto).exists()
+    repetida = Ofrenda.objects.filter(
+        reunion=reunion, tipo=tipo, concepto=concepto, tipo_ofrenda=catalogo
+    ).exists()
     unica = tipo == Ofrenda.Tipo.ESPECIAL or config.obtener("ofrendas.una_regular_por_reunion")
     if repetida and unica:
         raise ValidationError(
@@ -155,7 +170,7 @@ def capturar(reunion, *, tipo, concepto, monto, actor, request=None) -> Ofrenda:
     suplencia = captura_suplente(actor, reunion)
     ofrenda = Ofrenda.objects.create(
         reunion=reunion, tipo=tipo, concepto=concepto, monto=monto, capturada_por=actor,
-        tipo_ofrenda=TipoOfrenda.objects.filter(nombre=Ofrenda.Tipo(tipo).label).first(),
+        tipo_ofrenda=catalogo,
     )  # fmt: skip
     OfrendaMovimiento.objects.create(
         ofrenda=ofrenda, tipo="captura", monto=monto, usuario=actor,
@@ -222,7 +237,7 @@ def ofrenda_dict(o: Ofrenda, *, detalle: bool = True) -> dict:
         "fecha": o.reunion.fecha.isoformat(),
         "grupo": o.reunion.grupo.nombre,
         "tipo": o.tipo,
-        "tipo_display": o.get_tipo_display(),
+        "tipo_display": o.tipo_ofrenda.nombre if o.tipo_ofrenda else o.get_tipo_display(),
         "concepto": o.concepto,
         "monto": str(o.monto),
         "estado": o.estado,
