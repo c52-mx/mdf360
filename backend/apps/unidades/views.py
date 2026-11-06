@@ -2,12 +2,13 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts import equipos
 from apps.core import audit
+from apps.grupos.views import IngresoThrottle
 
 from . import access, services
 from .models import Unidad, UnidadMiembro
@@ -72,6 +73,9 @@ class UnidadesView(APIView):
             return _error("duplicate", "Ya existe un ministerio con ese nombre.")
         unidad = Unidad.objects.create(**data.validated_data)
         audit.log("unidad.creada", actor=request.user, target=unidad, request=request)
+        services.generar_enlace(
+            unidad, actor=request.user, request=request
+        )  # QR fijo desde el inicio
         return Response(unidad_resumen(unidad, request.user), status=status.HTTP_201_CREATED)
 
 
@@ -93,6 +97,12 @@ class UnidadView(APIView):
                 "miembros": [miembro_dict(m, equipos.nombres("ministerio")) for m in miembros],
                 "puede_gestionar": access.puede_gestionar_integrantes(request.user, unidad),
                 "puede_administrar": access.puede_administrar(request.user),
+                "enlace": (
+                    f"/servir/{unidad.enlace_token}"
+                    if unidad.enlace_token
+                    and access.puede_gestionar_integrantes(request.user, unidad)
+                    else None
+                ),
             }
         )
 
@@ -231,3 +241,72 @@ class IntegranteRestaurarView(IntegranteView):
             persona=miembro.persona_id, rol=miembro.rol,
         )  # fmt: skip
         return Response(miembro_dict(miembro))
+
+
+# ---------- ingreso por enlace o QR ----------
+class EnlaceUnidadView(APIView):
+    """Quien gestiona al equipo genera, regenera o desactiva el enlace (y su QR)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def _unidad(self, request, pk):
+        unidad = get_object_or_404(Unidad, pk=pk, activa=True)
+        if not access.puede_ver(request.user, unidad):
+            raise Http404
+        return unidad
+
+    def post(self, request, pk):
+        unidad = self._unidad(request, pk)
+        if not access.puede_gestionar_integrantes(request.user, unidad):
+            return _denegado()
+        token = services.generar_enlace(unidad, actor=request.user, request=request)
+        return Response({"enlace": f"/servir/{token}"}, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, pk):
+        unidad = self._unidad(request, pk)
+        if not access.puede_gestionar_integrantes(request.user, unidad):
+            return _denegado()
+        services.desactivar_enlace(unidad, actor=request.user, request=request)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _unidad_por_enlace(token: str):
+    return Unidad.objects.filter(enlace_token=token, activa=True).first()
+
+
+class EnlacePublicoUnidadView(APIView):
+    """Lo que ve quien abre el QR: solo el nombre del ministerio."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+    throttle_classes = [IngresoThrottle]
+
+    def get(self, request, token):
+        unidad = _unidad_por_enlace(token)
+        if unidad is None:
+            return _error("invalid_link", "Este enlace ya no es válido.", status.HTTP_404_NOT_FOUND)
+        return Response({"ministerio": unidad.nombre, "descripcion": unidad.descripcion})
+
+
+class SumarseSerializer(serializers.Serializer):
+    nombre = serializers.CharField(max_length=100)
+    whatsapp = serializers.CharField(max_length=40)
+    acepta_datos = serializers.BooleanField()
+
+
+class SumarseUnidadView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+    throttle_classes = [IngresoThrottle]
+
+    def post(self, request, token):
+        unidad = _unidad_por_enlace(token)
+        if unidad is None:
+            return _error("invalid_link", "Este enlace ya no es válido.", status.HTTP_404_NOT_FOUND)
+        data = SumarseSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        try:
+            services.unirse_por_enlace(unidad, request=request, **data.validated_data)
+        except DjangoValidationError as exc:
+            return _error("invalid", " ".join(exc.messages))
+        return Response({"ministerio": unidad.nombre}, status=status.HTTP_201_CREATED)

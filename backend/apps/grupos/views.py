@@ -229,6 +229,9 @@ class GruposView(APIView):
             return _error("invalid", _detalle(exc))
         grupo = Grupo.objects.create(**datos)
         audit.log("grupo.creado", actor=request.user, target=grupo, request=request)
+        services.generar_enlace(
+            grupo, actor=request.user, request=request
+        )  # QR fijo desde el inicio
         return Response(grupo_resumen(grupo, request.user), status=status.HTTP_201_CREATED)
 
 
@@ -856,3 +859,38 @@ class EstudioArchivoView(APIView):
             return _rangos(campo, request, mime)
         except FileNotFoundError as exc:
             raise Http404 from exc
+
+
+class MisEnlacesView(APIView):
+    """Los QR fijos de los grupos y ministerios que la persona puede gestionar."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from apps.unidades import access as acceso_unidades
+        from apps.unidades.models import Unidad
+
+        filas = []
+        for g in Grupo.objects.filter(activo=True, suspendido=False):
+            if access.puede_gestionar_integrantes(request.user, g):
+                filas.append(
+                    {
+                        "tipo": "grupo",
+                        "id": g.pk,
+                        "nombre": g.nombre,
+                        "enlace": f"/unirse/{g.enlace_token}" if g.enlace_token else None,
+                        "requiere_aprobacion": True,
+                    }
+                )
+        for u in Unidad.objects.filter(activa=True):
+            if acceso_unidades.puede_gestionar_integrantes(request.user, u):
+                filas.append(
+                    {
+                        "tipo": "ministerio",
+                        "id": u.pk,
+                        "nombre": u.nombre,
+                        "enlace": f"/servir/{u.enlace_token}" if u.enlace_token else None,
+                        "requiere_aprobacion": False,
+                    }
+                )
+        return Response(filas)

@@ -1,15 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDeferredValue, useState } from 'react'
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  CardDescription,
-  CardTitle,
-  Field,
-  useToast,
-} from '@/design-system'
+import { Alert, Badge, Button, Card, CardDescription, CardTitle, ComboField, useToast } from '@/design-system'
 import { api } from '@/lib/api'
 
 interface Acceso {
@@ -33,6 +24,7 @@ export function AccesosCard() {
   const toast = useToast()
   const [texto, setTexto] = useState('')
   const q = useDeferredValue(texto.trim())
+  const [elegido, setElegido] = useState('')
   const [reinicio, setReinicio] = useState<Reinicio | null>(null)
   const [copiado, setCopiado] = useState(false)
 
@@ -40,6 +32,7 @@ export function AccesosCard() {
     queryKey: ['accesos', q],
     queryFn: () => api<Acceso[]>(`/api/auth/accesos/?q=${encodeURIComponent(q)}`),
   })
+  const persona = accesos.data?.find((a) => String(a.id) === elegido)
 
   const desbloquear = useMutation({
     mutationFn: (a: Acceso) => api(`/api/auth/users/${a.id}/unlock/`, { method: 'POST' }),
@@ -69,44 +62,42 @@ export function AccesosCard() {
       <div className="flex flex-col gap-1">
         <CardTitle>Accesos de tu gente</CardTitle>
         <CardDescription>
-          Si alguien ve «Demasiados intentos», desbloquéalo aquí. Si perdió su PIN o cambió de
-          número, reinicia su acceso y envíale el enlace.
+          Si alguien ve «Demasiados intentos», desbloquéalo aquí. Si perdió su PIN o cambió de número,
+          reinicia su acceso y envíale el enlace.
         </CardDescription>
       </div>
-      <Field
-        label="Buscar por nombre o WhatsApp"
-        value={texto}
-        onChange={(e) => setTexto(e.target.value)}
+      <ComboField
+        label="Buscar persona"
+        options={(accesos.data ?? []).map((a) => ({ value: String(a.id), label: a.nombre, detalle: a.whatsapp }))}
+        value={elegido}
+        onChange={(v) => {
+          setElegido(v)
+          setReinicio(null)
+        }}
+        onBuscar={setTexto}
+        filtrar={false}
+        placeholder="Nombre o número de WhatsApp"
+        vacio="No hay personas con ese dato en tu alcance."
       />
       {error ? <Alert tone="destructive">{error.message}</Alert> : null}
-      {accesos.data?.length === 0 ? (
-        <CardDescription>No hay personas con ese dato en tu alcance.</CardDescription>
-      ) : null}
-      <ul className="flex flex-col divide-y divide-border">
-        {accesos.data?.map((a) => (
-          <li key={a.id} className="flex flex-wrap items-center gap-3 py-3">
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="font-semibold">{a.nombre}</span>
-              <span className="text-sm text-muted-foreground">{a.whatsapp}</span>
-            </div>
-            {a.bloqueado ? <Badge tone="destructive">Bloqueado</Badge> : null}
-            {!a.activada ? <Badge tone="warning">Sin activar</Badge> : null}
-            {a.bloqueado ? (
-              <Button size="sm" onClick={() => desbloquear.mutate(a)} disabled={desbloquear.isPending}>
-                Desbloquear
-              </Button>
-            ) : null}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => reiniciar.mutate(a)}
-              disabled={reiniciar.isPending}
-            >
-              Reiniciar acceso
+      {persona ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-control border border-border p-3">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="font-semibold">{persona.nombre}</span>
+            <span className="text-sm text-muted-foreground">{persona.whatsapp}</span>
+          </div>
+          {persona.bloqueado ? <Badge tone="destructive">Bloqueado</Badge> : null}
+          {!persona.activada ? <Badge tone="warning">Sin activar</Badge> : null}
+          {persona.bloqueado ? (
+            <Button size="sm" onClick={() => desbloquear.mutate(persona)} disabled={desbloquear.isPending}>
+              Desbloquear
             </Button>
-          </li>
-        ))}
-      </ul>
+          ) : null}
+          <Button size="sm" variant="outline" onClick={() => reiniciar.mutate(persona)} disabled={reiniciar.isPending}>
+            Reiniciar acceso
+          </Button>
+        </div>
+      ) : null}
       {reinicio ? (
         <Alert tone="success">
           <div className="flex flex-col gap-3">

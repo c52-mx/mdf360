@@ -11,6 +11,9 @@ class Unidad(models.Model):
     descripcion = models.CharField(max_length=300, blank=True)
     activa = models.BooleanField(default=True)
     creada_en = models.DateTimeField(auto_now_add=True)
+    # Enlace (y QR) fijo para sumarse como servidor sin aprobación; vacío = desactivado.
+    # Regenerarlo invalida el anterior.
+    enlace_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
 
     class Meta:
         ordering = ["nombre"]

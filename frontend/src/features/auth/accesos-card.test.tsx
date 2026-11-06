@@ -27,6 +27,7 @@ function montar(llamadas: string[]) {
           expires_at: '2026-11-01T12:00:00Z',
         })
       }
+      llamadas.push(url)
       return json(200, gente)
     }),
   )
@@ -39,34 +40,49 @@ function montar(llamadas: string[]) {
   )
 }
 
+const elegir = async (nombre: RegExp) => {
+  fireEvent.focus(screen.getByRole('combobox', { name: 'Buscar persona' }))
+  fireEvent.click(await screen.findByRole('option', { name: nombre }))
+}
+
 afterEach(() => vi.unstubAllGlobals())
 
 describe('AccesosCard', () => {
+  it('se busca a la persona con un combo y se pide al servidor lo que se escribe', async () => {
+    const llamadas: string[] = []
+    montar(llamadas)
+    fireEvent.change(screen.getByRole('combobox', { name: 'Buscar persona' }), { target: { value: '5500' } })
+    await waitFor(() => expect(llamadas.some((u) => u.includes('q=5500'))).toBe(true))
+    expect(screen.queryByRole('button', { name: 'Reiniciar acceso' })).not.toBeInTheDocument()
+  })
+
   it('marca a quien está bloqueado y solo a esa persona le ofrece desbloquear', async () => {
     montar([])
-    expect(await screen.findByText('Ana Asistente')).toBeInTheDocument()
+    await elegir(/Ana Asistente/)
     expect(screen.getByText('Bloqueado')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Desbloquear' })).toHaveLength(1)
-    expect(screen.getAllByRole('button', { name: 'Reiniciar acceso' })).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Desbloquear' })).toBeInTheDocument()
+    await elegir(/Beto Bueno/)
+    expect(screen.queryByRole('button', { name: 'Desbloquear' })).not.toBeInTheDocument()
   })
 
   it('desbloquear llama al servidor y avisa', async () => {
     const llamadas: string[] = []
     montar(llamadas)
-    fireEvent.click(await screen.findByRole('button', { name: 'Desbloquear' }))
-    await waitFor(() => expect(llamadas).toEqual(['/api/auth/users/7/unlock/']))
+    await elegir(/Ana Asistente/)
+    fireEvent.click(screen.getByRole('button', { name: 'Desbloquear' }))
+    await waitFor(() => expect(llamadas).toContain('/api/auth/users/7/unlock/'))
     expect(await screen.findByText('Ana Asistente ya puede intentar entrar de nuevo.')).toBeInTheDocument()
   })
 
   it('reiniciar acceso muestra el enlace para mandarlo por WhatsApp', async () => {
     const llamadas: string[] = []
     montar(llamadas)
-    const botones = await screen.findAllByRole('button', { name: 'Reiniciar acceso' })
-    fireEvent.click(botones[1])
+    await elegir(/Beto Bueno/)
+    fireEvent.click(screen.getByRole('button', { name: 'Reiniciar acceso' }))
     expect(await screen.findByRole('link', { name: 'Enviar por WhatsApp' })).toHaveAttribute(
       'href',
       'https://wa.me/525500000009?text=hola',
     )
-    expect(llamadas).toEqual(['/api/auth/users/8/reset/'])
+    expect(llamadas).toContain('/api/auth/users/8/reset/')
   })
 })

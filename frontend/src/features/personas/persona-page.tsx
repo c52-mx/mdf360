@@ -11,11 +11,16 @@ import {
   CardDescription,
   CardTitle,
   CheckboxField,
+  ConfirmButton,
+  DangerAction,
+  DangerZone,
   Field,
   FileButton,
+  Modal,
   PageHeader,
   Section,
   SelectField,
+  Tabs,
   TextareaField,
 } from '@/design-system'
 import { useCan } from '@/features/auth/use-auth'
@@ -189,48 +194,47 @@ function Ficha({ persona }: { persona: Persona }) {
   const errorNivel =
     subirNivel.error ?? reactivar.error ?? darBaja.error ?? trasladar.error ?? asignar.error ?? subirFoto.error
 
-  return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-6">
-      <Link to="/personas" className="presionable flex w-fit items-center gap-2 font-semibold text-primary">
-        <ArrowLeft aria-hidden className="size-5" />
-        Volver al listado
-      </Link>
-      <PageHeader
-        title={persona.nombre_completo}
-        description={persona.edad !== null ? `${persona.edad} años` : undefined}
-        module="admin"
-        actions={
-          <Button type="submit" disabled={guardar.isPending}>
-            {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}
-          </Button>
-        }
+  const datosPersonales = (
+    <Section title="Datos personales">
+      <Field label="Nombre" value={form.nombre} onChange={texto('nombre')} required />
+      <Field label="Apellido paterno" value={form.apellido_paterno} onChange={texto('apellido_paterno')} />
+      <Field label="Apellido materno" value={form.apellido_materno} onChange={texto('apellido_materno')} />
+      <Field
+        label="Fecha de nacimiento"
+        type="date"
+        value={form.fecha_nacimiento ?? ''}
+        onChange={texto('fecha_nacimiento')}
       />
+      <SelectField
+        label="Procedencia"
+        value={form.procedencia}
+        onChange={(e) => setForm((f) => ({ ...f, procedencia: e.target.value as Procedencia }))}
+        options={procedenciaOptions}
+      />
+      <Field
+        label="Miembro desde"
+        type="date"
+        hint="Con esta fecha se calcula el tiempo en Mundo de Fe."
+        value={form.miembro_desde ?? ''}
+        onChange={texto('miembro_desde')}
+      />
+    </Section>
+  )
 
-      {guardar.isSuccess ? <Alert tone="success">Los cambios se guardaron.</Alert> : null}
-      {guardar.error ? <Alert tone="destructive">{guardar.error.message}</Alert> : null}
-      {errorNivel ? <Alert tone="destructive">{errorNivel.message}</Alert> : null}
-      {!persona.activo ? <Alert tone="warning">Esta persona está dada de baja.</Alert> : null}
+  const contacto = (
+    <Section title="Contacto y domicilio">
+      <Field label="Celular / WhatsApp" inputMode="tel" value={form.whatsapp} onChange={texto('whatsapp')} />
+      <Field label="Teléfono fijo" inputMode="tel" value={form.telefono_fijo} onChange={texto('telefono_fijo')} />
+      <Field label="Correo" type="email" value={form.email} onChange={texto('email')} />
+      <Field label="Calle y número" value={form.calle_numero} onChange={texto('calle_numero')} />
+      <Field label="Colonia" value={form.colonia} onChange={texto('colonia')} />
+      <Field label="Código postal" inputMode="numeric" value={form.codigo_postal} onChange={texto('codigo_postal')} />
+      <Field label="Alcaldía o municipio" value={form.alcaldia} onChange={texto('alcaldia')} />
+    </Section>
+  )
 
-      <Card className="flex flex-wrap items-center gap-5">
-        <Avatar name={persona.nombre_completo} src={fotoUrl(persona, persona.actualizado_en)} size="lg" />
-        <div className="flex flex-1 flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
-            <Badge tone="primary">{nivelLabel[persona.nivel]}</Badge>
-            {persona.activo ? <Badge tone="success">Activo</Badge> : <Badge tone="warning">Baja</Badge>}
-            {persona.roles.map((rol) => (
-              <Badge key={rol} tone="neutral">
-                {rol}
-              </Badge>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <FileButton onFile={(file) => subirFoto.mutate(file)} disabled={subirFoto.isPending}>
-              {persona.tiene_foto ? 'Cambiar foto' : 'Subir foto'}
-            </FileButton>
-          </div>
-        </div>
-      </Card>
-
+  const iglesia = (
+    <>
       <Card className="flex flex-col gap-3">
         <CardTitle>Nivel de registro</CardTitle>
         <ul className="flex flex-col gap-2">
@@ -294,6 +298,75 @@ function Ficha({ persona }: { persona: Persona }) {
         ) : null}
       </Card>
 
+      <Section title="Grupo de Conexión" description="Por ahora son datos de texto; después se ligan al módulo de Grupos.">
+        <Field label="Grupo de Conexión" value={form.grupo_conexion} onChange={texto('grupo_conexion')} />
+        <Field label="Líder" value={form.lider} onChange={texto('lider')} />
+        <Field label="Sector" value={form.sector} onChange={texto('sector')} />
+      </Section>
+
+      <Section title="Vida en la iglesia">
+        <CheckboxField
+          checked={form.sirve_en_ministerio}
+          onChange={casilla('sirve_en_ministerio')}
+          label="Sirve en un ministerio"
+        />
+        <Field label="Ministerio(s) en que sirve" value={form.ministerios} onChange={texto('ministerios')} />
+        <Field label="Devocional personal" value={form.devocional_personal} onChange={texto('devocional_personal')} />
+        <CheckboxField
+          checked={form.oracion_familias}
+          onChange={casilla('oracion_familias')}
+          label="Oración de Familias en Acción (miércoles)"
+        />
+        <Field
+          label="Detalle de la oración de familias"
+          value={form.oracion_familias_detalle}
+          onChange={texto('oracion_familias_detalle')}
+        />
+      </Section>
+    </>
+  )
+
+  const discipulado = (
+    <Card className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <CardTitle>Procesos de desarrollo discipular</CardTitle>
+        <CardDescription>Marca los que ya cursó, con su fecha y el nombre del maestro.</CardDescription>
+      </div>
+      {form.procesos.length === 0 ? <CardDescription>Aún no hay procesos configurados.</CardDescription> : null}
+      <ul className="flex flex-col gap-3">
+        {form.procesos.map((p, i) => (
+          <li key={p.proceso} className="grid grid-cols-1 items-center gap-3 md:grid-cols-3">
+            <CheckboxField
+              checked={p.completado}
+              onChange={(e) => proceso(i, { completado: e.target.checked })}
+              label={p.nombre}
+            />
+            <Field
+              label={`Fecha · ${p.nombre}`}
+              type="date"
+              value={p.fecha ?? ''}
+              onChange={(e) => proceso(i, { fecha: e.target.value || null })}
+            />
+            {p.pide_maestro ? (
+              <Field
+                label={`Maestro · ${p.nombre}`}
+                value={p.maestro}
+                onChange={(e) => proceso(i, { maestro: e.target.value })}
+              />
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </Card>
+  )
+
+  const mas = (
+    <>
+      <Section title="Notas">
+        <TextareaField label="Otros cursos" value={form.otros_cursos} onChange={texto('otros_cursos')} />
+        <TextareaField label="Observaciones" value={form.observaciones} onChange={texto('observaciones')} />
+      </Section>
+
       <DatosAdicionalesCard
         entidad="persona"
         id={persona.id}
@@ -318,169 +391,6 @@ function Ficha({ persona }: { persona: Persona }) {
         </Card>
       ) : null}
 
-      <Card className="flex flex-col gap-4">
-        <CardTitle>Situación en la iglesia</CardTitle>
-        {persona.activo ? (
-          bajaAbierta ? (
-            <div className="grid max-w-xl grid-cols-1 gap-4">
-              <CardDescription>
-                La persona sale de sus grupos y su acceso a la aplicación queda inactivo. Su historial se conserva y, al reactivarla, todo regresa.
-              </CardDescription>
-              <Field label="Fecha" type="date" value={bajaFecha} onChange={(e) => setBajaFecha(e.target.value)} />
-              <Field label="Motivo" value={bajaMotivo} onChange={(e) => setBajaMotivo(e.target.value)} />
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  disabled={!bajaMotivo.trim() || darBaja.isPending}
-                  onClick={() => darBaja.mutate()}
-                >
-                  Confirmar baja
-                </Button>
-                <Button type="button" variant="ghost" onClick={() => setBajaAbierta(false)}>
-                  Cancelar
-                </Button>
-              </div>
-            </div>
-          ) : trasladoAbierto ? (
-            <div className="grid max-w-xl grid-cols-1 gap-4">
-              <CardDescription>
-                La persona queda inactiva con la iglesia de destino en su historial, sale de sus grupos y su acceso queda inactivo.
-              </CardDescription>
-              <Field label="Fecha" type="date" value={trasladoFecha} onChange={(e) => setTrasladoFecha(e.target.value)} />
-              <Field
-                label="Iglesia a la que se traslada"
-                value={trasladoIglesia}
-                onChange={(e) => setTrasladoIglesia(e.target.value)}
-              />
-              <Field label="Motivo (opcional)" value={trasladoMotivo} onChange={(e) => setTrasladoMotivo(e.target.value)} />
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  disabled={!trasladoIglesia.trim() || trasladar.isPending}
-                  onClick={() => trasladar.mutate()}
-                >
-                  Confirmar traslado
-                </Button>
-                <Button type="button" variant="ghost" onClick={() => setTrasladoAbierto(false)}>
-                  Cancelar
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-3">
-              <Button type="button" variant="outline" onClick={() => setTrasladoAbierto(true)}>
-                Pasar a otra iglesia
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setBajaAbierta(true)}>
-                Dar de baja
-              </Button>
-            </div>
-          )
-        ) : (
-          <div>
-            <Button type="button" variant="success" onClick={() => reactivar.mutate()}>
-              Reactivar
-            </Button>
-          </div>
-        )}
-      </Card>
-
-      <Section title="Datos personales">
-        <Field label="Nombre" value={form.nombre} onChange={texto('nombre')} required />
-        <Field label="Apellido paterno" value={form.apellido_paterno} onChange={texto('apellido_paterno')} />
-        <Field label="Apellido materno" value={form.apellido_materno} onChange={texto('apellido_materno')} />
-        <Field
-          label="Fecha de nacimiento"
-          type="date"
-          value={form.fecha_nacimiento ?? ''}
-          onChange={texto('fecha_nacimiento')}
-        />
-        <SelectField
-          label="Procedencia"
-          value={form.procedencia}
-          onChange={(e) => setForm((f) => ({ ...f, procedencia: e.target.value as Procedencia }))}
-          options={procedenciaOptions}
-        />
-        <Field
-          label="Miembro desde"
-          type="date"
-          hint="Con esta fecha se calcula el tiempo en Mundo de Fe."
-          value={form.miembro_desde ?? ''}
-          onChange={texto('miembro_desde')}
-        />
-      </Section>
-
-      <Section title="Contacto y domicilio">
-        <Field label="Celular / WhatsApp" inputMode="tel" value={form.whatsapp} onChange={texto('whatsapp')} />
-        <Field label="Teléfono fijo" inputMode="tel" value={form.telefono_fijo} onChange={texto('telefono_fijo')} />
-        <Field label="Correo" type="email" value={form.email} onChange={texto('email')} />
-        <Field label="Calle y número" value={form.calle_numero} onChange={texto('calle_numero')} />
-        <Field label="Colonia" value={form.colonia} onChange={texto('colonia')} />
-        <Field label="Código postal" inputMode="numeric" value={form.codigo_postal} onChange={texto('codigo_postal')} />
-        <Field label="Alcaldía o municipio" value={form.alcaldia} onChange={texto('alcaldia')} />
-      </Section>
-
-      <Section title="Grupo de Conexión" description="Por ahora son datos de texto; después se ligan al módulo de Grupos.">
-        <Field label="Grupo de Conexión" value={form.grupo_conexion} onChange={texto('grupo_conexion')} />
-        <Field label="Líder" value={form.lider} onChange={texto('lider')} />
-        <Field label="Sector" value={form.sector} onChange={texto('sector')} />
-      </Section>
-
-      <Card className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <CardTitle>Procesos de desarrollo discipular</CardTitle>
-          <CardDescription>Marca los que ya cursó, con su fecha y el nombre del maestro.</CardDescription>
-        </div>
-        <ul className="flex flex-col gap-3">
-          {form.procesos.map((p, i) => (
-            <li key={p.proceso} className="grid grid-cols-1 items-center gap-3 md:grid-cols-3">
-              <CheckboxField
-                checked={p.completado}
-                onChange={(e) => proceso(i, { completado: e.target.checked })}
-                label={p.nombre}
-              />
-              <Field
-                label={`Fecha · ${p.nombre}`}
-                type="date"
-                value={p.fecha ?? ''}
-                onChange={(e) => proceso(i, { fecha: e.target.value || null })}
-              />
-              {p.pide_maestro ? (
-                <Field
-                  label={`Maestro · ${p.nombre}`}
-                  value={p.maestro}
-                  onChange={(e) => proceso(i, { maestro: e.target.value })}
-                />
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </Card>
-
-      <Section title="Vida en la iglesia">
-        <CheckboxField
-          checked={form.sirve_en_ministerio}
-          onChange={casilla('sirve_en_ministerio')}
-          label="Sirve en un ministerio"
-        />
-        <Field label="Ministerio(s) en que sirve" value={form.ministerios} onChange={texto('ministerios')} />
-        <Field label="Devocional personal" value={form.devocional_personal} onChange={texto('devocional_personal')} />
-        <CheckboxField
-          checked={form.oracion_familias}
-          onChange={casilla('oracion_familias')}
-          label="Oración de Familias en Acción (miércoles)"
-        />
-        <Field
-          label="Detalle de la oración de familias"
-          value={form.oracion_familias_detalle}
-          onChange={texto('oracion_familias_detalle')}
-        />
-        <TextareaField label="Otros cursos" value={form.otros_cursos} onChange={texto('otros_cursos')} />
-        <TextareaField label="Observaciones" value={form.observaciones} onChange={texto('observaciones')} />
-      </Section>
-
       <Card className="flex flex-col gap-3">
         <CardTitle>Historial de movimientos</CardTitle>
         {movimientos.data?.length ? (
@@ -498,6 +408,147 @@ function Ficha({ persona }: { persona: Persona }) {
           <CardDescription>Sin movimientos.</CardDescription>
         )}
       </Card>
+    </>
+  )
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-6">
+      <Link to="/personas" className="presionable flex w-fit items-center gap-2 font-semibold text-primary">
+        <ArrowLeft aria-hidden className="size-5" />
+        Volver al listado
+      </Link>
+      <PageHeader
+        title={persona.nombre_completo}
+        description={persona.edad !== null ? `${persona.edad} años` : undefined}
+        module="admin"
+        actions={
+          <Button type="submit" disabled={guardar.isPending}>
+            {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}
+          </Button>
+        }
+      />
+
+      {guardar.isSuccess ? <Alert tone="success">Los cambios se guardaron.</Alert> : null}
+      {guardar.error ? <Alert tone="destructive">{guardar.error.message}</Alert> : null}
+      {errorNivel ? <Alert tone="destructive">{errorNivel.message}</Alert> : null}
+      {!persona.activo ? <Alert tone="warning">Esta persona está dada de baja.</Alert> : null}
+
+      <Card className="flex flex-wrap items-center gap-5">
+        <Avatar name={persona.nombre_completo} src={fotoUrl(persona, persona.actualizado_en)} size="lg" />
+        <div className="flex flex-1 flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Badge tone="primary">{nivelLabel[persona.nivel]}</Badge>
+            {persona.activo ? <Badge tone="success">Activo</Badge> : <Badge tone="warning">Baja</Badge>}
+            {persona.roles.map((rol) => (
+              <Badge key={rol} tone="neutral">
+                {rol}
+              </Badge>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <FileButton onFile={(file) => subirFoto.mutate(file)} disabled={subirFoto.isPending}>
+              {persona.tiene_foto ? 'Cambiar foto' : 'Subir foto'}
+            </FileButton>
+          </div>
+        </div>
+      </Card>
+
+      <p className="text-muted-foreground">
+        Ninguna pestaña es obligatoria: llena lo que tengas y guarda cuando quieras; los cambios de todas se guardan
+        juntos.
+      </p>
+      <Tabs
+        titulo="Ficha de la persona"
+        pestanas={[
+          { id: 'datos', titulo: 'Datos personales', contenido: datosPersonales },
+          { id: 'contacto', titulo: 'Contacto', contenido: contacto },
+          { id: 'iglesia', titulo: 'En la iglesia', contenido: iglesia },
+          { id: 'discipulado', titulo: 'Discipulado', contenido: discipulado },
+          { id: 'mas', titulo: 'Notas e historial', contenido: mas },
+        ]}
+      />
+
+      <DangerZone>
+        {persona.activo ? (
+          <>
+            <DangerAction
+              title="Pasar a otra iglesia"
+              description="Queda inactiva con la iglesia de destino en su historial, sale de sus grupos y su acceso queda inactivo."
+            >
+              <Button type="button" variant="outline" onClick={() => setTrasladoAbierto(true)}>
+                Pasar a otra iglesia
+              </Button>
+            </DangerAction>
+            <DangerAction
+              title="Dar de baja"
+              description="Sale de sus grupos y su acceso queda inactivo. Su historial se conserva y, al reactivarla, todo regresa."
+            >
+              <Button type="button" variant="outline" onClick={() => setBajaAbierta(true)}>
+                Dar de baja
+              </Button>
+            </DangerAction>
+          </>
+        ) : (
+          <DangerAction title="Reactivar" description="Vuelve a quedar activa y recupera su historial.">
+            <ConfirmButton variant="success" etiquetaConfirmar="Sí, reactivar" onConfirm={() => reactivar.mutate()}>
+              Reactivar
+            </ConfirmButton>
+          </DangerAction>
+        )}
+      </DangerZone>
+
+      <Modal open={bajaAbierta} onClose={() => setBajaAbierta(false)} title="Dar de baja">
+        <div className="flex flex-col gap-4">
+          <CardDescription>
+            La persona sale de sus grupos y su acceso a la aplicación queda inactivo. Su historial se conserva y, al
+            reactivarla, todo regresa.
+          </CardDescription>
+          <Field label="Fecha" type="date" value={bajaFecha} onChange={(e) => setBajaFecha(e.target.value)} />
+          <Field label="Motivo" value={bajaMotivo} onChange={(e) => setBajaMotivo(e.target.value)} />
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!bajaMotivo.trim() || darBaja.isPending}
+              onClick={() => darBaja.mutate()}
+            >
+              Confirmar baja
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setBajaAbierta(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={trasladoAbierto} onClose={() => setTrasladoAbierto(false)} title="Pasar a otra iglesia">
+        <div className="flex flex-col gap-4">
+          <CardDescription>
+            La persona queda inactiva con la iglesia de destino en su historial, sale de sus grupos y su acceso queda
+            inactivo.
+          </CardDescription>
+          <Field label="Fecha" type="date" value={trasladoFecha} onChange={(e) => setTrasladoFecha(e.target.value)} />
+          <Field
+            label="Iglesia a la que se traslada"
+            value={trasladoIglesia}
+            onChange={(e) => setTrasladoIglesia(e.target.value)}
+          />
+          <Field label="Motivo (opcional)" value={trasladoMotivo} onChange={(e) => setTrasladoMotivo(e.target.value)} />
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!trasladoIglesia.trim() || trasladar.isPending}
+              onClick={() => trasladar.mutate()}
+            >
+              Confirmar traslado
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setTrasladoAbierto(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </form>
   )
 }

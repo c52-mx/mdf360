@@ -47,3 +47,39 @@ def agregar_integrante(
             excluir=actor,
         )
     return miembro
+
+
+def generar_enlace(unidad, *, actor=None, request=None) -> str:
+    """Crea (o regenera) el enlace fijo del ministerio; el anterior deja de servir."""
+    import secrets
+
+    unidad.enlace_token = secrets.token_urlsafe(18)
+    unidad.save(update_fields=["enlace_token"])
+    audit.log("unidad.enlace_generado", actor=actor, target=unidad, request=request)
+    return unidad.enlace_token
+
+
+def desactivar_enlace(unidad, *, actor=None, request=None) -> None:
+    unidad.enlace_token = None
+    unidad.save(update_fields=["enlace_token"])
+    audit.log("unidad.enlace_desactivado", actor=actor, target=unidad, request=request)
+
+
+def unirse_por_enlace(unidad, *, nombre, whatsapp, acepta_datos, request=None):
+    """Quien abre el QR del ministerio entra de inmediato como servidor (rol básico), sin
+    aprobación. Los roles con más alcance los asigna después quien administra el ministerio."""
+    from apps.accounts.phone import normalize_whatsapp
+
+    numero = normalize_whatsapp(whatsapp)
+    if personas.buscar_duplicado(numero) is None and not acepta_datos:
+        raise ValidationError("Debes aceptar el aviso de privacidad para sumarte.")
+    miembro = agregar_integrante(
+        unidad,
+        rol=UnidadMiembro.Rol.SERVIDOR,
+        whatsapp=numero,
+        nombre=nombre,
+        acepta_datos=acepta_datos,
+        request=request,
+    )
+    audit.log("unidad.ingreso_por_qr", target=unidad, request=request, persona=miembro.persona_id)
+    return miembro

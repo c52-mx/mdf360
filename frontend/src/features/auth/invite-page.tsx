@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { Alert, Button, Card, CardDescription, CardTitle, Field, PageHeader } from '@/design-system'
 import { api } from '@/lib/api'
 import { AccesosCard } from './accesos-card'
+import { QrEnlacesCard } from './qr-enlaces-card'
 import { useCan, type User } from './use-auth'
 
 interface Invitation {
@@ -88,6 +89,8 @@ export function InvitePage() {
           </div>
         </Card>
       ) : null}
+
+      <QrEnlacesCard />
 
       <AccesosCard />
     </div>

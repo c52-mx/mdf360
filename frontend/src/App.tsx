@@ -26,6 +26,7 @@ import { InvitePage } from '@/features/auth/invite-page'
 import { LoginPage } from '@/features/auth/login-page'
 import { RecoveryPage } from '@/features/auth/recovery-page'
 import { RequireAuth } from '@/features/auth/require-auth'
+import { ServirPage } from '@/features/unidades/servir-page'
 import { UnidadPage } from '@/features/unidades/unidad-page'
 import { UnidadesPage } from '@/features/unidades/unidades-page'
 import { AvisoPendiente } from '@/features/auth/aviso-pendiente'
@@ -115,6 +116,7 @@ export default function App() {
       <Route path="/activar/:token" element={<ActivatePage />} />
       <Route path="/recuperar" element={<RecoveryPage />} />
       <Route path="/unirse/:token" element={<UnirsePage />} />
+      <Route path="/servir/:token" element={<ServirPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<PrivateLayout />}>
           <Route path="/" element={<HomePage />} />
