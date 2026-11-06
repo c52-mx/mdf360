@@ -11,12 +11,8 @@ import {
   CheckboxField,
   Field,
   PageHeader,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
+  DataTable,
+  type DataColumn,
 } from '@/design-system'
 import { api } from '@/lib/api'
 import { useCan, type User } from './use-auth'
@@ -120,6 +116,37 @@ export function RolesPage() {
     )
   }
 
+  const columnas: DataColumn<User>[] = [
+    { clave: 'persona', titulo: 'Persona', orden: (u) => u.nombre, celda: (u) => <span className="font-bold">{u.nombre}</span> },
+    { clave: 'whatsapp', titulo: 'WhatsApp', orden: (u) => u.whatsapp, celda: (u) => u.whatsapp },
+    {
+      clave: 'roles',
+      titulo: 'Roles',
+      orden: (u) => u.roles.map(nombreDe).join(', ') || null,
+      celda: (u) =>
+        u.roles.length > 0 ? (
+          <span className="flex flex-wrap gap-1">
+            {u.roles.map((r) => (
+              <Badge key={r} tone="primary">
+                {nombreDe(r)}
+              </Badge>
+            ))}
+          </span>
+        ) : (
+          <Badge tone="warning">Sin rol</Badge>
+        ),
+    },
+    {
+      clave: 'acciones',
+      titulo: 'Acciones',
+      celda: (u) => (
+        <Button size="sm" variant="outline" onClick={() => setEditando(u.id)}>
+          Asignar roles
+        </Button>
+      ),
+    },
+  ]
+
   const texto = busqueda.trim().toLowerCase()
   const filas = (usuarios.data ?? []).filter(
     (u) => !texto || u.nombre.toLowerCase().includes(texto) || u.whatsapp.includes(texto),
@@ -139,44 +166,13 @@ export function RolesPage() {
       {usuarios.isError ? <Alert tone="destructive">{usuarios.error.message}</Alert> : null}
       {usuarios.data && filas.length === 0 ? <Alert>No hay personas con ese dato.</Alert> : null}
       {filas.length > 0 ? (
-        <Table aria-label="Personas con acceso y sus roles">
-          <TableHead>
-            <TableRow className="hover:bg-muted">
-              <TableHeaderCell>Persona</TableHeaderCell>
-              <TableHeaderCell>WhatsApp</TableHeaderCell>
-              <TableHeaderCell>Roles</TableHeaderCell>
-              <TableHeaderCell>
-                <span className="sr-only">Acciones</span>
-              </TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filas.map((u) => (
-              <TableRow key={u.id}>
-                <TableCell className="font-bold">{u.nombre}</TableCell>
-                <TableCell>{u.whatsapp}</TableCell>
-                <TableCell>
-                  {u.roles.length > 0 ? (
-                    <span className="flex flex-wrap gap-1">
-                      {u.roles.map((r) => (
-                        <Badge key={r} tone="primary">
-                          {nombreDe(r)}
-                        </Badge>
-                      ))}
-                    </span>
-                  ) : (
-                    <Badge tone="warning">Sin rol</Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Button size="sm" variant="outline" onClick={() => setEditando(u.id)}>
-                    Asignar roles
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          titulo="Personas con acceso y sus roles"
+          columnas={columnas}
+          filas={filas}
+          clave={(u) => u.id}
+          ordenInicial={{ clave: 'persona' }}
+        />
       ) : null}
     </div>
   )

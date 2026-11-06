@@ -11,15 +11,13 @@ import {
   Field,
   PageHeader,
   SelectField,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
+  DataTable,
+  type DataColumn,
 } from '@/design-system'
 import { api } from '@/lib/api'
 import { fotoUrl, nivelLabel, type Nivel, type Pagina, type PersonaResumen } from './types'
+
+const MAX_PAGINAS = 50
 
 const nivelTone: Record<Nivel, 'neutral' | 'primary' | 'success'> = {
   contacto: 'neutral',
@@ -27,23 +25,78 @@ const nivelTone: Record<Nivel, 'neutral' | 'primary' | 'success'> = {
   edu: 'success',
 }
 
+const columnas: DataColumn<PersonaResumen>[] = [
+  {
+    clave: 'persona',
+    titulo: 'Persona',
+    orden: (p) => p.nombre_completo,
+    celda: (p) => (
+      <Link to={`/personas/${p.id}`} className="flex items-center gap-3 font-bold underline">
+        <Avatar name={p.nombre_completo} src={fotoUrl(p)} />
+        {p.nombre_completo}
+      </Link>
+    ),
+  },
+  { clave: 'contacto', titulo: 'Contacto', orden: (p) => p.whatsapp || null, celda: (p) => p.whatsapp || 'Sin datos' },
+  {
+    clave: 'grupo',
+    titulo: 'Grupo',
+    orden: (p) => (p.grupos.length > 0 ? p.grupos.join(', ') : p.grupo_conexion || null),
+    celda: (p) => (p.grupos.length > 0 ? p.grupos.join(', ') : p.grupo_conexion || '–'),
+  },
+  {
+    clave: 'roles',
+    titulo: 'Roles',
+    orden: (p) => p.roles.join(', ') || null,
+    celda: (p) =>
+      p.roles.length > 0 ? (
+        <span className="flex flex-wrap gap-1">
+          {p.roles.map((rol) => (
+            <Badge key={rol}>{rol}</Badge>
+          ))}
+        </span>
+      ) : (
+        '–'
+      ),
+  },
+  {
+    clave: 'nivel',
+    titulo: 'Nivel',
+    orden: (p) => nivelLabel[p.nivel],
+    celda: (p) => (
+      <span className="flex flex-wrap gap-1">
+        <Badge tone={nivelTone[p.nivel]}>{nivelLabel[p.nivel]}</Badge>
+        {!p.activo ? <Badge tone="warning">Baja</Badge> : null}
+      </span>
+    ),
+  },
+]
+
 export function PersonasPage() {
   const [q, setQ] = useState('')
   const [nivel, setNivel] = useState('')
   const [activo, setActivo] = useState('true')
   const [grupo, setGrupo] = useState('')
   const [rol, setRol] = useState('')
-  const [page, setPage] = useState(1)
 
   const lista = useQuery({
-    queryKey: ['personas', { q, nivel, activo, grupo, rol, page }],
-    queryFn: () => {
-      const params = new URLSearchParams({ page: String(page), activo })
+    queryKey: ['personas', { q, nivel, activo, grupo, rol }],
+    queryFn: async () => {
+      // La tabla ordena sobre todo el resultado: se piden las páginas del servidor de una vez
+      const params = new URLSearchParams({ page_size: '100', activo })
       if (q.trim()) params.set('q', q.trim())
       if (nivel) params.set('nivel', nivel)
       if (grupo) params.set('grupo', grupo)
       if (rol) params.set('rol', rol)
-      return api<Pagina<PersonaResumen>>(`/api/personas/?${params.toString()}`)
+      const todas: PersonaResumen[] = []
+      let pagina = 1
+      for (;;) {
+        params.set('page', String(pagina))
+        const r = await api<Pagina<PersonaResumen>>(`/api/personas/?${params.toString()}`)
+        todas.push(...r.results)
+        if (!r.next || pagina >= MAX_PAGINAS) return { count: r.count, results: todas }
+        pagina += 1
+      }
     },
     placeholderData: (previous) => previous,
   })
@@ -60,10 +113,7 @@ export function PersonasPage() {
     retry: false,
   })
 
-  const cambiar = (fn: () => void) => {
-    fn()
-    setPage(1)
-  }
+  const cambiar = (fn: () => void) => fn()
 
   return (
     <div className="flex flex-col gap-6">
@@ -140,61 +190,14 @@ export function PersonasPage() {
           <p className="text-muted-foreground">
             {lista.data.count === 1 ? '1 persona' : `${lista.data.count} personas`}
           </p>
-          {lista.data.results.length === 0 ? (
-            <Alert>No hay personas con esos filtros.</Alert>
-          ) : (
-            <Table aria-label="Personas">
-              <TableHead>
-                <TableRow className="hover:bg-muted">
-                  <TableHeaderCell>Persona</TableHeaderCell>
-                  <TableHeaderCell>Contacto</TableHeaderCell>
-                  <TableHeaderCell>Grupo</TableHeaderCell>
-                  <TableHeaderCell>Roles</TableHeaderCell>
-                  <TableHeaderCell>Nivel</TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {lista.data.results.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <Link to={`/personas/${p.id}`} className="flex items-center gap-3 font-bold underline">
-                        <Avatar name={p.nombre_completo} src={fotoUrl(p)} />
-                        {p.nombre_completo}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{p.whatsapp || 'Sin datos'}</TableCell>
-                    <TableCell>{p.grupos.length > 0 ? p.grupos.join(', ') : p.grupo_conexion || '–'}</TableCell>
-                    <TableCell>
-                      {p.roles.length > 0 ? (
-                        <span className="flex flex-wrap gap-1">
-                          {p.roles.map((rol) => (
-                            <Badge key={rol}>{rol}</Badge>
-                          ))}
-                        </span>
-                      ) : (
-                        '–'
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="flex flex-wrap gap-1">
-                        <Badge tone={nivelTone[p.nivel]}>{nivelLabel[p.nivel]}</Badge>
-                        {!p.activo ? <Badge tone="warning">Baja</Badge> : null}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-          <div className="flex items-center justify-between">
-            <Button variant="outline" disabled={!lista.data.previous} onClick={() => setPage((n) => n - 1)}>
-              Anterior
-            </Button>
-            <span className="text-muted-foreground">Página {page}</span>
-            <Button variant="outline" disabled={!lista.data.next} onClick={() => setPage((n) => n + 1)}>
-              Siguiente
-            </Button>
-          </div>
+          <DataTable
+            titulo="Personas"
+            columnas={columnas}
+            filas={lista.data.results}
+            clave={(p) => p.id}
+            ordenInicial={{ clave: 'persona' }}
+            vacio="No hay personas con esos filtros."
+          />
         </>
       ) : null}
     </div>
