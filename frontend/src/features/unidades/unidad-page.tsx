@@ -13,11 +13,14 @@ import {
   Field,
   PageHeader,
   SelectField,
+  Tabs,
   useToast,
 } from '@/design-system'
 import { opcionesDeRol, useRolesEquipo } from '@/features/equipos/use-roles-equipo'
 import { TableroPanel } from '@/features/tablero/tablero-panel'
 import { api } from '@/lib/api'
+import { ComunidadUnidad } from './comunidad-unidad'
+import { PanelUnidadCard } from './panel-unidad'
 import type { UnidadDetalle } from './types'
 
 export function UnidadPage() {
@@ -96,14 +99,8 @@ export function UnidadPage() {
     agregar.mutate()
   }
 
-  return (
-    <div className="flex flex-col gap-6">
-      <Link to="/ministerios" className="presionable flex w-fit items-center gap-2 font-semibold text-primary">
-        <ArrowLeft aria-hidden className="size-5" />
-        Volver a ministerios
-      </Link>
-      <PageHeader title={u.nombre} description={u.descripcion || undefined} module="grupos" />
-
+  const equipo = (
+    <>
       <Card className="flex flex-col gap-3">
         <CardTitle>Integrantes</CardTitle>
         <ul className="flex flex-col gap-2">
@@ -220,7 +217,35 @@ export function UnidadPage() {
         </Card>
       ) : null}
 
-      <TableroPanel origenTipo="unidad" origenId={u.id} puedePublicar={u.puede_gestionar} />
+    </>
+  )
+  const muro = (
+    <TableroPanel origenTipo="unidad" origenId={u.id} puedePublicar={u.puede_gestionar} />
+  )
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Link to="/ministerios" className="presionable flex w-fit items-center gap-2 font-semibold text-primary">
+        <ArrowLeft aria-hidden className="size-5" />
+        Volver a ministerios
+      </Link>
+      <PageHeader title={u.nombre} description={u.descripcion || undefined} module="grupos" />
+
+      {!u.puede_gestionar && !u.puede_ver_panel ? (
+        <ComunidadUnidad unidad={u} />
+      ) : (
+        <Tabs
+          titulo="Secciones del ministerio"
+          pestanas={[
+            ...(u.puede_ver_panel
+              ? [{ id: 'panel', titulo: 'Panel', contenido: <PanelUnidadCard unidadId={u.id} /> }]
+              : []),
+            { id: 'equipo', titulo: 'Equipo', contenido: <div className="flex flex-col gap-6">{equipo}</div> },
+            { id: 'muro', titulo: 'Mensajes', contenido: muro },
+            { id: 'servidor', titulo: 'Vista del servidor', contenido: <ComunidadUnidad unidad={u} /> },
+          ]}
+        />
+      )}
     </div>
   )
 }

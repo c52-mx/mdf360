@@ -336,3 +336,39 @@ def test_los_permisos_nuevos_llegan_a_los_roles_que_corresponden(db):
         "avisos.iglesia",
         "avisos.personas",
     }
+
+
+# ---------- panel del ministerio ----------
+def test_el_panel_lo_ven_los_roles_superiores_y_no_quien_solo_sirve(mundo):
+    caf = mundo["cafeteria"]
+    url = f"/api/unidades/{caf.pk}/panel/"
+    assert api_de(mundo["servidor"]).get(url).status_code == 403
+    assert api_de(mundo["lider"]).get(url).status_code == 404  # ni existe para quien no participa
+    for quien in ("pastor", "anciano", "encargada"):
+        assert api_de(mundo[quien]).get(url).status_code == 200
+    detalle = api_de(mundo["servidor"]).get(f"/api/unidades/{caf.pk}/").json()
+    assert detalle["puede_ver_panel"] is False
+    assert api_de(mundo["encargada"]).get(f"/api/unidades/{caf.pk}/").json()["puede_ver_panel"]
+
+
+def test_el_panel_cuenta_gente_mensajes_y_peticiones_sin_leerlas(mundo):
+    caf = mundo["cafeteria"]
+    Mensaje.objects.create(
+        origen_tipo="unidad", origen_id=caf.pk, origen_etiqueta="Ministerio · Cafetería",
+        autor=mundo["encargada"], autor_nombre="Eva", texto="Hola equipo",
+    )  # fmt: skip
+    Mensaje.objects.create(
+        origen_tipo="unidad", origen_id=caf.pk, origen_etiqueta="x", autor_nombre="Eva",
+        texto="Borrado", eliminado=True,
+    )  # fmt: skip
+    salio = UnidadMiembro.objects.get(unidad=caf, persona=mundo["servidor"].persona)
+    salio.activo = False
+    salio.save()
+    datos = api_de(mundo["pastor"]).get(f"/api/unidades/{caf.pk}/panel/").json()
+    assert datos["ministerio"] == "Cafetería"
+    assert datos["integrantes"] == 2 and datos["salieron"] == 1 and datos["nuevos_30_dias"] == 3
+    assert {r["rol"]: r["total"] for r in datos["por_rol"]} == {"encargado": 1, "respaldo": 1}
+    assert len(datos["meses"]) == 6
+    assert datos["meses"][-1]["mensajes"] == 1 and datos["meses"][-1]["sumaron"] == 3
+    assert datos["ultimo_mensaje"] is not None
+    assert datos["peticiones"] == {"activas": 0, "atendidas": 0}

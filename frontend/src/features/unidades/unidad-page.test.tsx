@@ -8,6 +8,13 @@ import { UnidadPage } from './unidad-page'
 
 vi.mock('@/features/tablero/tablero-panel', () => ({ TableroPanel: () => null }))
 
+const panel = {
+  ministerio: 'Cafetería', integrantes: 2, nuevos_30_dias: 1, salieron: 0,
+  por_rol: [{ rol: 'encargado', rol_display: 'Encargado', total: 1 }],
+  meses: [{ mes: '2026-11', sumaron: 2, mensajes: 3 }],
+  ultimo_mensaje: null, peticiones: { activas: 2, atendidas: 5 },
+}
+
 const json = (status: number, body: unknown) =>
   Promise.resolve(new Response(JSON.stringify(body), { status }))
 
@@ -42,6 +49,7 @@ function montar(datos = unidad, llamadas: { url: string; init?: RequestInit }[] 
         return json(200, {})
       }
       if (url.includes('/roles-equipo/')) return json(200, roles)
+      if (url.includes('/panel/')) return json(200, panel)
       return json(200, datos)
     }),
   )
@@ -96,5 +104,27 @@ describe('UnidadPage', () => {
     await waitFor(() =>
       expect(llamadas.map((l) => l.url)).toContain('/api/unidades/2/integrantes/2/restaurar/'),
     )
+  })
+
+  it('quien tiene acceso al panel lo ve primero, con los números del ministerio', async () => {
+    montar({ ...unidad, puede_ver_panel: true })
+    expect(await screen.findByText('Nuevos en 30 días')).toBeInTheDocument()
+    expect(screen.getByText('5 atendidas')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Equipo' }))
+    expect(await screen.findByText('Sergio Servidor')).toBeInTheDocument()
+  })
+
+  it('quien solo sirve ve la vista tipo red social (maqueta) y nada de gestión', async () => {
+    montar({ ...unidad, puede_gestionar: false, mis_roles: ['servidor'] })
+    expect(await screen.findByText('Tu ministerio')).toBeInTheDocument()
+    expect(screen.getAllByText('Maqueta').length).toBeGreaterThan(0)
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.queryByLabelText('WhatsApp')).toBeNull()
+  })
+
+  it('el encargado puede previsualizar la vista del servidor', async () => {
+    montar()
+    fireEvent.click(await screen.findByRole('tab', { name: 'Vista del servidor' }))
+    expect(await screen.findByText('Tu ministerio')).toBeInTheDocument()
   })
 })
