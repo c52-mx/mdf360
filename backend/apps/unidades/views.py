@@ -10,7 +10,7 @@ from apps.accounts import equipos
 from apps.core import audit
 from apps.grupos.views import IngresoThrottle
 
-from . import access, services
+from . import access, panel, services
 from .models import Unidad, UnidadMiembro
 
 
@@ -97,6 +97,7 @@ class UnidadView(APIView):
                 "miembros": [miembro_dict(m, equipos.nombres("ministerio")) for m in miembros],
                 "puede_gestionar": access.puede_gestionar_integrantes(request.user, unidad),
                 "puede_administrar": access.puede_administrar(request.user),
+                "puede_ver_panel": panel.puede_ver_panel(request.user, unidad),
                 "enlace": (
                     f"/servir/{unidad.enlace_token}"
                     if unidad.enlace_token
@@ -123,6 +124,20 @@ class UnidadView(APIView):
             campos=sorted(data.validated_data),
         )  # fmt: skip
         return Response(unidad_resumen(unidad, request.user))
+
+
+class PanelUnidadView(APIView):
+    """Números del ministerio para los roles superiores (dashboard)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        unidad = get_object_or_404(Unidad, pk=pk)
+        if not access.puede_ver(request.user, unidad):
+            raise Http404
+        if not panel.puede_ver_panel(request.user, unidad):
+            return _denegado()
+        return Response({"ministerio": unidad.nombre, **panel.resumen(unidad)})
 
 
 class IntegranteEscritura(serializers.Serializer):

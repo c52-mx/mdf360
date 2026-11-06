@@ -11,6 +11,7 @@ urlpatterns = [
         name="enlace-unidad-sumarse",
     ),
     path("<int:pk>/", views.UnidadView.as_view(), name="unidad"),
+    path("<int:pk>/panel/", views.PanelUnidadView.as_view(), name="unidad-panel"),
     path("<int:pk>/enlace/", views.EnlaceUnidadView.as_view(), name="unidad-enlace"),
     path("<int:pk>/integrantes/", views.IntegrantesView.as_view(), name="unidad-integrantes"),
     path(
