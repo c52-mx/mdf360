@@ -7,16 +7,77 @@ import {
   Badge,
   Button,
   Card,
-  CardLink,
-  CardDescription,
   CardTitle,
+  DataTable,
   Field,
   PageHeader,
   SelectField,
+  type DataColumn,
 } from '@/design-system'
 import { useCan } from '@/features/auth/use-auth'
 import { api } from '@/lib/api'
 import { dias, SECTORES, type GrupoResumen } from './types'
+
+const columnas: DataColumn<GrupoResumen>[] = [
+  {
+    clave: 'nombre',
+    titulo: 'Grupo',
+    orden: (g) => g.nombre,
+    celda: (g) => (
+      <Link to={`/grupos/${g.id}`} className="font-bold underline">
+        {g.nombre}
+      </Link>
+    ),
+  },
+  {
+    clave: 'horario',
+    titulo: 'Reunión',
+    orden: (g) => (g.dia_semana === null ? null : g.dia_semana * 10000 + Number(g.hora.replace(':', '') || 0)),
+    celda: (g) => `${g.dia} ${g.hora}`.trim() || '–',
+  },
+  {
+    clave: 'lugar',
+    titulo: 'Lugar',
+    orden: (g) => g.ubicacion || g.colonia || null,
+    celda: (g) => [g.ubicacion, g.colonia].filter(Boolean).join(' · ') || '–',
+  },
+  {
+    clave: 'lider',
+    titulo: 'Líder',
+    orden: (g) => g.lideres[0] ?? null,
+    celda: (g) => (g.lideres.length ? g.lideres.join(', ') : '–'),
+  },
+  {
+    clave: 'integrantes',
+    titulo: 'Integrantes',
+    numerica: true,
+    orden: (g) => g.integrantes,
+    celda: (g) => g.integrantes,
+  },
+  {
+    clave: 'estado',
+    titulo: 'Estado',
+    orden: (g) => (g.suspendido ? 'Suspendido' : 'Activo'),
+    celda: (g) => (
+      <span className="flex flex-wrap gap-1">
+        {g.suspendido ? <Badge tone="warning">Suspendido</Badge> : <Badge tone="success">Activo</Badge>}
+        {g.tipo === 'lideres' ? <Badge tone="primary">Líderes</Badge> : null}
+        {g.ofrendas_con_diferencia ? (
+          <Badge tone="destructive">
+            {g.ofrendas_con_diferencia === 1
+              ? '1 ofrenda con diferencia'
+              : `${g.ofrendas_con_diferencia} ofrendas con diferencia`}
+          </Badge>
+        ) : null}
+        {g.mis_roles.map((r) => (
+          <Badge key={r} tone="neutral">
+            {r}
+          </Badge>
+        ))}
+      </span>
+    ),
+  },
+]
 
 export function GruposPage() {
   const queryClient = useQueryClient()
@@ -198,44 +259,16 @@ export function GruposPage() {
       </Card>
 
       {grupos.isError ? <Alert tone="destructive">{grupos.error.message}</Alert> : null}
-      {grupos.data && grupos.data.length === 0 ? (
-        <Alert>No hay grupos con esos filtros, o todavía no perteneces a ninguno.</Alert>
+      {grupos.data ? (
+        <DataTable
+          titulo="Grupos"
+          columnas={columnas}
+          filas={grupos.data}
+          clave={(g) => g.id}
+          ordenInicial={{ clave: 'nombre' }}
+          vacio="No hay grupos con esos filtros, o todavía no perteneces a ninguno."
+        />
       ) : null}
-      <ul className="flex flex-col gap-3">
-        {grupos.data?.map((g) => (
-          <li key={g.id}>
-            <CardLink to={`/grupos/${g.id}`} className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <CardTitle>{g.nombre}</CardTitle>
-                  <CardDescription>
-                    {[g.dia && `${g.dia} ${g.hora}`.trim(), g.ubicacion, g.colonia, `${g.integrantes} integrantes`]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </CardDescription>
-                  {g.lideres.length ? (
-                    <CardDescription>Líder: {g.lideres.join(', ')}</CardDescription>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {g.ofrendas_con_diferencia ? (
-                    <Badge tone="destructive">
-                      {g.ofrendas_con_diferencia === 1
-                        ? '1 ofrenda con diferencia'
-                        : `${g.ofrendas_con_diferencia} ofrendas con diferencia`}
-                    </Badge>
-                  ) : null}
-                  {g.suspendido ? <Badge tone="warning">Suspendido</Badge> : null}
-                  {g.tipo === 'lideres' ? <Badge tone="primary">Líderes</Badge> : null}
-                  {g.mis_roles.map((r) => (
-                    <Badge key={r} tone="success">
-                      {r}
-                    </Badge>
-                  ))}
-                </div>
-            </CardLink>
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }
