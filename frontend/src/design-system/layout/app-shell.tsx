@@ -1,6 +1,6 @@
 import { Ellipsis, LogOut, PanelLeftClose, PanelLeftOpen, X, type LucideIcon } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { moduleText, type ModuleKey } from './module'
 import { cn } from '@/lib/cn'
 
@@ -26,8 +26,17 @@ export interface NavItem {
   group?: string
 }
 
+/** Un espacio del sitio (Comunidad, Grupos, Administración) para el selector. */
+export interface EspacioItem {
+  to: string
+  label: string
+  activo: boolean
+}
+
 interface AppShellProps {
   nav: NavItem[]
+  /** Espacios disponibles para la persona; si hay más de uno se muestra el selector. */
+  espacios?: EspacioItem[]
   children: ReactNode
   /** Nombre de quien tiene la sesión abierta; se muestra en la barra superior. */
   userName?: string
@@ -44,6 +53,32 @@ function agrupar(items: NavItem[]): { group?: string; items: NavItem[] }[] {
     else bloques.push({ group: item.group, items: [item] })
   }
   return bloques
+}
+
+/** Selector de espacio: pastillas que caben en el ancho del celular y en el menú lateral. */
+function SelectorEspacio({ espacios, oscuro }: { espacios: EspacioItem[]; oscuro?: boolean }) {
+  if (espacios.length < 2) return null
+  return (
+    <nav aria-label="Espacios" className={cn('flex gap-1', oscuro ? 'flex-col' : 'overflow-x-auto')}>
+      {espacios.map((e) => (
+        <Link
+          key={e.label}
+          to={e.to}
+          aria-current={e.activo ? 'page' : undefined}
+          className={cn(
+            'presionable flex h-11 shrink-0 items-center rounded-full px-4 text-sm font-bold',
+            e.activo
+              ? 'bg-primary text-primary-foreground'
+              : oscuro
+                ? 'text-background/80 hover:bg-muted-foreground/25'
+                : 'text-muted-foreground hover:bg-muted',
+          )}
+        >
+          {e.label}
+        </Link>
+      ))}
+    </nav>
+  )
 }
 
 const CLAVE_MENU = 'mdf360.menu-oculto'
@@ -63,7 +98,7 @@ function leerOculto(): boolean {
  * menú lateral en escritorio (se puede ocultar y mostrar), barra inferior en móvil con el menú
  * «Más» cuando hay más opciones de las que caben, y un área de contenido con ancho máximo.
  */
-export function AppShell({ nav, children, userName, onLogout }: AppShellProps) {
+export function AppShell({ nav, espacios, children, userName, onLogout }: AppShellProps) {
   const [oculto, setOculto] = useState(leerOculto)
   const [masAbierto, setMasAbierto] = useState(false)
   const hoja = useRef<HTMLDialogElement>(null)
@@ -117,6 +152,11 @@ export function AppShell({ nav, children, userName, onLogout }: AppShellProps) {
           <div className="mb-4 rounded-card bg-card p-3">
             <img src="/logo.png" alt="Mundo de Fe México" className="h-auto w-full" />
           </div>
+          {espacios ? (
+            <div className="mb-2 flex flex-col">
+              <SelectorEspacio espacios={espacios} oscuro />
+            </div>
+          ) : null}
           <nav aria-label="Principal" className="flex flex-col gap-1">
             {agrupar(nav).map((bloque, i) => (
               <div key={bloque.group ?? `bloque-${i}`} className="flex flex-col gap-1">
@@ -176,6 +216,11 @@ export function AppShell({ nav, children, userName, onLogout }: AppShellProps) {
             ) : null}
           </div>
         </header>
+        {espacios && espacios.length > 1 ? (
+          <div className="border-b border-border bg-card px-4 py-1 md:hidden">
+            <SelectorEspacio espacios={espacios} />
+          </div>
+        ) : null}
         <main className="mx-auto w-full max-w-6xl flex-1 p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:p-8">
           {children}
         </main>

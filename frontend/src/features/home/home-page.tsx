@@ -55,10 +55,17 @@ export function HomePage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title={user ? `Hola, ${user.nombre.split(' ')[0]}` : 'Bienvenido a MDF360'}
-        description="Plataforma de gestión y discipulado de Mundo de Fe México."
+        description="Mundo de Fe México: tu comunidad, tus grupos y tu servicio."
         module="admin"
       />
       <InvitacionAvisos />
+      <Card>
+        <CardTitle>Tu comunidad</CardTitle>
+        <CardDescription>
+          Pronto verás aquí lo que se publica para toda la iglesia, para tus grupos y para tus
+          ministerios, y podrás comentar y reaccionar.
+        </CardDescription>
+      </Card>
       <section aria-label="Accesos rápidos" className="flex flex-col gap-3">
         <h2 className="text-xl">Accesos rápidos</h2>
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
