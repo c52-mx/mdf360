@@ -121,6 +121,13 @@ CATALOGO: tuple[Permiso, ...] = (
     Permiso(
         "avisos.personas", "Avisos", "Avisos masivos", "Enviar avisos a personas", sensible=True
     ),
+    Permiso(
+        "muro.publicar",
+        "Comunidad",
+        "Muro",
+        "Publicar en el muro para toda la iglesia o por segmentos",
+        sensible=True,
+    ),
     Permiso("bitacora.ver", "Administración", "Bitácora", "Consultar la bitácora"),
     Permiso(
         "config.gestionar", "Administración", "Configuración", "Cambiar los parámetros del sistema"
@@ -260,8 +267,8 @@ _LIDER_GRUPO = (
     "ofrendas_ver", "ofrendas_capturar_suplente", "ofrendas_avalar_suplente",
     "peticiones_registrar", "peticiones_ver",
 )  # fmt: skip
-# Lo mínimo para participar: ver su grupo, el estudio de la semana y publicar en su tablero.
-_BASICO_GRUPO = ("avisos", "estudio", "ver")
+# Lo mínimo para participar: ver su grupo y el estudio de la semana. Publicar es un permiso aparte.
+_BASICO_GRUPO = ("estudio", "ver")
 BASE_EQUIPO: dict[str, tuple[tuple[str, str, str, tuple[str, ...]], ...]] = {
     AMBITO_GRUPO: (
         ("lider", "Líder", "Encargado del grupo.", _LIDER_GRUPO),

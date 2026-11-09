@@ -540,4 +540,4 @@ def test_el_asistente_ve_su_grupo_y_el_estudio(mundo):
     # ver el grupo no le da la asistencia ni la gestión de la gente
     detalle = api.get(f"/api/grupos/{mundo['norte'].pk}/").json()
     assert detalle["puede_capturar"] is False and detalle["puede_gestionar"] is False
-    assert detalle["puede_publicar"] is True
+    assert detalle["puede_publicar"] is False  # publicar es un permiso aparte

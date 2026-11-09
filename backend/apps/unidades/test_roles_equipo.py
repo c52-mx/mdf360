@@ -40,8 +40,8 @@ def test_los_roles_base_de_grupo_replican_lo_que_ya_se_hacia(db):
         "peticiones_registrar",
     }  # fmt: skip
     assert permisos["tesorero"] == {"ofrendas_ver", "ofrendas_avalar"}
-    # Quien participa ve su grupo y el estudio y publica en su tablero, pero no modera ni gestiona
-    assert permisos["asistente"] == permisos["servidor"] == {"ver", "estudio", "avisos"}
+    # Quien participa ve su grupo y el estudio; publicar es un permiso aparte, no viene de fábrica
+    assert permisos["asistente"] == permisos["servidor"] == {"ver", "estudio"}
     assert permisos["anfitrion"] == set()
 
 

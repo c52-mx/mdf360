@@ -2,7 +2,7 @@
 
 from apps.grupos.models import GrupoMiembro
 
-from .test_tablero import _limpiar, api_de, cuenta, m, publicar  # noqa: F401
+from .test_tablero import _asistente_publica, _limpiar, api_de, cuenta, m, publicar  # noqa: F401
 
 
 def tableros(m, quien, tipo="grupo"):

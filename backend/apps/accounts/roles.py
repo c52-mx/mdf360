@@ -17,6 +17,7 @@ PERMISOS = {
     "unidades.gestionar": "Crear y administrar ministerios y sus encargados",
     "avisos.iglesia": "Enviar avisos a toda la iglesia",
     "avisos.personas": "Enviar avisos a personas",
+    "muro.publicar": "Publicar en el muro para toda la iglesia o por segmentos",
     "bitacora.ver": "Consultar la bitácora",
     "grupos.ver_todos": "Ver todos los Grupos de Conexión",
     "grupos.gestionar": "Crear y administrar Grupos de Conexión",
