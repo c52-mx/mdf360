@@ -25,7 +25,7 @@ export { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } fro
 export { ThemePicker } from './ui/theme-picker'
 export { Tabs, type Pestana } from './ui/tabs'
 export { TextareaField } from './ui/textarea-field'
-export { AppShell, type NavItem } from './layout/app-shell'
+export { AppShell, type EspacioItem, type NavItem } from './layout/app-shell'
 export { AuthLayout } from './layout/auth-layout'
 export { PageHeader } from './layout/page-header'
 export { type ModuleKey } from './layout/module'

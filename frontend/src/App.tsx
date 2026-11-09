@@ -16,8 +16,9 @@ import {
   Users,
   UsersRound,
 } from 'lucide-react'
-import { Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom'
-import { AppShell, type NavItem } from '@/design-system'
+import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { AppShell, type EspacioItem, type NavItem } from '@/design-system'
+import { ESPACIOS, espacioDeRuta, espaciosDe, type Espacio } from '@/features/espacios/espacios'
 import { AuditoriaPage } from '@/features/auditoria/auditoria-page'
 import { ConfigPage } from '@/features/config/config-page'
 import { AccountPage } from '@/features/auth/account-page'
@@ -57,51 +58,74 @@ import { PersonasPage } from '@/features/personas/personas-page'
 function PrivateLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const can = (permiso: string) => !!user?.permisos.includes(permiso)
-  const operacion = 'Operación'
-  const catalogos = 'Catálogos'
-  const administracion = 'Administración'
-  const nav: NavItem[] = [
-    { to: '/', label: 'Inicio', icon: Home },
-    { to: '/grupos', label: 'Grupos', icon: UsersRound, module: 'grupos', group: operacion },
-    { to: '/ministerios', label: 'Ministerios', icon: Building2, module: 'grupos', group: operacion },
-    { to: '/peticiones', label: 'Peticiones', icon: HandHeart, module: 'grupos', group: operacion },
-    { to: '/avisos', label: 'Avisos', icon: Bell, module: 'grupos', group: operacion },
+  const espacios = espaciosDe(user?.permisos)
+  const actual = espacioDeRuta(pathname, espacios)
+  const administra = espacios.includes('admin')
+  // Las herramientas de uso mixto viven en Administración si se tiene; si no, en Grupos.
+  const mixtas: NavItem[] = [
     ...(can('ofrendas.acceso')
-      ? [{ to: '/ofrendas', label: 'Ofrendas', icon: Coins, module: 'grupos' as const, group: operacion }]
+      ? [{ to: '/ofrendas', label: 'Ofrendas', icon: Coins, module: 'grupos' as const }]
       : []),
-    ...(can('personas.ver')
-      ? [{ to: '/personas', label: 'Personas', icon: Users, module: 'admin' as const, group: catalogos }]
-      : []),
-    ...(can('usuarios.invitar')
-      ? [{ to: '/invitar', label: 'Invitar', icon: UserPlus, module: 'admin' as const, group: administracion }]
-      : []),
-    ...(can('roles.gestionar')
-      ? [{ to: '/roles', label: 'Roles', icon: ShieldCheck, module: 'admin' as const, group: administracion }]
-      : []),
-    ...(can('roles.administrar')
-      ? [{ to: '/permisos', label: 'Permisos', icon: KeyRound, module: 'admin' as const, group: administracion }]
-      : []),
-    ...(can('formularios.gestionar')
-      ? [{ to: '/formularios', label: 'Formularios', icon: ClipboardList, module: 'admin' as const, group: administracion }]
-      : []),
-    ...(can('config.gestionar')
-      ? [{ to: '/aviso-privacidad', label: 'Aviso de privacidad', icon: FileText, module: 'admin' as const, group: administracion }]
-      : []),
-    ...(can('bitacora.ver')
-      ? [{ to: '/bitacora', label: 'Bitácora', icon: ScrollText, module: 'admin' as const, group: administracion }]
-      : []),
-    ...(can('config.gestionar')
-      ? [{ to: '/configuracion', label: 'Configuración', icon: Settings, module: 'admin' as const, group: administracion }]
-      : []),
-    // Catálogo interno del sistema de diseño: solo para quien administra el sistema
-    ...(can('config.gestionar')
-      ? [{ to: '/diseno', label: 'Diseño', icon: Palette, group: administracion }]
-      : []),
-    { to: '/cuenta', label: 'Mi cuenta', icon: UserCog },
+    ...(can('usuarios.invitar') ? [{ to: '/invitar', label: 'Invitar', icon: UserPlus }] : []),
   ]
+  const navPorEspacio: Record<Espacio, NavItem[]> = {
+    comunidad: [
+      { to: '/', label: 'Inicio', icon: Home },
+      { to: '/avisos', label: 'Avisos', icon: Bell, module: 'grupos' },
+      { to: '/peticiones/formulario', label: 'Orar', icon: HandHeart, module: 'grupos' },
+      { to: '/cuenta', label: 'Mi cuenta', icon: UserCog },
+    ],
+    grupos: [
+      { to: '/grupos', label: 'Grupos', icon: UsersRound, module: 'grupos' },
+      { to: '/ministerios', label: 'Ministerios', icon: Building2, module: 'grupos' },
+      { to: '/peticiones', label: 'Peticiones', icon: HandHeart, module: 'grupos' },
+      ...(administra ? [] : mixtas),
+    ],
+    admin: [
+      ...(can('personas.ver')
+        ? [{ to: '/personas', label: 'Personas', icon: Users, module: 'admin' as const, group: 'Catálogos' }]
+        : []),
+      ...mixtas.map((m) => ({ ...m, group: 'Operación' })),
+      ...(can('roles.gestionar')
+        ? [{ to: '/roles', label: 'Roles', icon: ShieldCheck, module: 'admin' as const, group: 'Administración' }]
+        : []),
+      ...(can('roles.administrar')
+        ? [{ to: '/permisos', label: 'Permisos', icon: KeyRound, module: 'admin' as const, group: 'Administración' }]
+        : []),
+      ...(can('formularios.gestionar')
+        ? [{ to: '/formularios', label: 'Formularios', icon: ClipboardList, module: 'admin' as const, group: 'Administración' }]
+        : []),
+      ...(can('config.gestionar')
+        ? [{ to: '/aviso-privacidad', label: 'Aviso de privacidad', icon: FileText, module: 'admin' as const, group: 'Administración' }]
+        : []),
+      ...(can('bitacora.ver')
+        ? [{ to: '/bitacora', label: 'Bitácora', icon: ScrollText, module: 'admin' as const, group: 'Administración' }]
+        : []),
+      ...(can('config.gestionar')
+        ? [{ to: '/configuracion', label: 'Configuración', icon: Settings, module: 'admin' as const, group: 'Administración' }]
+        : []),
+      // Catálogo interno del sistema de diseño: solo para quien administra el sistema
+      ...(can('config.gestionar')
+        ? [{ to: '/diseno', label: 'Diseño', icon: Palette, group: 'Administración' }]
+        : []),
+    ],
+  }
+  const selector: EspacioItem[] = espacios.map((e) => ({
+    to: (e === 'admin' ? navPorEspacio.admin[0]?.to : undefined) ?? ESPACIOS[e].inicio,
+    label: ESPACIOS[e].etiqueta,
+    activo: e === actual,
+  }))
+  // Quien no administra nada no entra a las pantallas de Administración
+  if (actual === 'admin' && !administra) return <Navigate to="/" replace />
   return (
-    <AppShell nav={nav} userName={user?.nombre} onLogout={() => void logout().then(() => navigate('/login', { replace: true }))}>
+    <AppShell
+      nav={navPorEspacio[actual]}
+      espacios={selector}
+      userName={user?.nombre}
+      onLogout={() => void logout().then(() => navigate('/login', { replace: true }))}
+    >
       <SyncBanner />
       <AvisoPendiente />
       <Outlet />

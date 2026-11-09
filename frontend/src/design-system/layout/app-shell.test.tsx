@@ -17,6 +17,37 @@ function montar() {
 describe('AppShell', () => {
   beforeEach(() => localStorage.clear())
 
+  it('muestra el selector de espacios y marca el actual', () => {
+    render(
+      <MemoryRouter>
+        <AppShell
+          nav={nav}
+          espacios={[
+            { to: '/', label: 'Comunidad', activo: true },
+            { to: '/grupos', label: 'Grupos', activo: false },
+          ]}
+        >
+          contenido
+        </AppShell>
+      </MemoryRouter>,
+    )
+    const actual = screen.getAllByRole('link', { name: 'Comunidad' })
+    expect(actual.length).toBeGreaterThan(0)
+    expect(actual[0].getAttribute('aria-current')).toBe('page')
+    expect(screen.getAllByRole('link', { name: 'Grupos' })[0].getAttribute('href')).toBe('/grupos')
+  })
+
+  it('no muestra el selector si hay un solo espacio', () => {
+    render(
+      <MemoryRouter>
+        <AppShell nav={nav} espacios={[{ to: '/', label: 'Comunidad', activo: true }]}>
+          contenido
+        </AppShell>
+      </MemoryRouter>,
+    )
+    expect(screen.queryByRole('navigation', { name: 'Espacios' })).toBeNull()
+  })
+
   it('oculta y muestra el menú lateral y recuerda la preferencia', () => {
     montar()
     expect(document.getElementById('menu-lateral')).not.toBeNull()
