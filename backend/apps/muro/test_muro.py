@@ -174,3 +174,83 @@ def test_avisos_ya_publicados_se_copian_al_muro(m):
     importlib.import_module("apps.muro.migrations.0002_copiar_avisos").copiar(registro, None)
     assert textos(m["asistente"]) == ["Aviso viejo"]
     assert not Publicacion.objects.filter(texto="Privado").exists()
+
+
+# ---------- reacciones y comentarios (paso 24) ----------
+def una(m, texto="Cena para servidores", *destinos):
+    r = publicar(m["pastor"], texto, *(destinos or [("segmento", 1)]))
+    assert r.status_code == 201
+    return r.json()["id"]
+
+
+def reaccionar(user, pid, tipo):
+    return api_de(user).put(f"/api/muro/{pid}/reaccion/", {"tipo": tipo}, format="json")
+
+
+def test_cualquiera_que_ve_la_publicacion_reacciona_y_cambia_o_quita(m):
+    pid = una(m)
+    r = reaccionar(m["servidor"], pid, "amen")
+    assert r.status_code == 200
+    assert r.json()["reacciones"] == {"amen": 1} and r.json()["mi_reaccion"] == "amen"
+    # cambiar de reacción no suma otra
+    assert reaccionar(m["servidor"], pid, "corazon").json()["reacciones"] == {"corazon": 1}
+    # tocar la misma la quita
+    quitada = reaccionar(m["servidor"], pid, "corazon").json()
+    assert quitada["reacciones"] == {} and quitada["mi_reaccion"] is None
+    assert reaccionar(m["servidor"], pid, "inventada").status_code == 400
+
+
+def test_el_muro_trae_conteos_y_mi_reaccion(m):
+    pid = una(m, "Para todos", ("iglesia", 1))
+    reaccionar(m["asistente"], pid, "me_gusta")
+    reaccionar(m["lider"], pid, "me_gusta")
+    reaccionar(m["otro"], pid, "amen")
+    api_de(m["otro"]).post(f"/api/muro/{pid}/comentarios/", {"texto": "Ahí estaré"}, format="json")
+    fila = api_de(m["asistente"]).get("/api/muro/").json()["resultados"][0]
+    assert fila["reacciones"] == {"me_gusta": 2, "amen": 1}
+    assert fila["mi_reaccion"] == "me_gusta" and fila["comentarios_total"] == 1
+
+
+def test_quien_no_ve_la_publicacion_no_reacciona_ni_comenta_ni_la_lee(m):
+    pid = una(m)  # solo servidores
+    assert reaccionar(m["asistente"], pid, "amen").status_code == 404
+    c = api_de(m["asistente"])
+    assert c.post(f"/api/muro/{pid}/comentarios/", {"texto": "x"}, format="json").status_code == 404
+    assert c.get(f"/api/muro/{pid}/comentarios/").status_code == 404
+
+
+def test_comentarios_se_leen_en_orden_y_se_validan(m):
+    pid = una(m, "Para todos", ("iglesia", 1))
+    a, s = api_de(m["asistente"]), api_de(m["servidor"])
+    assert (
+        a.post(f"/api/muro/{pid}/comentarios/", {"texto": "  "}, format="json").status_code == 400
+    )
+    assert (
+        a.post(f"/api/muro/{pid}/comentarios/", {"texto": "x" * 501}, format="json").status_code
+        == 400
+    )
+    a.post(f"/api/muro/{pid}/comentarios/", {"texto": "Primero"}, format="json")
+    s.post(f"/api/muro/{pid}/comentarios/", {"texto": "Segundo"}, format="json")
+    lista = s.get(f"/api/muro/{pid}/comentarios/").json()
+    assert [c["texto"] for c in lista] == ["Primero", "Segundo"]
+    assert [c["es_mio"] for c in lista] == [False, True]
+
+
+def test_quitar_comentario_lo_hace_su_autor_o_el_de_la_publicacion(m):
+    pid = una(m, "Para todos", ("iglesia", 1))
+    cid = (
+        api_de(m["asistente"])
+        .post(f"/api/muro/{pid}/comentarios/", {"texto": "Hola"}, format="json")
+        .json()["id"]
+    )
+    # otra persona que ve la publicación no puede quitarlo
+    assert api_de(m["otro"]).delete(f"/api/muro/comentarios/{cid}/").status_code == 403
+    # el autor de la publicación sí
+    assert api_de(m["pastor"]).delete(f"/api/muro/comentarios/{cid}/").status_code == 204
+    assert api_de(m["asistente"]).get(f"/api/muro/{pid}/comentarios/").json() == []
+    c2 = (
+        api_de(m["otro"])
+        .post(f"/api/muro/{pid}/comentarios/", {"texto": "Otro"}, format="json")
+        .json()["id"]
+    )
+    assert api_de(m["otro"]).delete(f"/api/muro/comentarios/{c2}/").status_code == 204

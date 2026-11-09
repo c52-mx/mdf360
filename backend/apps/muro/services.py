@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import Count, Q
 
 from apps.accounts.permissions import tiene_permiso
 from apps.core import audit
@@ -7,7 +7,7 @@ from apps.notificaciones import push
 from apps.tablero import registry
 
 from . import segmentos
-from .models import Audiencia, Publicacion
+from .models import Audiencia, Comentario, Publicacion, Reaccion
 
 LIMITE = 2000
 MAX_AUDIENCIAS = 20
@@ -158,6 +158,98 @@ def muro(user, *, antes: int | None = None, audiencia: tuple[str, int] | None = 
     if antes:
         qs = qs.filter(pk__lt=antes)
     return list(qs.prefetch_related("audiencias").order_by("-id")[: PAGINA + 1])
+
+
+LIMITE_COMENTARIO = 500
+
+
+def reaccionar(publicacion: Publicacion, user, tipo: str | None) -> None:
+    """Pone, cambia o quita (tipo=None, o el mismo tipo otra vez) la reacción de la persona."""
+    if not puede_ver(user, publicacion):
+        raise SinPermiso
+    if tipo is not None and tipo not in Reaccion.Tipo.values:
+        raise ValidationError("Esa reacción no existe.")
+    actual = Reaccion.objects.filter(publicacion=publicacion, usuario=user).first()
+    if tipo is None or (actual and actual.tipo == tipo):
+        if actual:
+            actual.delete()
+        return
+    Reaccion.objects.update_or_create(
+        publicacion=publicacion, usuario=user, defaults={"tipo": tipo}
+    )
+
+
+def comentar(publicacion: Publicacion, user, texto, request=None) -> Comentario:
+    if not puede_ver(user, publicacion):
+        raise SinPermiso
+    texto = (texto or "").strip()
+    if not texto:
+        raise ValidationError("Escribe el comentario.")
+    if len(texto) > LIMITE_COMENTARIO:
+        raise ValidationError(f"El comentario puede tener hasta {LIMITE_COMENTARIO} caracteres.")
+    comentario = Comentario.objects.create(
+        publicacion=publicacion, autor=user, autor_nombre=user.nombre, texto=texto
+    )
+    if publicacion.autor_id and publicacion.autor_id != user.pk:
+        push.notificar(
+            titulo="Comentaron tu publicación",
+            cuerpo=f"{user.nombre}: {texto}",
+            url="/",
+            etiqueta=f"muro-comentario-{publicacion.pk}",
+            usuarios=[publicacion.autor],
+        )
+    return comentario
+
+
+def puede_quitar_comentario(user, comentario: Comentario) -> bool:
+    """Lo quita quien lo escribió o quien escribió la publicación."""
+    return user.pk in (comentario.autor_id, comentario.publicacion.autor_id)
+
+
+def comentario_dict(c: Comentario, user) -> dict:
+    return {
+        "id": c.pk,
+        "autor": c.autor_nombre,
+        "texto": c.texto,
+        "creado_en": c.creado_en.isoformat(),
+        "es_mio": c.autor_id == user.pk,
+        "puede_quitar": puede_quitar_comentario(user, c),
+    }
+
+
+def _resumen(publicaciones, user) -> dict[int, dict]:
+    ids = [p.pk for p in publicaciones]
+    reacciones: dict[int, dict[str, int]] = {i: {} for i in ids}
+    for f in (
+        Reaccion.objects.filter(publicacion_id__in=ids)
+        .values("publicacion_id", "tipo")
+        .annotate(n=Count("id"))
+    ):
+        reacciones[f["publicacion_id"]][f["tipo"]] = f["n"]
+    mias = dict(
+        Reaccion.objects.filter(publicacion_id__in=ids, usuario=user).values_list(
+            "publicacion_id", "tipo"
+        )
+    )
+    comentarios = dict(
+        Comentario.objects.filter(publicacion_id__in=ids, eliminado=False)
+        .values("publicacion_id")
+        .annotate(n=Count("id"))
+        .values_list("publicacion_id", "n")
+    )
+    return {
+        i: {
+            "reacciones": reacciones[i],
+            "mi_reaccion": mias.get(i),
+            "comentarios_total": comentarios.get(i, 0),
+        }
+        for i in ids
+    }
+
+
+def publicaciones_dict(publicaciones, user) -> list[dict]:
+    resumen = _resumen(publicaciones, user)
+    return [publicacion_dict(p, user) | resumen[p.pk] for p in publicaciones]
 
 
 def publicacion_dict(p: Publicacion, user) -> dict:

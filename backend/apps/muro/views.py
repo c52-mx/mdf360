@@ -1,10 +1,12 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import Http404
 from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import services
+from .models import Comentario, Publicacion
 
 
 def _error(code, detail, http_status=status.HTTP_400_BAD_REQUEST):
@@ -41,7 +43,7 @@ class MuroView(APIView):
         filas = filas[: services.PAGINA]
         return Response(
             {
-                "resultados": [services.publicacion_dict(p, request.user) for p in filas],
+                "resultados": services.publicaciones_dict(filas, request.user),
                 "siguiente": filas[-1].pk if hay_mas and filas else None,
             }
         )
@@ -61,7 +63,8 @@ class MuroView(APIView):
         except DjangoValidationError as exc:
             return _error("invalid", " ".join(exc.messages))
         return Response(
-            services.publicacion_dict(publicacion, request.user), status=status.HTTP_201_CREATED
+            services.publicaciones_dict([publicacion], request.user)[0],
+            status=status.HTTP_201_CREATED,
         )
 
 
@@ -72,3 +75,68 @@ class DestinosView(APIView):
 
     def get(self, request):
         return Response(services.destinos_para_publicar(request.user))
+
+
+def _publicacion_visible(request, pk) -> Publicacion:
+    """La publicación, o 404 si no existe o la persona no la puede ver (no se revela cuál)."""
+    publicacion = Publicacion.objects.filter(pk=pk, eliminada=False).first()
+    if publicacion is None or not services.puede_ver(request.user, publicacion):
+        raise Http404
+    return publicacion
+
+
+class ReaccionView(APIView):
+    """Pone, cambia o quita la reacción propia: {"tipo": "amen"}; null la quita."""
+
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, pk):
+        publicacion = _publicacion_visible(request, pk)
+        tipo = request.data.get("tipo")
+        if tipo is not None and not isinstance(tipo, str):
+            return _error("invalid", "Indica la reacción.")
+        try:
+            services.reaccionar(publicacion, request.user, tipo)
+        except DjangoValidationError as exc:
+            return _error("invalid", " ".join(exc.messages))
+        return Response(services.publicaciones_dict([publicacion], request.user)[0])
+
+
+class ComentariosView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        publicacion = _publicacion_visible(request, pk)
+        comentarios = publicacion.comentarios.filter(eliminado=False)
+        return Response([services.comentario_dict(c, request.user) for c in comentarios])
+
+    def post(self, request, pk):
+        publicacion = _publicacion_visible(request, pk)
+        texto = request.data.get("texto")
+        if not isinstance(texto, str):
+            return _error("invalid", "Escribe el comentario.")
+        try:
+            comentario = services.comentar(publicacion, request.user, texto, request)
+        except DjangoValidationError as exc:
+            return _error("invalid", " ".join(exc.messages))
+        return Response(
+            services.comentario_dict(comentario, request.user), status=status.HTTP_201_CREATED
+        )
+
+
+class ComentarioView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        comentario = (
+            Comentario.objects.filter(pk=pk, eliminado=False).select_related("publicacion").first()
+        )
+        if comentario is None or not services.puede_ver(request.user, comentario.publicacion):
+            raise Http404
+        if not services.puede_quitar_comentario(request.user, comentario):
+            return _error(
+                "forbidden", "No puedes quitar este comentario.", status.HTTP_403_FORBIDDEN
+            )
+        comentario.eliminado = True
+        comentario.save(update_fields=["eliminado"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
