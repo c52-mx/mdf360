@@ -254,3 +254,101 @@ def test_quitar_comentario_lo_hace_su_autor_o_el_de_la_publicacion(m):
         .json()["id"]
     )
     assert api_de(m["otro"]).delete(f"/api/muro/comentarios/{c2}/").status_code == 204
+
+
+# ---------- editar, fijar, eliminar y reportar (paso 25) ----------
+def test_el_autor_edita_su_publicacion_y_queda_marcada(m):
+    pid = una(m, "Borrador", ("iglesia", 1))
+    ok = api_de(m["pastor"]).patch(f"/api/muro/{pid}/", {"texto": "Texto final"}, format="json")
+    assert ok.status_code == 200 and ok.json()["texto"] == "Texto final"
+    assert ok.json()["editada"] is True
+    # otros no editan, ni siquiera quien modera
+    assert (
+        api_de(m["asistente"]).patch(f"/api/muro/{pid}/", {"texto": "x"}, format="json").status_code
+        == 403
+    )
+    assert (
+        api_de(m["pastor"]).patch(f"/api/muro/{pid}/", {"texto": " "}, format="json").status_code
+        == 400
+    )
+    assert AuditEvent.objects.filter(action="muro.editado").exists()
+
+
+def test_fijar_lo_hace_quien_modera_y_las_fijadas_van_arriba(m):
+    a = una(m, "Vieja", ("iglesia", 1))
+    una(m, "Nueva", ("iglesia", 1))
+    assert (
+        api_de(m["asistente"]).patch(f"/api/muro/{a}/", {"fijada": True}, format="json").status_code
+        == 403
+    )
+    ok = api_de(m["pastor"]).patch(f"/api/muro/{a}/", {"fijada": True}, format="json")
+    assert ok.status_code == 200 and ok.json()["fijada"] is True
+    muro = api_de(m["asistente"]).get("/api/muro/").json()
+    assert [p["texto"] for p in muro["fijadas"]] == ["Vieja"]
+    assert [p["texto"] for p in muro["resultados"]] == ["Nueva"]  # la fijada no se repite
+    # en las páginas siguientes no vuelven a venir
+    assert api_de(m["asistente"]).get("/api/muro/", {"antes": 9999}).json()["fijadas"] == []
+
+
+def test_el_lider_modera_su_grupo_pero_no_el_de_otros(m):
+    pid = publicar(m["pastor"], "Para el norte", ("grupo", m["norte"].pk)).json()["id"]
+    otro = publicar(m["pastor"], "Para el sur", ("grupo", m["sur"].pk)).json()["id"]
+    assert (
+        api_de(m["lider"]).patch(f"/api/muro/{pid}/", {"fijada": True}, format="json").status_code
+        == 200
+    )
+    # no ve la del sur: 404
+    assert (
+        api_de(m["lider"]).patch(f"/api/muro/{otro}/", {"fijada": True}, format="json").status_code
+        == 404
+    )
+    assert api_de(m["lider"]).delete(f"/api/muro/{pid}/").status_code == 204
+
+
+def test_eliminar_su_autor_o_quien_modera_y_deja_de_verse(m):
+    propia = publicar(m["lider"], "Mía", ("grupo", m["norte"].pk)).json()["id"]
+    ajena = publicar(m["pastor"], "Ajena", ("iglesia", 1)).json()["id"]
+    assert api_de(m["asistente"]).delete(f"/api/muro/{ajena}/").status_code == 403
+    assert api_de(m["lider"]).delete(f"/api/muro/{propia}/").status_code == 204  # su autor
+    assert api_de(m["pastor"]).delete(f"/api/muro/{ajena}/").status_code == 204
+    assert textos(m["asistente"]) == []
+    assert api_de(m["asistente"]).get(f"/api/muro/{ajena}/comentarios/").status_code == 404
+    assert AuditEvent.objects.filter(action="muro.eliminado").count() == 2
+
+
+def test_reportar_avisa_a_quien_modera_y_se_atiende(m):
+    pid = una(m, "Dudosa", ("iglesia", 1))
+    r = api_de(m["asistente"]).post(
+        f"/api/muro/{pid}/reportar/", {"motivo": "Es spam"}, format="json"
+    )
+    assert r.status_code == 204
+    api_de(m["asistente"]).post(
+        f"/api/muro/{pid}/reportar/", {}, format="json"
+    )  # repetir no duplica
+    api_de(m["servidor"]).post(f"/api/muro/{pid}/reportar/", {}, format="json")
+    # solo quien modera ve cuántos reportes hay
+    assert api_de(m["pastor"]).get("/api/muro/").json()["resultados"][0]["reportes"] == 2
+    assert api_de(m["asistente"]).get("/api/muro/").json()["resultados"][0]["reportes"] == 0
+    assert api_de(m["asistente"]).get("/api/muro/").json()["resultados"][0]["yo_reporte"] is True
+    # quien no puede ver la publicación no puede reportarla
+    secreta = una(m, "Solo servidores")
+    assert (
+        api_de(m["asistente"]).post(f"/api/muro/{secreta}/reportar/", {}, format="json").status_code
+        == 404
+    )
+    # atender: solo quien modera
+    assert api_de(m["asistente"]).post(f"/api/muro/{pid}/atender-reportes/").status_code == 403
+    ok = api_de(m["pastor"]).post(f"/api/muro/{pid}/atender-reportes/")
+    assert ok.status_code == 200 and ok.json()["reportes"] == 0
+
+
+def test_banderas_de_permiso_en_cada_publicacion(m):
+    una(m, "Para todos", ("iglesia", 1))
+    ajena = api_de(m["asistente"]).get("/api/muro/").json()["resultados"][0]
+    assert (ajena["puede_editar"], ajena["puede_quitar"], ajena["puede_moderar"]) == (
+        False,
+        False,
+        False,
+    )
+    mia = api_de(m["pastor"]).get("/api/muro/").json()["resultados"][0]
+    assert (mia["puede_editar"], mia["puede_quitar"], mia["puede_moderar"]) == (True, True, True)

@@ -10,6 +10,7 @@ class Publicacion(models.Model):
     )
     autor_nombre = models.CharField(max_length=150)  # se conserva aunque cambie la cuenta
     texto = models.TextField(max_length=2000)
+    fijada = models.BooleanField(default=False)
     eliminada = models.BooleanField(default=False)
     creada_en = models.DateTimeField(auto_now_add=True, db_index=True)
     editada_en = models.DateTimeField(null=True, blank=True)
@@ -92,3 +93,23 @@ class Comentario(models.Model):
 
     def __str__(self):
         return f"{self.autor_nombre}: {self.texto[:40]}"
+
+
+class Reporte(models.Model):
+    """Aviso de una persona sobre una publicación que cree inapropiada. Lo atiende quien modera."""
+
+    publicacion = models.ForeignKey(Publicacion, on_delete=models.CASCADE, related_name="reportes")
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+"
+    )
+    motivo = models.CharField(max_length=300, blank=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    atendido = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["publicacion", "usuario"], name="muro_reporte_unico")
+        ]
+
+    def __str__(self):
+        return f"{self.usuario_id} reporta {self.publicacion_id}"

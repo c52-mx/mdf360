@@ -39,10 +39,17 @@ class MuroView(APIView):
             antes=int(antes) if antes else None,
             audiencia=(tipo, int(ref)) if tipo else None,
         )
+        primera = not antes
         hay_mas = len(filas) > services.PAGINA
         filas = filas[: services.PAGINA]
         return Response(
             {
+                "fijadas": services.publicaciones_dict(
+                    services.fijadas(request.user, (tipo, int(ref)) if tipo else None),
+                    request.user,
+                )
+                if primera
+                else [],
                 "resultados": services.publicaciones_dict(filas, request.user),
                 "siguiente": filas[-1].pk if hay_mas and filas else None,
             }
@@ -140,3 +147,59 @@ class ComentarioView(APIView):
         comentario.eliminado = True
         comentario.save(update_fields=["eliminado"])
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PublicacionView(APIView):
+    """Editar (su autor), fijar (quien modera) o eliminar (su autor o quien modera)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        publicacion = _publicacion_visible(request, pk)
+        try:
+            if "texto" in request.data:
+                if not isinstance(request.data["texto"], str):
+                    return _error("invalid", "Escribe la publicación.")
+                services.editar(publicacion, request.user, request.data["texto"], request)
+            if "fijada" in request.data:
+                if not isinstance(request.data["fijada"], bool):
+                    return _error("invalid", "Indica si se fija o no.")
+                services.fijar(publicacion, request.user, request.data["fijada"], request)
+        except services.SinPermiso:
+            return _error(
+                "forbidden", "No puedes cambiar esta publicación.", status.HTTP_403_FORBIDDEN
+            )
+        except DjangoValidationError as exc:
+            return _error("invalid", " ".join(exc.messages))
+        return Response(services.publicaciones_dict([publicacion], request.user)[0])
+
+    def delete(self, request, pk):
+        publicacion = _publicacion_visible(request, pk)
+        try:
+            services.eliminar(publicacion, request.user, request)
+        except services.SinPermiso:
+            return _error(
+                "forbidden", "No puedes eliminar esta publicación.", status.HTTP_403_FORBIDDEN
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ReportarView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        publicacion = _publicacion_visible(request, pk)
+        services.reportar(publicacion, request.user, request.data.get("motivo", ""), request)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AtenderReportesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        publicacion = _publicacion_visible(request, pk)
+        try:
+            services.atender_reportes(publicacion, request.user, request)
+        except services.SinPermiso:
+            return _error("forbidden", "No puedes atender reportes.", status.HTTP_403_FORBIDDEN)
+        return Response(services.publicaciones_dict([publicacion], request.user)[0])

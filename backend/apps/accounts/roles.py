@@ -18,6 +18,7 @@ PERMISOS = {
     "avisos.iglesia": "Enviar avisos a toda la iglesia",
     "avisos.personas": "Enviar avisos a personas",
     "muro.publicar": "Publicar en el muro para toda la iglesia o por segmentos",
+    "muro.moderar": "Fijar, quitar y atender reportes de publicaciones ajenas en el muro",
     "bitacora.ver": "Consultar la bitácora",
     "grupos.ver_todos": "Ver todos los Grupos de Conexión",
     "grupos.gestionar": "Crear y administrar Grupos de Conexión",

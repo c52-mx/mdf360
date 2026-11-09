@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { Alert, Badge, Button, Card, Field } from '@/design-system'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { Acciones, CLAVE_MURO, Edicion } from './acciones-publicacion'
 import {
   REACCIONES,
   type Comentario,
@@ -12,10 +13,11 @@ import {
   type TipoReaccion,
 } from './types'
 
-export const CLAVE_MURO = ['muro']
-
 function fecha(iso: string): string {
-  return new Date(iso).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(iso).toLocaleString('es-MX', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
 }
 
 function Comentarios({ publicacion }: { publicacion: Publicacion }) {
@@ -32,7 +34,10 @@ function Comentarios({ publicacion }: { publicacion: Publicacion }) {
   }
   const comentar = useMutation({
     mutationFn: () =>
-      api(`/api/muro/${publicacion.id}/comentarios/`, { method: 'POST', body: { texto } }),
+      api(`/api/muro/${publicacion.id}/comentarios/`, {
+        method: 'POST',
+        body: { texto },
+      }),
     onSuccess: () => {
       setTexto('')
       refrescar()
@@ -92,10 +97,14 @@ function Comentarios({ publicacion }: { publicacion: Publicacion }) {
 export function PublicacionCard({ publicacion: p }: { publicacion: Publicacion }) {
   const queryClient = useQueryClient()
   const [verComentarios, setVerComentarios] = useState(false)
+  const [editando, setEditando] = useState(false)
 
   const reaccionar = useMutation({
     mutationFn: (tipo: TipoReaccion) =>
-      api<Publicacion>(`/api/muro/${p.id}/reaccion/`, { method: 'PUT', body: { tipo } }),
+      api<Publicacion>(`/api/muro/${p.id}/reaccion/`, {
+        method: 'PUT',
+        body: { tipo },
+      }),
     onSuccess: (nueva) => {
       // Se refleja al instante en la lista, sin volver a pedir todo el muro
       queryClient.setQueriesData<InfiniteData<PaginaMuro>>({ queryKey: CLAVE_MURO }, (datos) =>
@@ -104,6 +113,7 @@ export function PublicacionCard({ publicacion: p }: { publicacion: Publicacion }
               ...datos,
               pages: datos.pages.map((pg) => ({
                 ...pg,
+                fijadas: pg.fijadas.map((x) => (x.id === nueva.id ? nueva : x)),
                 resultados: pg.resultados.map((x) => (x.id === nueva.id ? nueva : x)),
               })),
             }
@@ -116,7 +126,11 @@ export function PublicacionCard({ publicacion: p }: { publicacion: Publicacion }
     <Card className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="font-bold">{p.autor}</span>
-        <span className="text-sm text-muted-foreground">{fecha(p.creada_en)}</span>
+        <span className="flex items-center gap-2 text-sm text-muted-foreground">
+          {p.fijada ? <Badge tone="primary">Fijada</Badge> : null}
+          {fecha(p.creada_en)}
+          {p.editada ? ' · editada' : ''}
+        </span>
       </div>
       <ul aria-label="Dirigida a" className="flex flex-wrap gap-1">
         {p.audiencias.map((a) => (
@@ -125,7 +139,11 @@ export function PublicacionCard({ publicacion: p }: { publicacion: Publicacion }
           </li>
         ))}
       </ul>
-      <p className="whitespace-pre-line">{p.texto}</p>
+      {editando ? (
+        <Edicion publicacion={p} onTerminar={() => setEditando(false)} />
+      ) : (
+        <p className="whitespace-pre-line">{p.texto}</p>
+      )}
       <div className="flex flex-wrap items-center gap-1">
         {REACCIONES.map(({ tipo, icono, nombre }) => {
           const activa = p.mi_reaccion === tipo
@@ -157,6 +175,7 @@ export function PublicacionCard({ publicacion: p }: { publicacion: Publicacion }
           {p.comentarios_total > 0 ? `${p.comentarios_total} comentarios` : 'Comentar'}
         </button>
       </div>
+      <Acciones publicacion={p} onEditar={() => setEditando(true)} />
       {reaccionar.error ? <Alert tone="destructive">{reaccionar.error.message}</Alert> : null}
       {verComentarios ? <Comentarios publicacion={p} /> : null}
     </Card>
