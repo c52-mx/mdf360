@@ -17,6 +17,16 @@ PIN = "482915"
 
 
 @pytest.fixture(autouse=True)
+def _asistente_publica(db):
+    """Publicar ya no viene de fábrica para el Asistente: estas pruebas lo configuran en su rol."""
+    from apps.accounts.models import RolEquipo
+
+    rol = RolEquipo.objects.get(ambito="grupo", clave="asistente")
+    rol.permisos = sorted({*rol.permisos, "avisos"})
+    rol.save()
+
+
+@pytest.fixture(autouse=True)
 def _limpiar():
     cache.clear()
 
