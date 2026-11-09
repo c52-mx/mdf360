@@ -11,6 +11,7 @@ import {
 import { Card, CardDescription, CardLink, CardTitle, PageHeader } from '@/design-system'
 import { useAuth } from '@/features/auth/use-auth'
 import { ResumenGrupos } from '@/features/grupos/dashboard-page'
+import { MuroFeed } from '@/features/muro/muro-feed'
 import { InvitacionAvisos } from '@/features/notificaciones/notificaciones-card'
 
 interface Acceso {
@@ -59,13 +60,7 @@ export function HomePage() {
         module="admin"
       />
       <InvitacionAvisos />
-      <Card>
-        <CardTitle>Tu comunidad</CardTitle>
-        <CardDescription>
-          Pronto verás aquí lo que se publica para toda la iglesia, para tus grupos y para tus
-          ministerios, y podrás comentar y reaccionar.
-        </CardDescription>
-      </Card>
+      <MuroFeed />
       <section aria-label="Accesos rápidos" className="flex flex-col gap-3">
         <h2 className="text-xl">Accesos rápidos</h2>
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
