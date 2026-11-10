@@ -1,5 +1,4 @@
 import {
-  Bell,
   Coins,
   HandHeart,
   UserCog,
@@ -32,7 +31,6 @@ export function HomePage() {
   const accesos: Acceso[] = [
     { to: '/grupos', titulo: 'Grupos', detalle: 'Pasar lista, estudio y reuniones.', icono: UsersRound },
     { to: '/peticiones', titulo: 'Peticiones', detalle: 'Motivos de oración.', icono: HandHeart },
-    { to: '/avisos', titulo: 'Avisos', detalle: 'Mensajes de tus grupos.', icono: Bell },
     ...(can('ofrendas.acceso')
       ? [{ to: '/ofrendas', titulo: 'Ofrendas', detalle: 'Registro y aval.', icono: Coins }]
       : []),

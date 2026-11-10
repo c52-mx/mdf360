@@ -6,7 +6,7 @@ import { ToastProvider } from '@/design-system'
 import type { UnidadDetalle } from './types'
 import { UnidadPage } from './unidad-page'
 
-vi.mock('@/features/tablero/tablero-panel', () => ({ TableroPanel: () => null }))
+vi.mock('@/features/muro/muro-feed', () => ({ MuroFeed: () => null }))
 
 const panel = {
   ministerio: 'Cafetería', integrantes: 2, nuevos_30_dias: 1, salieron: 0,
@@ -114,10 +114,11 @@ describe('UnidadPage', () => {
     expect(await screen.findByText('Sergio Servidor')).toBeInTheDocument()
   })
 
-  it('quien solo sirve ve la vista tipo red social (maqueta) y nada de gestión', async () => {
+  it('quien solo sirve ve su servicio y el muro, y nada de gestión', async () => {
     montar({ ...unidad, puede_gestionar: false, mis_roles: ['servidor'] })
-    expect(await screen.findByText('Tu ministerio')).toBeInTheDocument()
-    expect(screen.getAllByText('Maqueta').length).toBeGreaterThan(0)
+    expect(await screen.findByText('Mi servicio')).toBeInTheDocument()
+    expect(screen.getByText(/Sirves aquí como/)).toBeInTheDocument()
+    expect(screen.queryByText('Sergio Servidor')).toBeNull()
     expect(screen.queryByRole('tab')).toBeNull()
     expect(screen.queryByLabelText('WhatsApp')).toBeNull()
   })
@@ -125,7 +126,7 @@ describe('UnidadPage', () => {
   it('el encargado puede previsualizar la vista del servidor', async () => {
     montar()
     fireEvent.click(await screen.findByRole('tab', { name: 'Vista del servidor' }))
-    expect(await screen.findByText('Tu ministerio')).toBeInTheDocument()
+    expect(await screen.findByText('Mi servicio')).toBeInTheDocument()
   })
 
   it('quien gestiona al equipo ve el QR fijo del ministerio', async () => {

@@ -25,7 +25,7 @@ import {
 import { opcionesDeRol, useRolesEquipo } from '@/features/equipos/use-roles-equipo'
 import { DatosAdicionalesCard } from '@/features/formularios/datos-adicionales-card'
 import { PeticionesPanel } from '@/features/peticiones/peticiones-panel'
-import { TableroPanel } from '@/features/tablero/tablero-panel'
+import { MuroFeed } from '@/features/muro/muro-feed'
 import { api } from '@/lib/api'
 import { esErrorDeRed } from '@/lib/outbox'
 import { IngresoCard } from './ingreso-card'
@@ -300,7 +300,7 @@ export function GrupoPage() {
         </Alert>
       ) : null}
 
-      <TableroPanel origenTipo="grupo" origenId={g.id} puedePublicar={g.puede_publicar} />
+      <MuroFeed audiencia={{ tipo: 'grupo', id: g.id }} />
 
       <Card className="flex flex-col gap-3">
         <CardTitle>Integrantes</CardTitle>

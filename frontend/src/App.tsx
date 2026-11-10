@@ -1,5 +1,4 @@
 import {
-  Bell,
   Building2,
   ClipboardList,
   Coins,
@@ -44,7 +43,6 @@ import { EstudiosPage } from '@/features/grupos/estudios-page'
 import { ListaSinConexionPage } from '@/features/grupos/lista-sin-conexion-page'
 import { GrupoPage } from '@/features/grupos/grupo-page'
 import { GruposPage } from '@/features/grupos/grupos-page'
-import { AvisosPage } from '@/features/tablero/avisos-page'
 import { OfrendasPage } from '@/features/grupos/ofrendas-page'
 import { ReunionPage } from '@/features/grupos/reunion-page'
 import { SyncBanner } from '@/features/offline/sync-banner'
@@ -73,7 +71,6 @@ function PrivateLayout() {
   const navPorEspacio: Record<Espacio, NavItem[]> = {
     comunidad: [
       { to: '/', label: 'Inicio', icon: Home },
-      { to: '/avisos', label: 'Avisos', icon: Bell, module: 'grupos' },
       { to: '/peticiones/formulario', label: 'Orar', icon: HandHeart, module: 'grupos' },
       { to: '/cuenta', label: 'Mi cuenta', icon: UserCog },
     ],
@@ -146,7 +143,7 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/grupos" element={<GruposPage />} />
           <Route path="/grupos/resumen" element={<Navigate to="/" replace />} />
-          <Route path="/avisos" element={<AvisosPage />} />
+          <Route path="/avisos" element={<Navigate to="/" replace />} />
           <Route path="/grupos/reuniones/:rid" element={<ReunionPage />} />
           <Route path="/grupos/:id/hoy" element={<ListaSinConexionPage />} />
           <Route path="/grupos/:id" element={<GrupoPage />} />

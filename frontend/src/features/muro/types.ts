@@ -63,3 +63,9 @@ export interface Destino {
 
 /** Fotos que se pueden agregar a una publicación. */
 export const MAX_FOTOS = 4
+
+/** Un lugar concreto (grupo o ministerio) al que se limita el muro. */
+export interface AudienciaFija {
+  tipo: 'grupo' | 'unidad'
+  id: number
+}
