@@ -352,3 +352,75 @@ def test_banderas_de_permiso_en_cada_publicacion(m):
     )
     mia = api_de(m["pastor"]).get("/api/muro/").json()["resultados"][0]
     assert (mia["puede_editar"], mia["puede_quitar"], mia["puede_moderar"]) == (True, True, True)
+
+
+# --- Fotos ---
+
+
+def imagen(nombre="f.png", lado=(2400, 1200)):
+    import io
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", lado, "teal").save(buf, format="PNG")
+    return SimpleUploadedFile(nombre, buf.getvalue(), content_type="image/png")
+
+
+def subir(quien, pub_id, archivo=None, confirmado=True):
+    datos = {"foto": archivo or imagen()}
+    if confirmado:
+        datos["permiso_confirmado"] = "true"
+    return api_de(quien).post(f"/api/muro/{pub_id}/fotos/", datos, format="multipart")
+
+
+def test_foto_exige_confirmar_permiso_y_se_normaliza(m, settings, tmp_path):
+    from PIL import Image
+
+    settings.MEDIA_ROOT = tmp_path
+    pub = publicar(m["pastor"], "Convivio", ("iglesia", 1)).json()["id"]
+    r = subir(m["pastor"], pub, confirmado=False)
+    assert r.status_code == 400 and r.json()["code"] == "consent_required"
+
+    r = subir(m["pastor"], pub)
+    assert r.status_code == 201
+    fotos = r.json()["fotos"]
+    assert len(fotos) == 1
+    ver = api_de(m["asistente"]).get(f"/api/muro/fotos/{fotos[0]}/")
+    assert ver.status_code == 200 and ver["Content-Type"] == "image/jpeg"
+    import io
+
+    resultado = Image.open(io.BytesIO(b"".join(ver.streaming_content)))
+    assert max(resultado.size) == 1600
+    assert AuditEvent.objects.filter(action="muro.foto_agregada").exists()
+
+
+def test_foto_solo_la_agrega_su_autor_y_tiene_tope(m, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    pub = publicar(m["lider"], "Fotos", ("grupo", m["norte"].pk)).json()["id"]
+    assert subir(m["pastor"], pub).status_code == 403
+    for _ in range(4):
+        assert subir(m["lider"], pub).status_code == 201
+    assert subir(m["lider"], pub).status_code == 400
+    assert len(api_de(m["lider"]).get("/api/muro/").json()["resultados"][0]["fotos"]) == 4
+
+
+def test_foto_no_valida_se_rechaza(m, settings, tmp_path):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    settings.MEDIA_ROOT = tmp_path
+    pub = publicar(m["pastor"], "Hola", ("iglesia", 1)).json()["id"]
+    falso = SimpleUploadedFile("x.png", b"no soy imagen", content_type="image/png")
+    assert subir(m["pastor"], pub, falso).status_code == 400
+
+
+def test_la_foto_no_se_ve_fuera_de_la_audiencia_y_quien_modera_la_quita(m, settings, tmp_path):
+    settings.MEDIA_ROOT = tmp_path
+    pub = publicar(m["lider"], "Solo Norte", ("grupo", m["norte"].pk)).json()["id"]
+    foto = subir(m["lider"], pub).json()["fotos"][0]
+    assert api_de(m["otro"]).get(f"/api/muro/fotos/{foto}/").status_code == 404
+    assert api_de(m["asistente"]).delete(f"/api/muro/fotos/{foto}/").status_code == 403
+    assert api_de(m["pastor"]).delete(f"/api/muro/fotos/{foto}/").status_code == 204
+    assert api_de(m["lider"]).get(f"/api/muro/fotos/{foto}/").status_code == 404
+    assert AuditEvent.objects.filter(action="muro.foto_quitada").exists()

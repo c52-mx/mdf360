@@ -1,12 +1,15 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.http import Http404
+from django.http import FileResponse, Http404
 from rest_framework import serializers, status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import services
-from .models import Comentario, Publicacion
+from .models import Comentario, Foto, Publicacion
+
+FOTO_MAX_BYTES = 10 * 1024 * 1024
 
 
 def _error(code, detail, http_status=status.HTTP_400_BAD_REQUEST):
@@ -203,3 +206,68 @@ class AtenderReportesView(APIView):
         except services.SinPermiso:
             return _error("forbidden", "No puedes atender reportes.", status.HTTP_403_FORBIDDEN)
         return Response(services.publicaciones_dict([publicacion], request.user)[0])
+
+
+class FotosView(APIView):
+    """Agrega una foto a una publicación propia (multipart: `foto` y `permiso_confirmado`)."""
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, pk):
+        publicacion = _publicacion_visible(request, pk)
+        archivo = request.data.get("foto")
+        if archivo is None:
+            return _error("invalid", "Elige una foto.")
+        if archivo.size > FOTO_MAX_BYTES:
+            return _error("invalid", "La foto pesa más de 10 MB.")
+        confirmado = str(request.data.get("permiso_confirmado", "")).lower() in ("true", "1")
+        try:
+            services.agregar_foto(
+                publicacion, request.user, archivo, permiso_confirmado=confirmado, request=request
+            )
+        except services.SinPermiso:
+            return _error(
+                "forbidden", "No puedes agregar fotos a esta publicación.",
+                status.HTTP_403_FORBIDDEN,
+            )  # fmt: skip
+        except services.PermisoDeImagenRequerido:
+            return _error(
+                "consent_required",
+                "Confirma que las personas que aparecen en la foto aceptaron que se publique.",
+            )
+        except DjangoValidationError as exc:
+            return _error("invalid", " ".join(exc.messages))
+        return Response(
+            services.publicaciones_dict([publicacion], request.user)[0],
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class FotoView(APIView):
+    """Ver la foto (solo quien puede ver la publicación) o quitarla (su autor o quien modera)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def _foto(self, request, pk):
+        foto = Foto.objects.select_related("publicacion").filter(pk=pk).first()
+        if foto is None or not services.puede_ver(request.user, foto.publicacion):
+            raise Http404
+        return foto
+
+    def get(self, request, pk):
+        foto = self._foto(request, pk)
+        try:
+            respuesta = FileResponse(foto.archivo.open("rb"), content_type="image/jpeg")
+        except FileNotFoundError as exc:
+            raise Http404 from exc
+        respuesta["Cache-Control"] = "private, max-age=3600"
+        return respuesta
+
+    def delete(self, request, pk):
+        foto = self._foto(request, pk)
+        try:
+            services.quitar_foto(foto, request.user, request)
+        except services.SinPermiso:
+            return _error("forbidden", "No puedes quitar esta foto.", status.HTTP_403_FORBIDDEN)
+        return Response(status=status.HTTP_204_NO_CONTENT)

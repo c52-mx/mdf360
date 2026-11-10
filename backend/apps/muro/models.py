@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 
@@ -113,3 +115,26 @@ class Reporte(models.Model):
 
     def __str__(self):
         return f"{self.usuario_id} reporta {self.publicacion_id}"
+
+
+def _ruta_foto(instance, filename):
+    return f"muro/{instance.publicacion_id}/{uuid.uuid4().hex}.jpg"
+
+
+class Foto(models.Model):
+    """Foto de una publicación; quien la sube confirma el permiso de las personas que aparecen."""
+
+    publicacion = models.ForeignKey(Publicacion, on_delete=models.CASCADE, related_name="fotos")
+    archivo = models.ImageField(upload_to=_ruta_foto)
+    orden = models.PositiveSmallIntegerField(default=0)
+    subida_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    permiso_confirmado = models.BooleanField(default=False)
+    creada_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["orden", "id"]
+
+    def __str__(self):
+        return f"Foto {self.pk} de la publicación {self.publicacion_id}"

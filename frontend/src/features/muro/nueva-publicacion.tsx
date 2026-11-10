@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { Alert, Button, Card, CardTitle, TextareaField } from '@/design-system'
-import { api } from '@/lib/api'
+import { Alert, Button, Card, CardTitle, CheckboxField, TextareaField } from '@/design-system'
+import { api, apiForm } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { CLAVE_MURO } from './acciones-publicacion'
-import type { Destino } from './types'
+import { MAX_FOTOS, type Destino, type Publicacion } from './types'
 
 const clave = (d: Destino) => `${d.tipo}:${d.id}`
 
@@ -16,13 +16,15 @@ export function NuevaPublicacion() {
   const queryClient = useQueryClient()
   const [texto, setTexto] = useState('')
   const [elegidas, setElegidas] = useState<string[]>([])
+  const [fotos, setFotos] = useState<File[]>([])
+  const [permiso, setPermiso] = useState(false)
   const destinos = useQuery({
     queryKey: ['muro-destinos'],
     queryFn: () => api<Destino[]>('/api/muro/destinos/'),
   })
   const publicar = useMutation({
-    mutationFn: () =>
-      api('/api/muro/', {
+    mutationFn: async () => {
+      const creada = await api<Publicacion>('/api/muro/', {
         method: 'POST',
         body: {
           texto,
@@ -30,10 +32,30 @@ export function NuevaPublicacion() {
             .filter((d) => elegidas.includes(clave(d)))
             .map(({ tipo, id }) => ({ tipo, id })),
         },
-      }),
+      })
+      // Las fotos se suben una por una a la publicación ya creada
+      try {
+        for (const foto of fotos) {
+          const form = new FormData()
+          form.append('foto', foto)
+          form.append('permiso_confirmado', 'true')
+          await apiForm(`/api/muro/${creada.id}/fotos/`, form)
+        }
+      } catch (e) {
+        void queryClient.invalidateQueries({ queryKey: CLAVE_MURO })
+        throw new Error(
+          `La publicación se creó, pero no se pudieron subir todas las fotos: ${
+            e instanceof Error ? e.message : ''
+          }`,
+          { cause: e },
+        )
+      }
+    },
     onSuccess: () => {
       setTexto('')
       setElegidas([])
+      setFotos([])
+      setPermiso(false)
       void queryClient.invalidateQueries({ queryKey: CLAVE_MURO })
     },
   })
@@ -85,10 +107,57 @@ export function NuevaPublicacion() {
             })}
           </div>
         </fieldset>
+        <div className="flex flex-col gap-2">
+          <label className="presionable flex h-11 w-fit cursor-pointer items-center rounded-full border border-border px-4 text-sm font-semibold text-muted-foreground hover:bg-muted">
+            Agregar fotos
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="sr-only"
+              onChange={(e) => {
+                setFotos((actual) =>
+                  [...actual, ...Array.from(e.target.files ?? [])].slice(0, MAX_FOTOS),
+                )
+                e.target.value = ''
+              }}
+            />
+          </label>
+          {fotos.length > 0 ? (
+            <>
+              <ul aria-label="Fotos elegidas" className="flex flex-col gap-1 text-sm">
+                {fotos.map((f, i) => (
+                  <li key={`${f.name}-${i}`} className="flex items-center justify-between gap-2">
+                    <span className="truncate">{f.name}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`Quitar ${f.name}`}
+                      onClick={() => setFotos((actual) => actual.filter((_, j) => j !== i))}
+                    >
+                      Quitar
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              <CheckboxField
+                checked={permiso}
+                onChange={(e) => setPermiso(e.target.checked)}
+                label="Confirmo que las personas que aparecen en las fotos (o sus tutores, si son menores de edad) aceptaron que se publiquen."
+              />
+            </>
+          ) : null}
+        </div>
         {publicar.error ? <Alert tone="destructive">{publicar.error.message}</Alert> : null}
         <Button
           type="submit"
-          disabled={publicar.isPending || !texto.trim() || elegidas.length === 0}
+          disabled={
+            publicar.isPending ||
+            !texto.trim() ||
+            elegidas.length === 0 ||
+            (fotos.length > 0 && !permiso)
+          }
         >
           Publicar
         </Button>

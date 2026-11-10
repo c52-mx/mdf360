@@ -16,6 +16,8 @@ export interface Publicacion {
   reacciones: Partial<Record<TipoReaccion, number>>
   mi_reaccion: TipoReaccion | null
   comentarios_total: number
+  /** Ids de las fotos; se piden en /api/muro/fotos/<id>/. */
+  fotos: number[]
   fijada: boolean
   editada: boolean
   puede_editar: boolean
@@ -58,3 +60,6 @@ export interface Destino {
   id: number
   etiqueta: string
 }
+
+/** Fotos que se pueden agregar a una publicación. */
+export const MAX_FOTOS = 4

@@ -1,6 +1,10 @@
+import io
+
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.db.models import Count, Q
 from django.utils import timezone
+from PIL import Image, ImageOps
 
 from apps.accounts.permissions import tiene_permiso
 from apps.core import audit
@@ -8,14 +12,20 @@ from apps.notificaciones import push
 from apps.tablero import registry
 
 from . import segmentos
-from .models import Audiencia, Comentario, Publicacion, Reaccion, Reporte
+from .models import Audiencia, Comentario, Foto, Publicacion, Reaccion, Reporte
 
 LIMITE = 2000
 MAX_AUDIENCIAS = 20
 PAGINA = 20
+MAX_FOTOS = 4
+FOTO_LADO_MAXIMO = 1600
 
 
 class SinPermiso(Exception):
+    pass
+
+
+class PermisoDeImagenRequerido(Exception):
     pass
 
 
@@ -228,6 +238,37 @@ def eliminar(publicacion: Publicacion, user, request=None) -> None:
     )  # fmt: skip
 
 
+def agregar_foto(publicacion: Publicacion, user, archivo, *, permiso_confirmado, request=None):
+    """Solo su autor agrega fotos y confirma que quienes aparecen aceptaron (menores: su tutor)."""
+    if not puede_editar(user, publicacion):
+        raise SinPermiso
+    if not permiso_confirmado:
+        raise PermisoDeImagenRequerido
+    actuales = publicacion.fotos.count()
+    if actuales >= MAX_FOTOS:
+        raise ValidationError(f"Cada publicación puede tener hasta {MAX_FOTOS} fotos.")
+    try:
+        imagen = ImageOps.exif_transpose(Image.open(archivo)).convert("RGB")
+    except Exception as exc:
+        raise ValidationError("El archivo no es una imagen válida.") from exc
+    imagen.thumbnail((FOTO_LADO_MAXIMO, FOTO_LADO_MAXIMO))
+    buffer = io.BytesIO()
+    imagen.save(buffer, format="JPEG", quality=85)  # JPEG sin metadatos (ubicación, cámara…)
+    foto = Foto(publicacion=publicacion, orden=actuales, subida_por=user, permiso_confirmado=True)
+    foto.archivo.save("foto.jpg", ContentFile(buffer.getvalue()), save=True)
+    audit.log("muro.foto_agregada", actor=user, target=publicacion, request=request, foto=foto.pk)
+    return foto
+
+
+def quitar_foto(foto: Foto, user, request=None) -> None:
+    if not puede_quitar(user, foto.publicacion):
+        raise SinPermiso
+    publicacion, pk = foto.publicacion, foto.pk
+    foto.archivo.delete(save=False)
+    foto.delete()
+    audit.log("muro.foto_quitada", actor=user, target=publicacion, request=request, foto=pk)
+
+
 def reportar(publicacion: Publicacion, user, motivo="", request=None) -> None:
     """Cualquiera que ve la publicación puede reportarla (una vez); avisa a quien modera."""
     if not puede_ver(user, publicacion):
@@ -343,8 +384,14 @@ def _resumen(publicaciones, user) -> dict[int, dict]:
             "publicacion_id", flat=True
         )
     )
+    fotos: dict[int, list[int]] = {i: [] for i in ids}
+    for pub_id, foto_id in Foto.objects.filter(publicacion_id__in=ids).values_list(
+        "publicacion_id", "id"
+    ):
+        fotos[pub_id].append(foto_id)
     return {
         i: {
+            "fotos": fotos[i],
             "reportes": reportes.get(i, 0) if puede_moderar(user, por_id[i]) else 0,
             "yo_reporte": i in reportadas,
             "reacciones": reacciones[i],
