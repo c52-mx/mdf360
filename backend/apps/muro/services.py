@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
+from django.utils import timezone
 
 from apps.accounts.permissions import tiene_permiso
 from apps.core import audit
@@ -7,7 +8,7 @@ from apps.notificaciones import push
 from apps.tablero import registry
 
 from . import segmentos
-from .models import Audiencia, Comentario, Publicacion, Reaccion
+from .models import Audiencia, Comentario, Publicacion, Reaccion, Reporte
 
 LIMITE = 2000
 MAX_AUDIENCIAS = 20
@@ -20,6 +21,15 @@ class SinPermiso(Exception):
 
 def _activo(user) -> bool:
     return bool(user and user.is_authenticated and user.is_active)
+
+
+def _texto_valido(texto) -> str:
+    texto = (texto or "").strip()
+    if not texto:
+        raise ValidationError("Escribe la publicación.")
+    if len(texto) > LIMITE:
+        raise ValidationError(f"La publicación puede tener hasta {LIMITE} caracteres.")
+    return texto
 
 
 def etiqueta_de(tipo: str, ref_id: int) -> str | None:
@@ -82,11 +92,7 @@ def puede_ver(user, publicacion: Publicacion) -> bool:
 
 def publicar(*, texto, destinos, actor, request=None) -> Publicacion:
     """Crea una publicación para varias audiencias. Si no puede publicar en alguna, no se crea."""
-    texto = (texto or "").strip()
-    if not texto:
-        raise ValidationError("Escribe la publicación.")
-    if len(texto) > LIMITE:
-        raise ValidationError(f"La publicación puede tener hasta {LIMITE} caracteres.")
+    texto = _texto_valido(texto)
     unicos, vistos = [], set()
     for d in destinos or []:
         clave = (d["tipo"], int(d["id"]))
@@ -152,7 +158,7 @@ def visibles(user):
 def muro(user, *, antes: int | None = None, audiencia: tuple[str, int] | None = None):
     """Una página del muro (más recientes primero); trae una de más para saber si hay otra.
     `antes` = id de la última publicación vista."""
-    qs = visibles(user)
+    qs = visibles(user).filter(fijada=False)
     if audiencia is not None:
         qs = qs.filter(audiencias__tipo=audiencia[0], audiencias__ref_id=audiencia[1])
     if antes:
@@ -161,6 +167,94 @@ def muro(user, *, antes: int | None = None, audiencia: tuple[str, int] | None = 
 
 
 LIMITE_COMENTARIO = 500
+
+
+def puede_moderar(user, publicacion: Publicacion) -> bool:
+    """Fijar, quitar o atender reportes: `muro.moderar` (iglesia y segmentos) o, en grupos y
+    ministerios, quien modera ese tablero (por omisión, quien publica en él)."""
+    if not _activo(user):
+        return False
+    if tiene_permiso(user, "muro.moderar"):
+        return True
+    for a in publicacion.audiencias.all():
+        if a.tipo in (Audiencia.Tipo.IGLESIA, Audiencia.Tipo.SEGMENTO):
+            continue
+        origen = registry.obtener(a.tipo)
+        if origen is None:
+            continue
+        moderador = origen.puede_moderar or origen.puede_publicar
+        if moderador(user, a.ref_id):
+            return True
+    return False
+
+
+def puede_editar(user, publicacion: Publicacion) -> bool:
+    return _activo(user) and publicacion.autor_id == user.pk
+
+
+def puede_quitar(user, publicacion: Publicacion) -> bool:
+    return puede_editar(user, publicacion) or puede_moderar(user, publicacion)
+
+
+def editar(publicacion: Publicacion, user, texto, request=None) -> Publicacion:
+    if not puede_editar(user, publicacion):
+        raise SinPermiso
+    texto = _texto_valido(texto)
+    publicacion.texto = texto
+    publicacion.editada_en = timezone.now()
+    publicacion.save(update_fields=["texto", "editada_en"])
+    audit.log("muro.editado", actor=user, target=publicacion, request=request)
+    return publicacion
+
+
+def fijar(publicacion: Publicacion, user, fijada: bool, request=None) -> Publicacion:
+    if not puede_moderar(user, publicacion):
+        raise SinPermiso
+    publicacion.fijada = fijada
+    publicacion.save(update_fields=["fijada"])
+    audit.log("muro.fijado", actor=user, target=publicacion, request=request, fijada=fijada)
+    return publicacion
+
+
+def eliminar(publicacion: Publicacion, user, request=None) -> None:
+    if not puede_quitar(user, publicacion):
+        raise SinPermiso
+    publicacion.eliminada = True
+    publicacion.fijada = False
+    publicacion.save(update_fields=["eliminada", "fijada"])
+    audit.log(
+        "muro.eliminado", actor=user, target=publicacion, request=request,
+        propio=publicacion.autor_id == user.pk,
+    )  # fmt: skip
+
+
+def reportar(publicacion: Publicacion, user, motivo="", request=None) -> None:
+    """Cualquiera que ve la publicación puede reportarla (una vez); avisa a quien modera."""
+    if not puede_ver(user, publicacion):
+        raise SinPermiso
+    motivo = (motivo or "").strip()[:300]
+    _, nuevo = Reporte.objects.get_or_create(
+        publicacion=publicacion, usuario=user, defaults={"motivo": motivo}
+    )
+    if not nuevo:
+        return
+    audit.log("muro.reportado", actor=user, target=publicacion, request=request)
+    push.notificar(
+        titulo="Publicación reportada",
+        cuerpo=f"{publicacion.autor_nombre}: {publicacion.texto[:80]}",
+        url="/",
+        etiqueta=f"muro-reporte-{publicacion.pk}",
+        puede_recibir=lambda u: u.pk != user.pk and puede_moderar(u, publicacion),
+        excluir=user,
+    )
+
+
+def atender_reportes(publicacion: Publicacion, user, request=None) -> None:
+    """Quien modera da por revisados los reportes (la publicación se queda)."""
+    if not puede_moderar(user, publicacion):
+        raise SinPermiso
+    publicacion.reportes.filter(atendido=False).update(atendido=True)
+    audit.log("muro.reportes_atendidos", actor=user, target=publicacion, request=request)
 
 
 def reaccionar(publicacion: Publicacion, user, tipo: str | None) -> None:
@@ -219,6 +313,7 @@ def comentario_dict(c: Comentario, user) -> dict:
 
 def _resumen(publicaciones, user) -> dict[int, dict]:
     ids = [p.pk for p in publicaciones]
+    por_id = {p.pk: p for p in publicaciones}
     reacciones: dict[int, dict[str, int]] = {i: {} for i in ids}
     for f in (
         Reaccion.objects.filter(publicacion_id__in=ids)
@@ -237,8 +332,21 @@ def _resumen(publicaciones, user) -> dict[int, dict]:
         .annotate(n=Count("id"))
         .values_list("publicacion_id", "n")
     )
+    reportes = dict(
+        Reporte.objects.filter(publicacion_id__in=ids, atendido=False)
+        .values("publicacion_id")
+        .annotate(n=Count("id"))
+        .values_list("publicacion_id", "n")
+    )
+    reportadas = set(
+        Reporte.objects.filter(publicacion_id__in=ids, usuario=user).values_list(
+            "publicacion_id", flat=True
+        )
+    )
     return {
         i: {
+            "reportes": reportes.get(i, 0) if puede_moderar(user, por_id[i]) else 0,
+            "yo_reporte": i in reportadas,
             "reacciones": reacciones[i],
             "mi_reaccion": mias.get(i),
             "comentarios_total": comentarios.get(i, 0),
@@ -252,6 +360,14 @@ def publicaciones_dict(publicaciones, user) -> list[dict]:
     return [publicacion_dict(p, user) | resumen[p.pk] for p in publicaciones]
 
 
+def fijadas(user, audiencia: tuple[str, int] | None = None):
+    """Las publicaciones fijadas que la persona puede ver (van arriba de la primera página)."""
+    qs = visibles(user).filter(fijada=True)
+    if audiencia is not None:
+        qs = qs.filter(audiencias__tipo=audiencia[0], audiencias__ref_id=audiencia[1])
+    return list(qs.prefetch_related("audiencias").order_by("-id"))
+
+
 def publicacion_dict(p: Publicacion, user) -> dict:
     return {
         "id": p.pk,
@@ -262,4 +378,9 @@ def publicacion_dict(p: Publicacion, user) -> dict:
             {"tipo": a.tipo, "id": a.ref_id, "etiqueta": a.etiqueta} for a in p.audiencias.all()
         ],
         "es_mia": p.autor_id == user.pk,
+        "fijada": p.fijada,
+        "editada": p.editada_en is not None,
+        "puede_editar": puede_editar(user, p),
+        "puede_quitar": puede_quitar(user, p),
+        "puede_moderar": puede_moderar(user, p),
     }

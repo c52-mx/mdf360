@@ -128,6 +128,13 @@ CATALOGO: tuple[Permiso, ...] = (
         "Publicar en el muro para toda la iglesia o por segmentos",
         sensible=True,
     ),
+    Permiso(
+        "muro.moderar",
+        "Comunidad",
+        "Muro",
+        "Fijar, quitar y atender reportes de publicaciones ajenas",
+        sensible=True,
+    ),
     Permiso("bitacora.ver", "Administración", "Bitácora", "Consultar la bitácora"),
     Permiso(
         "config.gestionar", "Administración", "Configuración", "Cambiar los parámetros del sistema"
