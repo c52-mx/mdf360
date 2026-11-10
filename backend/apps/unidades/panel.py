@@ -1,6 +1,6 @@
 """Panel de un ministerio para los roles superiores.
 
-Solo cuenta lo que ya existe: la gente del equipo y cómo creció, los mensajes del tablero y las
+Solo cuenta lo que ya existe: la gente del equipo y cómo creció, las publicaciones del muro y las
 peticiones del ministerio (solo cuántas, nunca su contenido, que va cifrado). Inventario, gastos y
 agenda siguen en definición y no aparecen aquí.
 """
@@ -12,8 +12,8 @@ from django.utils import timezone
 
 from apps.accounts import equipos
 from apps.accounts.permissions import tiene_permiso
+from apps.muro.models import Publicacion
 from apps.peticiones.models import Peticion
-from apps.tablero.models import Mensaje
 
 from . import access
 from .models import Unidad, UnidadMiembro
@@ -60,21 +60,16 @@ def resumen(unidad: Unidad) -> dict:
     sumaron = Counter(f"{d.year:04d}-{d.month:02d}" for d in primera.values())
 
     desde_mensajes = date.fromisoformat(f"{meses[0]}-01")
+    del_ministerio = Publicacion.objects.filter(
+        audiencias__tipo="unidad", audiencias__ref_id=unidad.pk, eliminada=False
+    )
     mensajes = Counter(
         f"{m.year:04d}-{m.month:02d}"
-        for m in Mensaje.objects.filter(
-            origen_tipo="unidad",
-            origen_id=unidad.pk,
-            eliminado=False,
-            creado_en__date__gte=desde_mensajes,
-        ).values_list("creado_en", flat=True)
+        for m in del_ministerio.filter(creada_en__date__gte=desde_mensajes).values_list(
+            "creada_en", flat=True
+        )
     )
-    ultimo = (
-        Mensaje.objects.filter(origen_tipo="unidad", origen_id=unidad.pk, eliminado=False)
-        .order_by("-creado_en")
-        .values_list("creado_en", flat=True)
-        .first()
-    )
+    ultimo = del_ministerio.order_by("-creada_en").values_list("creada_en", flat=True).first()
 
     peticiones = Counter(
         Peticion.objects.filter(origen_tipo="unidad", origen_id=unidad.pk).values_list(
