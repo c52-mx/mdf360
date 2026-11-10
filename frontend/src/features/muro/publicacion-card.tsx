@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { MessageCircle, Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { Alert, Badge, Button, Card, Field } from '@/design-system'
+import { Alert, Badge, Button, Card, ConfirmButton, Field } from '@/design-system'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { Acciones, CLAVE_MURO, Edicion } from './acciones-publicacion'
@@ -122,6 +122,11 @@ export function PublicacionCard({ publicacion: p }: { publicacion: Publicacion }
     },
   })
 
+  const quitarFoto = useMutation({
+    mutationFn: (id: number) => api(`/api/muro/fotos/${id}/`, { method: 'DELETE' }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: CLAVE_MURO }),
+  })
+
   return (
     <Card className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -144,6 +149,31 @@ export function PublicacionCard({ publicacion: p }: { publicacion: Publicacion }
       ) : (
         <p className="whitespace-pre-line">{p.texto}</p>
       )}
+      {p.fotos.length > 0 ? (
+        <div className={cn('grid gap-1', p.fotos.length === 1 ? 'grid-cols-1' : 'grid-cols-2')}>
+          {p.fotos.map((id, i) => (
+            <figure key={id} className="flex flex-col gap-1">
+              <img
+                src={`/api/muro/fotos/${id}/`}
+                alt={`Foto ${i + 1} de la publicación de ${p.autor}`}
+                loading="lazy"
+                className="max-h-96 w-full rounded-control object-cover"
+              />
+              {p.puede_quitar ? (
+                <ConfirmButton
+                  size="sm"
+                  variant="ghost"
+                  pregunta="¿Quitar esta foto?"
+                  etiquetaConfirmar="Sí, quitar"
+                  onConfirm={() => quitarFoto.mutate(id)}
+                >
+                  Quitar foto {i + 1}
+                </ConfirmButton>
+              ) : null}
+            </figure>
+          ))}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-1">
         {REACCIONES.map(({ tipo, icono, nombre }) => {
           const activa = p.mi_reaccion === tipo
@@ -176,6 +206,7 @@ export function PublicacionCard({ publicacion: p }: { publicacion: Publicacion }
         </button>
       </div>
       <Acciones publicacion={p} onEditar={() => setEditando(true)} />
+      {quitarFoto.error ? <Alert tone="destructive">{quitarFoto.error.message}</Alert> : null}
       {reaccionar.error ? <Alert tone="destructive">{reaccionar.error.message}</Alert> : null}
       {verComentarios ? <Comentarios publicacion={p} /> : null}
     </Card>

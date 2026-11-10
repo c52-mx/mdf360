@@ -14,6 +14,7 @@ const publicacion: Publicacion = {
   reacciones: { amen: 2 },
   mi_reaccion: null,
   comentarios_total: 1,
+  fotos: [],
   fijada: false,
   editada: false,
   puede_editar: false,
@@ -240,5 +241,71 @@ describe('MuroFeed', () => {
     expect(screen.getByText('2 personas la reportaron.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Quitar fijado' }))
     await waitFor(() => expect(fijar).toHaveBeenCalledWith(JSON.stringify({ fijada: false })))
+  })
+  it('muestra las fotos de la publicación y permite quitarlas a quien puede', async () => {
+    const quitada = vi.fn()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url.includes('/csrf/')) return json(200, { csrfToken: 'x' })
+        if (url === '/api/muro/destinos/') return json(200, [])
+        if (url === '/api/muro/fotos/31/' && init?.method === 'DELETE') {
+          quitada()
+          return Promise.resolve(new Response(null, { status: 204 }))
+        }
+        if (url === '/api/muro/')
+          return json(200, {
+            fijadas: [],
+            resultados: [{ ...publicacion, fotos: [31, 32], puede_quitar: true }],
+            siguiente: null,
+          })
+        return json(404, {})
+      }),
+    )
+    montar()
+    const fotos = await screen.findAllByRole('img')
+    expect(fotos.map((f) => f.getAttribute('src'))).toEqual([
+      '/api/muro/fotos/31/',
+      '/api/muro/fotos/32/',
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar foto 1' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Sí, quitar' }))
+    await waitFor(() => expect(quitada).toHaveBeenCalled())
+  })
+
+  it('con fotos exige confirmar el permiso de imagen y las sube a la publicación', async () => {
+    const subidas: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url.includes('/csrf/')) return json(200, { csrfToken: 'x' })
+        if (url === '/api/muro/destinos/')
+          return json(200, [{ tipo: 'iglesia', id: 1, etiqueta: 'Toda la iglesia' }])
+        if (url === '/api/muro/' && init?.method === 'POST') return json(201, publicacion)
+        if (url === '/api/muro/7/fotos/' && init?.method === 'POST') {
+          const form = init.body as FormData
+          subidas.push(`${(form.get('foto') as File).name}:${form.get('permiso_confirmado')}`)
+          return json(201, publicacion)
+        }
+        if (url === '/api/muro/') return json(200, { fijadas: [], resultados: [], siguiente: null })
+        return json(404, {})
+      }),
+    )
+    montar()
+    const boton = (await screen.findByRole('button', { name: 'Publicar' })) as HTMLButtonElement
+    fireEvent.change(screen.getByLabelText('¿Qué quieres compartir?'), {
+      target: { value: 'Convivio' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Toda la iglesia' }))
+    expect(boton.disabled).toBe(false)
+    const archivo = new File(['x'], 'convivio.jpg', { type: 'image/jpeg' })
+    fireEvent.change(screen.getByLabelText('Agregar fotos'), { target: { files: [archivo] } })
+    expect(screen.getByText('convivio.jpg')).toBeTruthy()
+    // con fotos, sin confirmar el permiso no se publica
+    expect(boton.disabled).toBe(true)
+    fireEvent.click(screen.getByLabelText(/Confirmo que las personas que aparecen/))
+    expect(boton.disabled).toBe(false)
+    fireEvent.click(boton)
+    await waitFor(() => expect(subidas).toEqual(['convivio.jpg:true']))
   })
 })
