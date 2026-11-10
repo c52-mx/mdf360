@@ -6,7 +6,7 @@ import { ToastProvider } from '@/design-system'
 import { GrupoPage } from './grupo-page'
 import type { GrupoDetalle } from './types'
 
-vi.mock('@/features/tablero/tablero-panel', () => ({ TableroPanel: () => null }))
+vi.mock('@/features/muro/muro-feed', () => ({ MuroFeed: () => null }))
 vi.mock('@/features/peticiones/peticiones-panel', () => ({ PeticionesPanel: () => null }))
 
 const json = (status: number, body: unknown) =>
@@ -121,7 +121,7 @@ describe('GrupoPage', () => {
     expect(screen.getByText('Fuera de tiempo')).toBeInTheDocument()
   })
 
-  it('pone primero el tablero y al final la zona de riesgo', async () => {
+  it('pone al final la zona de riesgo', async () => {
     montar()
     await screen.findByRole('heading', { name: 'Integrantes' })
     const zona = screen.getByRole('region', { name: 'Zona de riesgo' })

@@ -308,4 +308,46 @@ describe('MuroFeed', () => {
     fireEvent.click(boton)
     await waitFor(() => expect(subidas).toEqual(['convivio.jpg:true']))
   })
+  it('en la página de un ministerio pide solo lo de ese lugar y publica directo ahí', async () => {
+    const urls: string[] = []
+    const post = vi.fn()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        urls.push(url)
+        if (url.includes('/csrf/')) return json(200, { csrfToken: 'x' })
+        if (url === '/api/muro/destinos/')
+          return json(200, [
+            { tipo: 'iglesia', id: 1, etiqueta: 'Toda la iglesia' },
+            { tipo: 'unidad', id: 4, etiqueta: 'Cafetería' },
+          ])
+        if (url === '/api/muro/' && init?.method === 'POST') {
+          post(init.body)
+          return json(201, publicacion)
+        }
+        if (url.startsWith('/api/muro/?'))
+          return json(200, { fijadas: [], resultados: [], siguiente: null })
+        return json(404, {})
+      }),
+    )
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MuroFeed audiencia={{ tipo: 'unidad', id: 4 }} />
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByText('Se publicará en Cafetería.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Toda la iglesia' })).toBeNull()
+    expect(urls).toContain('/api/muro/?audiencia_tipo=unidad&audiencia_id=4')
+    fireEvent.change(screen.getByLabelText('¿Qué quieres compartir?'), {
+      target: { value: 'Turno del domingo' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Publicar' }))
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith(
+        JSON.stringify({ texto: 'Turno del domingo', destinos: [{ tipo: 'unidad', id: 4 }] }),
+      ),
+    )
+  })
 })

@@ -4,7 +4,7 @@ import { Alert, Button, Card, CardTitle, CheckboxField, TextareaField } from '@/
 import { api, apiForm } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { CLAVE_MURO } from './acciones-publicacion'
-import { MAX_FOTOS, type Destino, type Publicacion } from './types'
+import { MAX_FOTOS, type AudienciaFija, type Destino, type Publicacion } from './types'
 
 const clave = (d: Destino) => `${d.tipo}:${d.id}`
 
@@ -12,7 +12,7 @@ const clave = (d: Destino) => `${d.tipo}:${d.id}`
  * Compositor del muro. Solo aparece si la persona puede publicar en alguna audiencia; el servidor
  * vuelve a comprobarlo al publicar. Se elige a quién va dirigida (una o varias).
  */
-export function NuevaPublicacion() {
+export function NuevaPublicacion({ audiencia }: { audiencia?: AudienciaFija }) {
   const queryClient = useQueryClient()
   const [texto, setTexto] = useState('')
   const [elegidas, setElegidas] = useState<string[]>([])
@@ -24,13 +24,12 @@ export function NuevaPublicacion() {
   })
   const publicar = useMutation({
     mutationFn: async () => {
+      const dirigidas = audiencia ? lista : lista.filter((d) => elegidas.includes(clave(d)))
       const creada = await api<Publicacion>('/api/muro/', {
         method: 'POST',
         body: {
           texto,
-          destinos: (destinos.data ?? [])
-            .filter((d) => elegidas.includes(clave(d)))
-            .map(({ tipo, id }) => ({ tipo, id })),
+          destinos: dirigidas.map(({ tipo, id }) => ({ tipo, id })),
         },
       })
       // Las fotos se suben una por una a la publicación ya creada
@@ -60,7 +59,10 @@ export function NuevaPublicacion() {
     },
   })
 
-  const lista = destinos.data ?? []
+  // En la página de un grupo o ministerio solo se publica ahí: la audiencia ya viene elegida
+  const lista = (destinos.data ?? []).filter(
+    (d) => !audiencia || (d.tipo === audiencia.tipo && d.id === audiencia.id),
+  )
   if (lista.length === 0) return null
 
   const alternar = (d: Destino) =>
@@ -83,30 +85,34 @@ export function NuevaPublicacion() {
           onChange={(e) => setTexto(e.target.value)}
           hint={`${texto.length}/2000`}
         />
-        <fieldset className="flex flex-col gap-2">
-          <legend className="font-semibold">Dirigida a</legend>
-          <div className="flex flex-wrap gap-2">
-            {lista.map((d) => {
-              const activa = elegidas.includes(clave(d))
-              return (
-                <button
-                  key={clave(d)}
-                  type="button"
-                  aria-pressed={activa}
-                  onClick={() => alternar(d)}
-                  className={cn(
-                    'presionable flex h-11 items-center rounded-full border px-4 text-sm font-semibold',
-                    activa
-                      ? 'border-primary bg-primary-soft text-primary'
-                      : 'border-border text-muted-foreground hover:bg-muted',
-                  )}
-                >
-                  {d.etiqueta}
-                </button>
-              )
-            })}
-          </div>
-        </fieldset>
+        {audiencia ? (
+          <p className="text-sm text-muted-foreground">Se publicará en {lista[0].etiqueta}.</p>
+        ) : (
+          <fieldset className="flex flex-col gap-2">
+            <legend className="font-semibold">Dirigida a</legend>
+            <div className="flex flex-wrap gap-2">
+              {lista.map((d) => {
+                const activa = elegidas.includes(clave(d))
+                return (
+                  <button
+                    key={clave(d)}
+                    type="button"
+                    aria-pressed={activa}
+                    onClick={() => alternar(d)}
+                    className={cn(
+                      'presionable flex h-11 items-center rounded-full border px-4 text-sm font-semibold',
+                      activa
+                        ? 'border-primary bg-primary-soft text-primary'
+                        : 'border-border text-muted-foreground hover:bg-muted',
+                    )}
+                  >
+                    {d.etiqueta}
+                  </button>
+                )
+              })}
+            </div>
+          </fieldset>
+        )}
         <div className="flex flex-col gap-2">
           <label className="presionable flex h-11 w-fit cursor-pointer items-center rounded-full border border-border px-4 text-sm font-semibold text-muted-foreground hover:bg-muted">
             Agregar fotos
@@ -155,7 +161,7 @@ export function NuevaPublicacion() {
           disabled={
             publicar.isPending ||
             !texto.trim() ||
-            elegidas.length === 0 ||
+            (!audiencia && elegidas.length === 0) ||
             (fotos.length > 0 && !permiso)
           }
         >

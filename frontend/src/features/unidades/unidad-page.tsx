@@ -17,7 +17,7 @@ import {
   useToast,
 } from '@/design-system'
 import { opcionesDeRol, useRolesEquipo } from '@/features/equipos/use-roles-equipo'
-import { TableroPanel } from '@/features/tablero/tablero-panel'
+import { MuroFeed } from '@/features/muro/muro-feed'
 import { api } from '@/lib/api'
 import { EnlaceUnidadCard } from './enlace-unidad-card'
 import { ComunidadUnidad } from './comunidad-unidad'
@@ -224,9 +224,7 @@ export function UnidadPage() {
 
     </>
   )
-  const muro = (
-    <TableroPanel origenTipo="unidad" origenId={u.id} puedePublicar={u.puede_gestionar} />
-  )
+  const muro = <MuroFeed audiencia={{ tipo: 'unidad', id: u.id }} />
 
   return (
     <div className="flex flex-col gap-6">
@@ -246,7 +244,7 @@ export function UnidadPage() {
               ? [{ id: 'panel', titulo: 'Panel', contenido: <PanelUnidadCard unidadId={u.id} /> }]
               : []),
             { id: 'equipo', titulo: 'Equipo', contenido: <div className="flex flex-col gap-6">{equipo}</div> },
-            { id: 'muro', titulo: 'Mensajes', contenido: muro },
+            { id: 'muro', titulo: 'Muro', contenido: muro },
             { id: 'servidor', titulo: 'Vista del servidor', contenido: <ComunidadUnidad unidad={u} /> },
           ]}
         />
