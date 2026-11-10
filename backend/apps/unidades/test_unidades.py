@@ -6,6 +6,7 @@ from django.core.cache import cache
 from apps.accounts.models import AsignacionRol, Rol, User
 from apps.core.models import AuditEvent
 from apps.grupos.models import Grupo, GrupoMiembro
+from apps.muro.models import Audiencia, Publicacion
 from apps.notificaciones import push
 from apps.personas import services as personas
 from apps.tablero.models import Mensaje
@@ -363,14 +364,14 @@ def test_el_panel_lo_ven_los_roles_superiores_y_no_quien_solo_sirve(mundo):
 
 def test_el_panel_cuenta_gente_mensajes_y_peticiones_sin_leerlas(mundo):
     caf = mundo["cafeteria"]
-    Mensaje.objects.create(
-        origen_tipo="unidad", origen_id=caf.pk, origen_etiqueta="Ministerio · Cafetería",
-        autor=mundo["encargada"], autor_nombre="Eva", texto="Hola equipo",
-    )  # fmt: skip
-    Mensaje.objects.create(
-        origen_tipo="unidad", origen_id=caf.pk, origen_etiqueta="x", autor_nombre="Eva",
-        texto="Borrado", eliminado=True,
-    )  # fmt: skip
+    hola = Publicacion.objects.create(
+        autor=mundo["encargada"], autor_nombre="Eva", texto="Hola equipo"
+    )
+    Audiencia.objects.create(publicacion=hola, tipo="unidad", ref_id=caf.pk, etiqueta="Cafetería")
+    borrada = Publicacion.objects.create(autor_nombre="Eva", texto="Borrada", eliminada=True)
+    Audiencia.objects.create(
+        publicacion=borrada, tipo="unidad", ref_id=caf.pk, etiqueta="Cafetería"
+    )
     salio = UnidadMiembro.objects.get(unidad=caf, persona=mundo["servidor"].persona)
     salio.activo = False
     salio.save()
