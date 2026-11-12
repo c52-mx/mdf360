@@ -87,7 +87,7 @@
   h2,
   h3 {
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: 500;
   }
   /* Tracking según el tamaño: el texto grande pide letras más juntas; el cuerpo, normal. */
   h1 {

@@ -1,4 +1,5 @@
 import {
+  ChevronRight,
   Coins,
   HandHeart,
   UserCog,
@@ -7,7 +8,8 @@ import {
   UsersRound,
   type LucideIcon,
 } from 'lucide-react'
-import { Card, CardDescription, CardLink, CardTitle, PageHeader } from '@/design-system'
+import { Link } from 'react-router-dom'
+import { Card, CardDescription, CardTitle, PageHeader } from '@/design-system'
 import { useAuth } from '@/features/auth/use-auth'
 import { ResumenGrupos } from '@/features/grupos/dashboard-page'
 import { MuroFeed } from '@/features/muro/muro-feed'
@@ -29,51 +31,57 @@ export function HomePage() {
   const supervisa = !!user?.roles.some((r) => ROLES_DE_SUPERVISION.includes(r))
 
   const accesos: Acceso[] = [
-    { to: '/grupos', titulo: 'Grupos', detalle: 'Pasar lista, estudio y reuniones.', icono: UsersRound },
-    { to: '/peticiones', titulo: 'Peticiones', detalle: 'Motivos de oración.', icono: HandHeart },
+    { to: '/grupos', titulo: 'Grupos', detalle: 'Pasar lista, estudio y reuniones', icono: UsersRound },
+    { to: '/peticiones', titulo: 'Peticiones', detalle: 'Motivos de oración', icono: HandHeart },
     ...(can('ofrendas.acceso')
-      ? [{ to: '/ofrendas', titulo: 'Ofrendas', detalle: 'Registro y aval.', icono: Coins }]
+      ? [{ to: '/ofrendas', titulo: 'Ofrendas', detalle: 'Registro y aval', icono: Coins }]
       : []),
     ...(can('personas.crear')
       ? [
           {
             to: '/personas/nueva',
             titulo: 'Registrar contacto',
-            detalle: 'Alta rápida de una persona.',
+            detalle: 'Alta rápida de una persona',
             icono: UserPlus,
           },
         ]
       : []),
     ...(can('personas.ver')
-      ? [{ to: '/personas', titulo: 'Personas', detalle: 'Expedientes y procesos.', icono: Users }]
+      ? [{ to: '/personas', titulo: 'Personas', detalle: 'Expedientes y procesos', icono: Users }]
       : []),
-    { to: '/cuenta', titulo: 'Mi cuenta', detalle: 'Tu número, tu PIN y el color.', icono: UserCog },
+    { to: '/cuenta', titulo: 'Mi cuenta', detalle: 'Tu número, tu PIN y el color', icono: UserCog },
   ]
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title={user ? `Hola, ${user.nombre.split(' ')[0]}` : 'Bienvenido a MDF360'}
-        description="Mundo de Fe México: tu comunidad, tus grupos y tu servicio."
+        description="Mundo de Fe México: tu comunidad, tus grupos y tu servicio"
         module="admin"
       />
       <InvitacionAvisos />
       <MuroFeed />
       <section aria-label="Accesos rápidos" className="flex flex-col gap-3">
         <h2 className="text-xl">Accesos rápidos</h2>
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {accesos.map(({ to, titulo, detalle, icono: Icono }) => (
-            <li key={to}>
-              <CardLink to={to} className="flex h-full items-center gap-4">
-                <Icono aria-hidden className="size-8 shrink-0 text-primary" />
-                <span className="flex flex-col">
-                  <span className="font-bold">{titulo}</span>
-                  <span className="text-sm text-muted-foreground">{detalle}</span>
-                </span>
-              </CardLink>
-            </li>
-          ))}
-        </ul>
+        <Card className="p-0">
+          <ul className="divide-y divide-border">
+            {accesos.map(({ to, titulo, detalle, icono: Icono }) => (
+              <li key={to}>
+                <Link
+                  to={to}
+                  className="presionable flex min-h-16 items-center gap-4 px-4 py-2 hover:bg-primary-soft"
+                >
+                  <Icono aria-hidden className="size-6 shrink-0 text-muted-foreground" />
+                  <span className="flex flex-col">
+                    <span className="font-medium">{titulo}</span>
+                    <span className="text-sm text-muted-foreground">{detalle}</span>
+                  </span>
+                  <ChevronRight aria-hidden className="ml-auto size-5 shrink-0 text-muted-foreground" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
       </section>
       {supervisa ? (
         <section aria-label="Resumen de grupos">
