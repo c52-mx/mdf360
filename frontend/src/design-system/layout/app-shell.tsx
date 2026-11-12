@@ -1,20 +1,12 @@
 import { Ellipsis, LogOut, PanelLeftClose, PanelLeftOpen, X, type LucideIcon } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { moduleText, type ModuleKey } from './module'
+import type { ModuleKey } from './module'
 import { cn } from '@/lib/cn'
 
 /** Ícono del menú: siempre el glifo real; los módulos lo llevan en una pastilla con su color. */
-function NavIcon({ icon: Icon, module }: { icon: LucideIcon; module?: ModuleKey }) {
-  if (!module) return <Icon aria-hidden className="size-6 shrink-0" />
-  return (
-    <span
-      aria-hidden
-      className="flex size-8 shrink-0 items-center justify-center rounded-control bg-card ring-1 ring-border"
-    >
-      <Icon className={cn('size-5', moduleText[module])} />
-    </span>
-  )
+function NavIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return <Icon aria-hidden className="size-6 shrink-0 opacity-70" />
 }
 
 export interface NavItem {
@@ -66,7 +58,7 @@ function SelectorEspacio({ espacios, oscuro }: { espacios: EspacioItem[]; oscuro
           to={e.to}
           aria-current={e.activo ? 'page' : undefined}
           className={cn(
-            'presionable flex h-11 shrink-0 items-center rounded-full px-4 text-sm font-bold',
+            'presionable flex h-11 shrink-0 items-center rounded-full px-4 text-sm font-medium',
             e.activo
               ? 'bg-primary text-primary-foreground'
               : oscuro
@@ -139,7 +131,7 @@ export function AppShell({ nav, espacios, children, userName, onLogout }: AppShe
   const claseBarra = (activo: boolean) =>
     cn(
       'presionable flex h-16 flex-1 flex-col items-center justify-center gap-0.5 text-xs',
-      activo ? 'font-bold text-primary' : 'text-muted-foreground',
+      activo ? 'font-medium text-primary' : 'text-muted-foreground',
     )
 
   return (
@@ -161,23 +153,23 @@ export function AppShell({ nav, espacios, children, userName, onLogout }: AppShe
             {agrupar(nav).map((bloque, i) => (
               <div key={bloque.group ?? `bloque-${i}`} className="flex flex-col gap-1">
                 {bloque.group ? (
-                  <p className="mt-3 px-3 text-xs font-bold uppercase tracking-wide text-background/60">
+                  <p className="mt-4 px-3 text-sm font-medium text-background/60">
                     {bloque.group}
                   </p>
                 ) : null}
-                {bloque.items.map(({ to, label, icon: Icon, module }) => (
+                {bloque.items.map(({ to, label, icon: Icon }) => (
                   <NavLink
                     key={to}
                     to={to}
                     end={to === '/'}
                     className={({ isActive }) =>
                       cn(
-                        'presionable flex h-12 items-center gap-3 rounded-control px-3 font-semibold',
+                        'presionable flex h-12 items-center gap-3 rounded-control px-3 font-medium',
                         isActive ? 'bg-muted-foreground/40' : 'hover:bg-muted-foreground/25',
                       )
                     }
                   >
-                    <NavIcon icon={Icon} module={module} />
+                    <NavIcon icon={Icon} />
                     {label}
                   </NavLink>
                 ))}
@@ -275,11 +267,11 @@ export function AppShell({ nav, espacios, children, userName, onLogout }: AppShe
             {agrupar(resto).map((bloque, i) => (
               <div key={bloque.group ?? `resto-${i}`} className="flex flex-col">
                 {bloque.group ? (
-                  <p className="mt-2 px-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                  <p className="mt-2 px-3 text-sm font-medium text-muted-foreground">
                     {bloque.group}
                   </p>
                 ) : null}
-                {bloque.items.map(({ to, label, icon: Icon, module }) => (
+                {bloque.items.map(({ to, label, icon: Icon }) => (
                   <NavLink
                     key={to}
                     to={to}
@@ -287,12 +279,12 @@ export function AppShell({ nav, espacios, children, userName, onLogout }: AppShe
                     onClick={cerrarMas}
                     className={({ isActive }) =>
                       cn(
-                        'presionable flex h-14 items-center gap-3 rounded-control px-3 text-lg font-semibold',
+                        'presionable flex h-14 items-center gap-3 rounded-control px-3 text-lg font-medium',
                         isActive ? 'bg-primary-soft text-primary' : 'hover:bg-muted',
                       )
                     }
                   >
-                    <NavIcon icon={Icon} module={module} />
+                    <NavIcon icon={Icon} />
                     {label}
                   </NavLink>
                 ))}

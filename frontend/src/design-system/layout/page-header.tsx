@@ -14,7 +14,7 @@ export function PageHeader({ title, description, module, actions }: PageHeaderPr
   return (
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-3">
-        {module ? <span aria-hidden className={cn('h-9 w-3 rounded', moduleBg[module])} /> : null}
+        {module ? <span aria-hidden className={cn('size-3 rounded-full', moduleBg[module])} /> : null}
         <div>
           <h1 className="text-2xl leading-tight">{title}</h1>
           {description ? <p className="text-muted-foreground">{description}</p> : null}

@@ -4,11 +4,11 @@ import type { ButtonHTMLAttributes } from 'react'
 import { cn } from '@/lib/cn'
 
 const buttonVariants = cva(
-  'presionable inline-flex items-center justify-center gap-2 rounded-control font-bold disabled:pointer-events-none disabled:opacity-50',
+  'presionable inline-flex items-center justify-center gap-2 rounded-control font-medium disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
-        primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        primary: 'font-semibold bg-primary text-primary-foreground hover:bg-primary/90',
         outline: 'border-2 border-primary bg-card text-primary hover:bg-primary-soft',
         success: 'bg-success text-success-foreground hover:bg-success/90',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
